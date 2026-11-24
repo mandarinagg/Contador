@@ -31,6 +31,9 @@ Contador/
 │   │   │   ├── identity/        usuarios, sesiones, roles   (models, schemas, service, router)
 │   │   │   ├── organizations/   organizaciones, membresías, RUC
 │   │   │   ├── audit/           auditoría encadenada, eventos de seguridad
+│   │   │   ├── finance/         finanzas (fase 2): contextos, cuentas, movimientos, importación
+│   │   │   │                    (models, schemas, service, transactions, imports, importing,
+│   │   │   │                     money, normalize, summary, suggested, router)
 │   │   │   └── system/          salud y configuración inicial
 │   │   ├── integrations/    (fase 5) adaptadores externos: billing/SIFEN, bancos
 │   │   ├── ai/              (fase 6) agentes y herramientas controladas
@@ -120,7 +123,9 @@ Definido en `frontend/src/styles/index.css` (tokens) y `frontend/src/components/
 | alembic | 1.20.1 | Migraciones versionadas |
 | psycopg[binary] | 3.3.9 | Driver PostgreSQL (wheels binarios, sin compilar) |
 | argon2-cffi | 25.1.0 | Hash de contraseñas Argon2id |
-| *dev:* pytest 9.2.0, httpx2 2.16.2, ruff 0.17.6, mypy 2.4.1 | | Pruebas, cliente de pruebas, lint, tipos estrictos |
+| openpyxl | 3.1.5 | Lectura de extractos XLSX (fase 2), en modo `read_only` y `data_only`: no evalúa fórmulas ni ejecuta macros |
+| python-multipart | 0.0.34 | Formularios `multipart/form-data` de FastAPI (subida de extractos) |
+| *dev:* pytest 9.2.0, httpx2 2.16.2, ruff 0.17.6, mypy 2.4.1, types-openpyxl 3.1.5.20261122 | | Pruebas, cliente de pruebas, lint, tipos estrictos (openpyxl no trae tipos propios: sin el paquete de tipos, `mypy --strict` falla) |
 
 ### Frontend (versiones exactas en `frontend/package.json`)
 | Paquete | Versión | Por qué |

@@ -8,7 +8,7 @@ from app.models import Base
 
 config = context.config
 target_metadata = Base.metadata
-SCHEMAS = {"core", "audit"}
+SCHEMAS = {"core", "audit", "finance"}
 
 
 def include_name(name: str | None, type_: str, parent_names: object) -> bool:

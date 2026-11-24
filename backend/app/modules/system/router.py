@@ -11,6 +11,7 @@ from app.core.errors import Conflict
 from app.core.permissions import Role
 from app.core.security import hash_password
 from app.modules.audit import service as audit
+from app.modules.finance import service as finance
 from app.modules.identity import service as identity
 from app.modules.identity.models import User
 from app.modules.identity.schemas import (
@@ -94,6 +95,8 @@ def run_setup(body: SetupRequest, request: Request, db: DbSession) -> LoginRespo
     db.flush()
     member = OrganizationMember(organization_id=org.id, user_id=user.id, role_code=Role.OWNER)
     db.add(member)
+    # Contexto financiero empresarial (D-023), en la misma transacción que la organización.
+    finance.create_business_context(db, org.id)
     db.flush()
     audit.record(
         db,

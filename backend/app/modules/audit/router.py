@@ -59,6 +59,7 @@ def list_logs(
     rows = service.list_logs(
         db,
         auth.organization_id,
+        viewer_user_id=auth.user_id,
         limit=limit,
         before_seq=before_seq,
         entity_type=entity_type,

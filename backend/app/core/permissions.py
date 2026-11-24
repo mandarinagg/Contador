@@ -2,7 +2,8 @@
 
 Fuente de verdad del código. La migración 0001 los carga en `core.permissions`,
 `core.roles` y `core.role_permissions`; cada módulo nuevo agrega los suyos con una
-migración y una prueba verifica que la base y este catálogo coincidan.
+migración (p. ej. `finance.*` en la 0002) y una prueba verifica que la base y este
+catálogo coincidan.
 """
 
 from enum import StrEnum
@@ -14,6 +15,9 @@ class Perm(StrEnum):
     USERS_READ = "users.read"
     USERS_MANAGE = "users.manage"
     AUDIT_READ = "audit.read"
+    # Finanzas (fase 2). Aplican al contexto empresarial; el personal es solo de su dueño.
+    FINANCE_READ = "finance.read"
+    FINANCE_MANAGE = "finance.manage"
 
 
 PERMISSION_DESCRIPTIONS: dict[Perm, str] = {
@@ -22,6 +26,8 @@ PERMISSION_DESCRIPTIONS: dict[Perm, str] = {
     Perm.USERS_READ: "Ver los usuarios de la organización",
     Perm.USERS_MANAGE: "Crear usuarios, cambiar roles y desactivarlos",
     Perm.AUDIT_READ: "Consultar la auditoría y los eventos de seguridad",
+    Perm.FINANCE_READ: "Ver las finanzas de la empresa (cuentas, movimientos y resúmenes)",
+    Perm.FINANCE_MANAGE: "Cargar, editar, anular e importar movimientos de la empresa",
 }
 
 
@@ -42,6 +48,14 @@ ROLE_INFO: dict[Role, tuple[str, str]] = {
 ROLE_PERMISSIONS: dict[Role, frozenset[Perm]] = {
     Role.OWNER: frozenset(Perm),
     Role.ADMIN: frozenset(Perm),
-    Role.ACCOUNTANT: frozenset({Perm.ORGANIZATION_READ, Perm.USERS_READ, Perm.AUDIT_READ}),
-    Role.VIEWER: frozenset({Perm.ORGANIZATION_READ}),
+    Role.ACCOUNTANT: frozenset(
+        {
+            Perm.ORGANIZATION_READ,
+            Perm.USERS_READ,
+            Perm.AUDIT_READ,
+            Perm.FINANCE_READ,
+            Perm.FINANCE_MANAGE,
+        }
+    ),
+    Role.VIEWER: frozenset({Perm.ORGANIZATION_READ, Perm.FINANCE_READ}),
 }

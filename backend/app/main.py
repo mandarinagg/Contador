@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.core.errors import install_error_handlers
 from app.core.logging import configure_logging, request_id_var
 from app.modules.audit.router import router as audit_router
+from app.modules.finance.router import router as finance_router
 from app.modules.identity.router import auth_router, users_router
 from app.modules.organizations.router import router as organization_router
 from app.modules.system.router import router as system_router
@@ -74,7 +75,14 @@ def create_app() -> FastAPI:
         return response
 
     api = APIRouter(prefix="/api/v1")
-    for router in (system_router, auth_router, users_router, organization_router, audit_router):
+    for router in (
+        system_router,
+        auth_router,
+        users_router,
+        organization_router,
+        audit_router,
+        finance_router,
+    ):
         api.include_router(router)
     app.include_router(api)
     return app
