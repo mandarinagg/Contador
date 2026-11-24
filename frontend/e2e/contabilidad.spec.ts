@@ -60,11 +60,11 @@ test('plan de cuentas: se carga el propuesto y avisa que no está validado', asy
   await expect(page.getByText('Todavía no hay plan de cuentas')).toBeVisible()
   await expect(page.getByText(/RG N° 49\/2014/).first()).toBeVisible()
   await page.getByRole('button', { name: 'Cargar el plan propuesto' }).click()
-  await toast(page, 'Plan propuesto cargado: 159 cuentas, sin validar.')
+  await toast(page, 'Plan propuesto cargado: 173 cuentas, sin validar.')
 
   // El estado del plan siempre a la vista.
   await expect(page.getByText('Plan de cuentas sin validar por un contador').first()).toBeVisible()
-  await expect(page.getByText('159 cuentas, 110 imputables')).toBeVisible()
+  await expect(page.getByText('173 cuentas, 122 imputables')).toBeVisible()
 
   // Búsqueda por código.
   await page.getByPlaceholder('Buscar por código o nombre').fill('1.01.01.04.01')

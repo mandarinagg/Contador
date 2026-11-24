@@ -563,7 +563,7 @@ export function ChartPage() {
               )
             }
           >
-            El plan propuesto tiene 159 cuentas con los códigos y nombres del modelo de estados financieros de la RG N° 49/2014 de la DNIT, más
+            El plan propuesto tiene 173 cuentas con los códigos y nombres del modelo de estados financieros de la RG N° 49/2014 de la DNIT, más
             algunas subcuentas habituales. Es una propuesta: queda «sin validar» hasta que tu contador la revise. Después podés agregar, renombrar o
             archivar cuentas.
           </EmptyState>
