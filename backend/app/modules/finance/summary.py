@@ -7,19 +7,25 @@
   positivo; neto = ingreso - gasto.
 - Lo consolidado va siempre **por contexto identificado**: no existe un total que mezcle
   la empresa y lo personal.
+
+Rendimiento (D-033): saldos, flujo mensual y gasto por categoría salen de **una sola
+pasada** sobre los movimientos del contexto (una consulta agrupada por cuenta, mes,
+categoría y signo, con una sola suma), no de tres. Las filas que solo cuentan para el
+saldo (anteriores al período o transferencias) se agrupan por cuenta y nada más; el resto
+se reparte por mes y categoría. Sin cachés ni saldos precalculados: cada pedido lee los
+movimientos reales.
 """
 
 import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import DateTime, and_, case, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.modules.finance import service as fs
 from app.modules.finance.models import Account, Category, FinancialContext, Transaction
 
 ZERO = Decimal(0)
@@ -61,77 +67,122 @@ class ContextSummary:
     )
 
 
-def _flow_filters(context_id: uuid.UUID, date_from: date, date_to: date) -> list[object]:
-    return [
-        Transaction.context_id == context_id,
-        Transaction.voided_at.is_(None),
-        Transaction.transfer_group_id.is_(None),
-        Transaction.booked_on >= date_from,
-        Transaction.booked_on <= date_to,
-    ]
+@dataclass
+class _Aggregates:
+    """Resultado de la pasada única, ya repartido por moneda."""
+
+    balance_sums: dict[uuid.UUID, Decimal]
+    by_month: dict[tuple[str, str], Flow]
+    expenses: dict[tuple[str, uuid.UUID | None], Decimal]
 
 
-def _account_balances(
-    db: Session, ctx: FinancialContext, date_to: date
-) -> list[tuple[Account, Decimal]]:
-    accounts = list(
+def _aggregate(
+    db: Session,
+    ctx: FinancialContext,
+    accounts: list[Account],
+    date_from: date,
+    date_to: date,
+    *,
+    by_category: bool,
+) -> _Aggregates:
+    """Una consulta para saldos, ingresos/gastos por mes y gasto por categoría.
+
+    Se lee todo movimiento no anulado hasta `date_to` y se agrupa por
+    (cuenta, mes, categoría, signo) con **una sola suma**. Las columnas `mes`, `categoría`
+    y `signo` valen NULL cuando la fila no cuenta como flujo (anterior a `date_from` o
+    transferencia); la categoría solo se informa en los gastos. Esas filas aportan
+    únicamente al saldo; el resto, además, a ingresos (signo positivo) o gastos (negativo).
+
+    La moneda se toma de la cuenta: la clave foránea compuesta (cuenta, contexto, moneda)
+    garantiza que es la del movimiento (D-025).
+    """
+    in_flow = and_(Transaction.transfer_group_id.is_(None), Transaction.booked_on >= date_from)
+    month = case(
+        (in_flow, func.date_trunc("month", cast(Transaction.booked_on, DateTime))),
+    ).label("month")
+    positive = case((in_flow, Transaction.amount > 0)).label("positive")
+    columns = [Transaction.account_id, month]
+    if by_category:
+        columns.append(
+            case((and_(in_flow, Transaction.amount < 0), Transaction.category_id)).label(
+                "category_id"
+            )
+        )
+    columns.append(positive)
+    query = (
+        select(*columns, func.sum(Transaction.amount))
+        .where(
+            Transaction.context_id == ctx.id,
+            Transaction.voided_at.is_(None),
+            Transaction.booked_on <= date_to,
+        )
+        .group_by(*columns)
+    )
+    currency_of = {a.id: a.currency for a in accounts}
+    balance_sums: dict[uuid.UUID, Decimal] = defaultdict(Decimal)
+    by_month: dict[tuple[str, str], Flow] = {}
+    expenses: dict[tuple[str, uuid.UUID | None], Decimal] = defaultdict(Decimal)
+    for row in db.execute(query):
+        # Orden de columnas: cuenta, mes, [categoría,] signo, suma.
+        account_id, month_start, is_positive, total = row[0], row[1], row[-2], row[-1]
+        balance_sums[account_id] += total
+        if month_start is None:
+            continue
+        currency = currency_of[account_id]
+        flow = by_month.setdefault((currency, _month_label(month_start)), Flow())
+        if is_positive:
+            flow.income += total
+        else:
+            flow.expense -= total
+            if by_category:
+                expenses[(currency, row[2])] -= total
+    return _Aggregates(
+        balance_sums=dict(balance_sums),
+        by_month=dict(sorted(by_month.items())),
+        expenses=dict(expenses),
+    )
+
+
+def _month_label(month_start: datetime) -> str:
+    return f"{month_start.year:04d}-{month_start.month:02d}"
+
+
+def _accounts(db: Session, ctx: FinancialContext) -> list[Account]:
+    return list(
         db.scalars(select(Account).where(Account.context_id == ctx.id).order_by(Account.name))
     )
-    sums = fs.balances(db, ctx.id, until=date_to)
+
+
+def _with_balances(
+    accounts: list[Account], sums: dict[uuid.UUID, Decimal]
+) -> list[tuple[Account, Decimal]]:
     return [(a, a.opening_balance + sums.get(a.id, ZERO)) for a in accounts]
 
 
-def _monthly_flows(
-    db: Session, ctx: FinancialContext, date_from: date, date_to: date
-) -> dict[tuple[str, str], Flow]:
-    month = func.to_char(Transaction.booked_on, "YYYY-MM")
-    query = (
-        select(
-            Transaction.currency,
-            month,
-            func.coalesce(func.sum(Transaction.amount).filter(Transaction.amount > 0), ZERO),
-            func.coalesce(func.sum(-Transaction.amount).filter(Transaction.amount < 0), ZERO),
-        )
-        .where(*_flow_filters(ctx.id, date_from, date_to))  # type: ignore[arg-type]
-        .group_by(Transaction.currency, month)
-        .order_by(Transaction.currency, month)
-    )
-    return {
-        (currency, label): Flow(income=income, expense=expense)
-        for currency, label, income, expense in db.execute(query)
-    }
-
-
 def summarize(db: Session, ctx: FinancialContext, date_from: date, date_to: date) -> ContextSummary:
-    by_month = _monthly_flows(db, ctx, date_from, date_to)
+    accounts = _accounts(db, ctx)
+    agg = _aggregate(db, ctx, accounts, date_from, date_to, by_category=True)
     totals: dict[str, Flow] = defaultdict(Flow)
-    for (currency, _), flow in by_month.items():
+    for (currency, _), flow in agg.by_month.items():
         totals[currency].income += flow.income
         totals[currency].expense += flow.expense
 
-    expense_query = (
-        select(Transaction.currency, Transaction.category_id, func.sum(-Transaction.amount))
-        .where(
-            *_flow_filters(ctx.id, date_from, date_to),  # type: ignore[arg-type]
-            Transaction.amount < 0,
-        )
-        .group_by(Transaction.currency, Transaction.category_id)
-    )
-    expense_rows = list(db.execute(expense_query))
-    category_ids = [cid for _, cid, _ in expense_rows if cid is not None]
-    category_names = select(Category.id, Category.name).where(Category.id.in_(category_ids))
-    names = {cid: name for cid, name in db.execute(category_names)}
+    category_ids = [cid for _, cid in agg.expenses if cid is not None]
+    names: dict[uuid.UUID, str] = {}
+    if category_ids:
+        category_names = select(Category.id, Category.name).where(Category.id.in_(category_ids))
+        names = {cid: name for cid, name in db.execute(category_names)}
     expenses = sorted(
         (
             (currency, cid, names.get(cid, "Sin categoría") if cid else "Sin categoría", amount)
-            for currency, cid, amount in expense_rows
+            for (currency, cid), amount in agg.expenses.items()
         ),
         key=lambda item: (item[0], -item[3], item[2]),
     )
     return ContextSummary(
-        balances=_account_balances(db, ctx, date_to),
+        balances=_with_balances(accounts, agg.balance_sums),
         totals=dict(sorted(totals.items())),
-        by_month=by_month,
+        by_month=agg.by_month,
         expenses_by_category=expenses,
     )
 
@@ -146,11 +197,13 @@ def context_totals(
     db: Session, ctx: FinancialContext, date_from: date, date_to: date
 ) -> dict[str, ContextTotals]:
     """Totales por moneda de un contexto (para el consolidado)."""
+    accounts = _accounts(db, ctx)
+    agg = _aggregate(db, ctx, accounts, date_from, date_to, by_category=False)
     result: dict[str, ContextTotals] = {}
-    for account, balance in _account_balances(db, ctx, date_to):
+    for account, balance in _with_balances(accounts, agg.balance_sums):
         entry = result.setdefault(account.currency, ContextTotals(flow=Flow(), balance=ZERO))
         entry.balance += balance
-    for (currency, _), flow in _monthly_flows(db, ctx, date_from, date_to).items():
+    for (currency, _), flow in agg.by_month.items():
         entry = result.setdefault(currency, ContextTotals(flow=Flow(), balance=ZERO))
         entry.flow.income += flow.income
         entry.flow.expense += flow.expense

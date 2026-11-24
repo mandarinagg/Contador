@@ -245,6 +245,34 @@ erDiagram
 | `ix_transactions_context_booked` | `(context_id, booked_on DESC, id DESC)`: listado paginado |
 | `ix_transactions_account_dedupe` | `(account_id, dedupe_key)` **no único**: el duplicado se señala, no se prohíbe |
 
+### Rendimiento del resumen (índices evaluados, D-033)
+Requisito: con 100.000 movimientos, `GET /transactions` (primera página) y `GET /summary` de 12 meses responden en < 300 ms (objetivo de margen: resumen < 120 ms con la máquina libre). **No hay migración `0003`: no se agregaron índices**, porque ninguno dio una mejora medible. Lo que cambió es la consulta (`app/modules/finance/summary.py`): una pasada en lugar de tres.
+
+| Consulta (base con `VACUUM ANALYZE`, máquina libre) | Plan | Tiempo de base |
+|---|---|---|
+| Listado, primera página | `Index Scan using ix_transactions_context_booked` + `LIMIT 50`; 53 buffers | 0,1-0,2 ms (el pedido completo, ~9 ms, es autenticación y serialización) |
+| Resumen **antes** | 3 consultas: `HashAggregate` sobre `Bitmap Heap Scan` por `ix_transactions_account_booked` para el flujo mensual con `to_char` (49.182 filas) y otro igual para el gasto por categoría (32.789 filas); `HashAggregate` sobre `Seq Scan` para los saldos (100.000 filas) | 36 + 16 + 25 ≈ 77 ms |
+| Resumen **después** | 1 consulta: `HashAggregate` (clave: cuenta, mes, categoría, signo; 50 grupos) sobre un único `Seq Scan` (100.000 filas) | ≈ 39 ms |
+
+Medianas del pedido HTTP completo (`bench`: base real y confirmada, sembrada como la prueba de rendimiento; 15-21 corridas tras calentar; "cargada" = 8 procesos al 100 % más otro agente trabajando en la misma máquina):
+
+| Estado | Listado | Resumen antes | Resumen después |
+|---|---|---|---|
+| Sin `VACUUM` (solo `ANALYZE`), máquina libre | 9 ms | 82 ms | 48 ms |
+| Con `VACUUM ANALYZE`, máquina libre | 9 ms | 76 ms | 45 ms |
+| Sin `VACUUM`, máquina cargada | 23-44 ms | 222-278 ms | 156-158 ms |
+| Con `VACUUM ANALYZE`, máquina cargada | 20-42 ms | 237-294 ms | 154-156 ms |
+| Dentro de la prueba `slow` (filas sin confirmar), máquina libre | 10 ms | 65-70 ms | 49-69 ms |
+| Dentro de la prueba `slow`, máquina cargada | — | 383-414 ms | 223-289 ms |
+
+El listado casi no depende de la base: lo que crece con la carga es el trabajo de Python (siete consultas pequeñas de sesión, permisos y contexto por pedido). Dentro de la prueba, el planificador elegía planes paralelos (`Parallel Seq Scan`) para las tres consultas antiguas, lo que oculta parte de la mejora con la máquina libre y no ayuda con la máquina cargada.
+
+Índices evaluados y **descartados** (medidos con `EXPLAIN (ANALYZE, BUFFERS)` y con el CPU del proceso de PostgreSQL, intercalando las variantes):
+- `(context_id, booked_on) INCLUDE (account_id, currency, amount, category_id, transfer_group_id) WHERE voided_at IS NULL` (8,7 MB por 100.000 filas): el planificador no lo elige por costo; forzado (`enable_seqscan = off`) con `VACUUM`, el solo-índice ganó ~15 % por reloj (47 contra 57 ms) y empató en CPU con filas anchas (≈ 116 contra ≈ 118 ms). Sin `VACUUM` no puede evitar leer el montón.
+- `(context_id, account_id, booked_on) INCLUDE (amount) WHERE voided_at IS NULL`: con `VACUUM` el planificador sí lo usa para los saldos (`GroupAggregate` sobre `Index Only Scan`, 16 ms contra 26 ms), pero separar saldos y flujo en dos subconsultas sumó lo mismo que la pasada única (37 contra 38 ms) y solo vale con `VACUUM`.
+- Agregados filtrados + `GROUPING SETS`: igual de rápido que las tres consultas (85 contra 87 ms) antes de simplificar; se eligió la agrupación por signo, que lleva una sola suma por fila.
+- Paralelismo forzado (`parallel_setup_cost = 0`): más lento con la máquina cargada, y en Windows lanzar procesos de trabajo es caro; no se fuerza. `jit` no se activa en estas consultas (costo ≪ 100.000).
+
 ### Datos iniciales (migración `0002`)
 Permisos `finance.read` (owner, admin, accountant, viewer) y `finance.manage` (owner, admin, accountant), y el contexto `business` ("Empresa") de cada organización existente. Los permisos se insertan con `ON CONFLICT DO NOTHING` porque la `0001` carga el catálogo vivo de `app/core/permissions.py` (en una base nueva ya los trae).
 
