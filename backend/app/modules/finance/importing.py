@@ -33,6 +33,35 @@ _ZIP_MAGIC = b"PK\x03\x04"
 
 ColumnName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
 
+# Hora al final de una fecha ("15/01/2026 10:23", "2026-01-15T10:23:05", "15/01/2026 10:23 p. m.").
+_TRAILING_TIME = re.compile(
+    r"^(?P<date>\S+?)[ T]+\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:\s*[ap]\.?\s*m\.?)?$", re.IGNORECASE
+)
+_TIME_DIRECTIVES = ("%H", "%I", "%M", "%S", "%p", "%X", "%c")
+# Fechas que Excel guarda como número de serie (celda sin formato de fecha): 1960 a 2099.
+_EXCEL_SERIAL_RANGE = (21916, 73050)
+_PLAIN_INTEGER_LIMIT = Decimal(10) ** 20
+
+# Moneda escrita junto al importe ("Gs. 1.500.000", "US$ 1,234.50", "1.500.000 Gs").
+_CURRENCY_MARKERS = {
+    "GS.": "PYG",
+    "GS": "PYG",
+    "₲": "PYG",
+    "PYG": "PYG",
+    "US$": "USD",
+    "U$S": "USD",
+    "U$": "USD",
+    "USD": "USD",
+    "R$": "BRL",
+    "BRL": "BRL",
+    "ARS": "ARS",
+    "€": "EUR",
+    "EUR": "EUR",
+}
+_MARKER = "|".join(re.escape(m) for m in sorted(_CURRENCY_MARKERS, key=len, reverse=True))
+_MARKER_PREFIX = re.compile(rf"^(?P<sign>[-+(]*)(?P<marker>{_MARKER})(?P<rest>.+)$", re.IGNORECASE)
+_MARKER_SUFFIX = re.compile(rf"^(?P<rest>.+?)(?P<marker>{_MARKER})(?P<sign>[-)]*)$", re.IGNORECASE)
+
 
 class _Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -180,10 +209,22 @@ def _cell_text(value: Any) -> str:
     if isinstance(value, bool):
         return "VERDADERO" if value else "FALSO"
     if isinstance(value, float):
-        # XLSX guarda los números como dobles: repr() da el decimal más corto que los
-        # representa (el mismo texto que muestra Excel), sin redondeos de punto flotante.
-        return repr(value)
+        return str(_excel_decimal(value))
     return str(value).strip()
+
+
+def _excel_decimal(value: float) -> Decimal:
+    """Decimal de un número de un XLSX tal como lo muestra Excel: 15 dígitos significativos.
+
+    Excel guarda dobles y muestra a lo sumo 15 dígitos: una celda calculada que vale
+    1234.5600000000001 se ve (y es) 1234,56. Así no aparecen decimales fantasma.
+    """
+    result = Decimal(format(value, ".15g"))
+    # Sin notación científica para los enteros (1e+15 → 1000000000000000). Valores enormes o no
+    # finitos quedan como están: check_amount los rechaza y el texto crudo no debe fallar.
+    if result.is_finite() and abs(result) < _PLAIN_INTEGER_LIMIT and result == result.to_integral():
+        return result.quantize(Decimal(1))
+    return result
 
 
 # --- Conversión de valores --------------------------------------------------------------
@@ -194,17 +235,57 @@ def parse_date(value: Any, fmt: str) -> date:
         return value.date()
     if isinstance(value, date):
         return value
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return _excel_serial_date(value)
     text = _cell_text(value)
     if not text:
         raise ValueError("Falta la fecha")
     try:
         return datetime.strptime(text, fmt).date()
     except ValueError:
-        raise ValueError(f"Fecha inválida: {text}") from None
+        pass
+    # Muchos bancos agregan la hora de la operación; si el formato no la pide, se ignora.
+    match = _TRAILING_TIME.match(text)
+    if match and not any(d in fmt for d in _TIME_DIRECTIVES):
+        try:
+            return datetime.strptime(match["date"], fmt).date()
+        except ValueError:
+            pass
+    raise ValueError(f"Fecha inválida: {text}")
 
 
-def parse_amount(value: Any, mapping: ImportMapping) -> Decimal | None:
-    """Importe de una celda. `None` si está vacía. Admite `1.234.567`, `1.234,50`, `-`, `( )`."""
+def _excel_serial_date(value: float) -> date:
+    """Fecha de una celda XLSX numérica (Excel guarda las fechas como días desde 1899-12-30)."""
+    from openpyxl.utils.datetime import from_excel
+
+    low, high = _EXCEL_SERIAL_RANGE
+    if not low <= value < high:
+        raise ValueError(f"Fecha inválida: {_cell_text(value)}")
+    converted = from_excel(value)
+    return converted.date() if isinstance(converted, datetime) else converted
+
+
+def _strip_currency(text: str, currency: str | None, original: str) -> str:
+    """Quita la moneda escrita junto al importe; si no es la de la cuenta, es un error."""
+    if currency is None:
+        return text
+    match = _MARKER_PREFIX.match(text) or _MARKER_SUFFIX.match(text)
+    if not match:
+        return text
+    written = _CURRENCY_MARKERS[match["marker"].upper()]
+    if written != currency:
+        raise ValueError(f"El importe está en {written} y la cuenta en {currency}: {original}")
+    if match.re is _MARKER_PREFIX:
+        return match["sign"] + match["rest"]
+    return match["rest"] + match["sign"]
+
+
+def parse_amount(value: Any, mapping: ImportMapping, currency: str | None = None) -> Decimal | None:
+    """Importe de una celda. `None` si está vacía. Admite `1.234.567`, `1.234,50`, `-`, `( )`.
+
+    Con `currency`, acepta además la moneda escrita junto al número (`Gs. 1.500.000`) si
+    coincide con la de la cuenta.
+    """
     if value is None:
         return None
     if isinstance(value, bool):
@@ -212,13 +293,14 @@ def parse_amount(value: Any, mapping: ImportMapping) -> Decimal | None:
     if isinstance(value, int):
         return Decimal(value)
     if isinstance(value, float):
-        return Decimal(repr(value))
+        return _excel_decimal(value)
     if isinstance(value, Decimal):
         return value
     original = str(value).strip()
     text = "".join(original.replace(chr(0xA0), " ").split())  # sin espacios (ni duros)
     if not text:
         return None
+    text = _strip_currency(text, currency, original)
     negative = False
     if text.startswith("(") and text.endswith(")"):
         negative, text = True, text[1:-1]
@@ -314,12 +396,12 @@ def _analyze(
 
     try:
         if "amount" in columns:
-            amount = parse_amount(_cell(values, columns["amount"]), mapping)
+            amount = parse_amount(_cell(values, columns["amount"]), mapping, currency)
             if amount is None:
                 raise ValueError("Falta el importe")
         else:
-            debit = parse_amount(_cell(values, columns["debit"]), mapping)
-            credit = parse_amount(_cell(values, columns["credit"]), mapping)
+            debit = parse_amount(_cell(values, columns["debit"]), mapping, currency)
+            credit = parse_amount(_cell(values, columns["credit"]), mapping, currency)
             debit = abs(debit) if debit else None
             credit = abs(credit) if credit else None
             if debit is None and credit is None:

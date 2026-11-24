@@ -16,12 +16,16 @@ export const DELIMITERS: { value: Delimiter; label: string }[] = [
   { value: '|', label: 'Barra vertical ( | )' },
 ]
 
+// Hora opcional al final ("15/01/2026 10:23"): la API la ignora si el formato no la pide.
+const TIME = String.raw`(?:[ T]\d{1,2}:\d{2}(?::\d{2})?.*)?`
+const datePattern = (body: string) => new RegExp(`^${body}${TIME}$`)
+
 export const DATE_FORMATS: { value: string; label: string; pattern: RegExp }[] = [
-  { value: '%d/%m/%Y', label: 'dd/mm/aaaa (31/12/2026)', pattern: /^\d{1,2}\/\d{1,2}\/\d{4}$/ },
-  { value: '%d-%m-%Y', label: 'dd-mm-aaaa (31-12-2026)', pattern: /^\d{1,2}-\d{1,2}-\d{4}$/ },
-  { value: '%d.%m.%Y', label: 'dd.mm.aaaa (31.12.2026)', pattern: /^\d{1,2}\.\d{1,2}\.\d{4}$/ },
-  { value: '%d/%m/%y', label: 'dd/mm/aa (31/12/26)', pattern: /^\d{1,2}\/\d{1,2}\/\d{2}$/ },
-  { value: '%Y-%m-%d', label: 'aaaa-mm-dd (2026-12-31)', pattern: /^\d{4}-\d{2}-\d{2}( .*)?$/ },
+  { value: '%d/%m/%Y', label: 'dd/mm/aaaa (31/12/2026)', pattern: datePattern(String.raw`\d{1,2}\/\d{1,2}\/\d{4}`) },
+  { value: '%d-%m-%Y', label: 'dd-mm-aaaa (31-12-2026)', pattern: datePattern(String.raw`\d{1,2}-\d{1,2}-\d{4}`) },
+  { value: '%d.%m.%Y', label: 'dd.mm.aaaa (31.12.2026)', pattern: datePattern(String.raw`\d{1,2}\.\d{1,2}\.\d{4}`) },
+  { value: '%d/%m/%y', label: 'dd/mm/aa (31/12/26)', pattern: datePattern(String.raw`\d{1,2}\/\d{1,2}\/\d{2}`) },
+  { value: '%Y-%m-%d', label: 'aaaa-mm-dd (2026-12-31)', pattern: datePattern(String.raw`\d{4}-\d{2}-\d{2}`) },
   { value: '%m/%d/%Y', label: 'mm/dd/aaaa (12/31/2026, formato de EE. UU.)', pattern: /^$/ },
 ]
 

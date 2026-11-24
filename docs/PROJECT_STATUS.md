@@ -36,7 +36,7 @@
 
 ## Pruebas ejecutadas (2026-11-24)
 - Interfaz de finanzas: Vitest 53/53; `tsc -b` y build OK (409 kB JS inicial; finanzas en fragmentos aparte); oxlint sin advertencias nuevas; E2E 18/18 (10 de `flujos.spec.ts` + 8 de `finanzas.spec.ts`), dos corridas seguidas en verde (50 y 58 s). La prueba de privacidad (tres usuarios) va con `test.slow()`: con la PC cargada superaba los 30 s por defecto.
-- Backend: 84/84 pytest (incluidas las `slow`); resumen anual con 100.000 movimientos en ~48 ms con la máquina libre y 153-289 ms cargada (límite 300; D-033). Importaciones simultáneas sin duplicados (D-034).
+- Backend: 87/87 pytest (86 + 1 `slow`; incluye las 3 nuevas de extractos reales); resumen anual con 100.000 movimientos en ~48 ms con la máquina libre y 153-289 ms cargada (límite 300; D-033). Importaciones simultáneas sin duplicados (D-034).
 - Lanzador en Linux (PostgreSQL 18 de Ubuntu + backend empaquetado): `first_run_restart_and_recovery` y `daily_backup_retention_and_restore` OK; `cargo fmt` y `clippy -D warnings` sin errores.
 - CI (push `66b729c`): secretos ✅, Linux ✅, Windows real ✅ (backend empaquetado + PostgreSQL 18.7 portable: migración, configuración inicial, ingreso, auditoría).
 - Lanzador con PostgreSQL 18.6 de Ubuntu + backend empaquetado: primer arranque, reinicio con datos persistidos e ingreso, rechazo sin contraseña sin tocar datos, rechazo de carpeta ajena sin borrarla.
@@ -82,7 +82,7 @@ D-001 a D-034 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 2. Con Windows en verde, el propietario prueba el instalador NSIS (artefacto del CI) en su PC con Windows 11 (P-8: usuario con tildes o ñ).
 
 **Después:**
-- Fase 2: validar con extractos reales anonimizados del propietario (punto 6 de abajo) y preparar adaptadores por banco.
+- Fase 2: el importador ya se probó con extractos simulados de formato bancario paraguayo (cabecera del banco, débito y crédito, hora en la fecha, `Gs.`, totales al pie, XLSX con fechas numéricas y fórmulas), y se corrigieron 4 casos. Falta probarlo con extractos reales anonimizados del propietario (punto 6 de abajo) y guardar un mapeo por banco.
 - Fase 3: el plan de cuentas y las reglas tributarias de `docs/research/` siguen `pending` hasta que los valide el contador.
 - Sigue abierto, decisión del propietario: tabla de totales mensuales para el resumen. No se hizo: se revisa solo si en la PC real se nota lento.
 

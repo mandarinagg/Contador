@@ -322,6 +322,59 @@ def test_xlsx_single_and_split(client: TestClient, ctx: dict[str, Any]) -> None:
     assert next(a for a in accounts if a["id"] == ctx["usd"])["balance"] == "100.15"
 
 
+def test_realistic_bank_statements(client: TestClient, ctx: dict[str, Any]) -> None:
+    """Extractos reales: cabecera del banco, hora, moneda escrita y totales al pie."""
+    statement = (
+        "BANCO EJEMPLO S.A.;;;;;\n"
+        "Cuenta: 1234567 - GUARANIES;;;;;\n"
+        ";;;;;\n"
+        "Fecha;Concepto;Nro. Operación;Débito;Crédito;Saldo\n"
+        "02/01/2026 08:15;Transferencia recibida de CLIENTE SA;000123;;Gs. 1.500.000;11.500.000\n"
+        "03/01/2026 17:40;Pago ANDE NIS 12345;000124;Gs. 245.300;;11.254.700\n"
+        "04/01/2026;Compra en dólares;000125;US$ 20,00;;11.254.700\n"
+        ";Totales;;245.300;1.500.000;\n"
+        ";Saldo final;;;;11.254.700\n"
+    )
+    mapping = {
+        "skip_rows": 3,
+        "date_column": "Fecha",
+        "description_column": "Concepto",
+        "reference_column": "Nro. Operación",
+        "amount": {"mode": "split", "debit_column": "Débito", "credit_column": "Crédito"},
+    }
+    batch = ok(upload(client, ctx, statement.encode("cp1252"), mapping), 201)
+    rows = _rows(batch)
+    assert rows[5]["booked_on"] == "2026-01-02" and rows[5]["amount"] == "1500000"
+    assert rows[6]["booked_on"] == "2026-01-03" and rows[6]["amount"] == "-245300"
+    assert rows[5]["error"] is None and rows[6]["error"] is None
+    # Otra moneda que la de la cuenta: error legible, nunca una conversión.
+    assert rows[7]["error"] == "El importe está en USD y la cuenta en PYG: US$ 20,00"
+    # Totales y saldo final del pie quedan como filas con error, fuera de la importación.
+    assert rows[8]["error"] and rows[9]["error"]
+    assert (batch["rows_total"], batch["rows_error"]) == (5, 3)
+
+    # XLSX: fecha guardada como número y un importe calculado con decimales fantasma.
+    workbook = _xlsx(
+        [
+            ["Fecha", "Concepto", "Importe"],
+            [46034, "Fecha sin formato de fecha", -1000],
+            [datetime(2026, 1, 13), "Interés calculado", 1234.5600000000001],
+        ]
+    )
+    usd_mapping = {
+        "date_column": "Fecha",
+        "description_column": "Concepto",
+        "amount": {"mode": "single", "column": "Importe"},
+    }
+    batch = ok(
+        upload(client, ctx, workbook, usd_mapping, account="usd", filename="extracto.xlsx"), 201
+    )
+    rows = _rows(batch)
+    assert rows[2]["booked_on"] == "2026-01-12" and rows[2]["amount"] == "-1000.00"
+    assert rows[3]["amount"] == "1234.56" and rows[3]["raw"]["Importe"] == "1234.56"
+    assert batch["rows_error"] == 0
+
+
 def test_headerless_csv_uses_column_positions(client: TestClient, ctx: dict[str, Any]) -> None:
     content = b"01/05/2026;Venta;150.000\n02/05/2026;Compra;-20.000\n"
     mapping = {

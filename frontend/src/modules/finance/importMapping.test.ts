@@ -84,6 +84,15 @@ describe('guessMapping', () => {
     const view = tableView(parseCsv('Fecha,Descripción,Monto\n2026-03-01,Venta,100', ','), 0, true)
     expect(guessMapping(view, EMPTY_FORM)).toMatchObject({ amount_mode: 'single', amount_column: 'Monto', date_format: '%Y-%m-%d' })
   })
+
+  it('reconoce el formato aunque la fecha traiga la hora de la operación', () => {
+    const guess = (date: string) =>
+      guessMapping(tableView(parseCsv(`Fecha;Concepto;Importe\n${date};Compra;-1.000`, ';'), 0, true), { ...EMPTY_FORM, date_format: '%d/%m/%Y' }).date_format
+    expect(guess('15-01-2026 10:23')).toBe('%d-%m-%Y')
+    expect(guess('15.01.2026 10:23:59')).toBe('%d.%m.%Y')
+    expect(guess('2026-01-15T10:23:05')).toBe('%Y-%m-%d')
+    expect(guess('15/01/26 08:00')).toBe('%d/%m/%y')
+  })
 })
 
 describe('initialForm', () => {

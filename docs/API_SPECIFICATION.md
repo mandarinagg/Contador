@@ -115,7 +115,10 @@ Especificación: `docs/specs/FASE2_FINANZAS.md`. **Acceso:** el contexto `busine
 - `delimiter` ∈ `;` `,` tabulador `|`; `encoding` ∈ `auto`, `utf-8`, `cp1252` (`auto` prueba UTF-8 y luego Windows-1252); `thousands_separator` ∈ `.` `,` espacio o vacío, distinto del decimal. Valores por defecto: los del ejemplo (las columnas de fecha, descripción e importe son obligatorias; `reference_column` es opcional).
 - Sin encabezado (`has_header: false`), las columnas se indican por posición: `"1"`, `"2"`…
 - `skip_rows`: filas a saltear al principio (títulos del banco antes del encabezado). Las filas vacías se ignoran.
-- Importes: `1.234.567`, `1.234,50`, `-1.000`, `1.000-`, `(1.000)`. En XLSX las fechas y números de celda se leen tal cual; las fórmulas **no** se evalúan (se usa el valor guardado en el archivo). `.xls` se rechaza con un mensaje que pide CSV o XLSX.
+- Importes: `1.234.567`, `1.234,50`, `-1.000`, `1.000-`, `(1.000)`. La moneda puede venir escrita junto al número (`Gs. 1.500.000`, `1.500.000 Gs`, `₲`, `US$`, `U$S`, `R$`, `€` o el código ISO). Se acepta solo si es la moneda de la cuenta; si no, la fila da error (`El importe está en USD y la cuenta en PYG: …`) y nunca se convierte.
+- Fechas: si traen la hora de la operación (`15/01/2026 10:23`, `2026-01-15T10:23:05`, `10:23 p. m.`) y `date_format` no la pide, la hora se ignora.
+- XLSX: las fórmulas **no** se evalúan, se usa el valor guardado en el archivo. Los números se leen como los muestra Excel (15 dígitos significativos): una celda calculada que vale `1234.5600000000001` es `1234,56`. Una fecha guardada como número, en una celda sin formato de fecha, se lee como número de serie de Excel (1960 a 2099). `.xls` se rechaza con un mensaje que pide CSV o XLSX.
+- Las filas de totales o saldo final al pie de un extracto quedan como filas con error (sin fecha o sin importe) y no se importan.
 - Cada fila trae `row_number` (fila del archivo), `raw` (la fila original como texto), los valores interpretados, `error` (en español, p. ej. `"Fecha inválida: 31/02/2026"`), `duplicate_of` (movimiento existente no anulado de la misma cuenta con la misma clave) y `duplicate_in_file` (fila anterior igual). Duplicados y filas con error nacen con `decision = "skip"`.
 
 ## Acciones auditadas

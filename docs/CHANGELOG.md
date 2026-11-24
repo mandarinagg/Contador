@@ -4,6 +4,15 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Corregido — Importación de extractos con formatos reales (2026-11-24)
+- Se probó el importador con extractos armados como los de los bancos paraguayos. Cuatro casos válidos daban error de fila y ahora se leen bien:
+  - fecha con la hora de la operación (`15/01/2026 10:23`);
+  - moneda escrita junto al importe (`Gs. 1.500.000`, `US$ 20,00`), aceptada solo si es la de la cuenta;
+  - fecha de XLSX guardada como número de serie;
+  - importe de XLSX calculado con decimales fantasma (`1234.5600000000001` → `1234,56`, 15 dígitos como Excel).
+- La interfaz reconoce el formato de fecha aunque traiga la hora.
+- Pruebas nuevas: `test_parse_amount_with_written_currency`, `test_parse_date_ignores_time_and_reads_excel_serials` y `test_realistic_bank_statements` (por la API); en Vitest, la fecha con hora.
+
 ### Corregido — Lanzador en Windows (2026-11-24)
 - La prueba de copias (`tests/backup.rs`) arrancaba `pg_ctl` con `Command::output`: en Windows `postgres` hereda los handles del pipe y la prueba esperaba para siempre. Ahora la salida va a un archivo, igual que en `stack.rs`.
 - CI: límites de tiempo en el job `windows` y registros del lanzador cuando la prueba falla o se cuelga.
