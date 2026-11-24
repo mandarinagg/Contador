@@ -177,3 +177,21 @@ Formato: contexto → decisión → alternativas → consecuencias. Estado: **Ac
 - **D-079 — Fecha y alcance de los recurrentes.** La fecha es el día de la plantilla o el último del mes si es más corto, y tiene que caer dentro de la vigencia (`start_date`, `end_date`). La generación de un período es todo o nada: si una plantilla falla (por ejemplo, una cuenta archivada), 422 con el nombre de la plantilla y no se crea ninguna.
 - **D-080 — Bajada de la 0004.** Falla con un mensaje claro (`RuntimeError`) si hay asientos de depreciación, baja o recurrentes, o líneas con centro de costos, aunque estén descartados: la 0003 no los admite y borrarlos violaría D-027. Sin eso, borra las tablas de la 3B y devuelve los triggers exactamente a la versión de la 0003.
 - **D-081 — Cuentas de una categoría en uso.** No cambian si algún bien de la categoría tiene depreciaciones vivas (409 `ASSET_CATEGORY_IN_USE`); una cuenta asignada a una categoría no archivada no se archiva (409 `ACCOUNT_IN_ASSET_CATEGORY`), ni la cuenta de resultado por bajas (409 `ACCOUNT_IN_SETTINGS`).
+
+## Fase 4 — Tributación (núcleo), 2026-11-24
+Detalle en `docs/specs/FASE4_TRIBUTACION.md`.
+- **D-082 — Reglas `pending` utilizables con aviso.** Reformula BR-TAX-01: una regla sin verificar alimenta calendario, avisos y estimaciones, siempre marcada «sin verificar»; nada se presenta como oficial; una `deprecated` no se usa.
+- **D-083 — Perfil fiscal versionado**, declarado por el propietario o verificado por el contador con la constancia de RUC.
+- **D-084 — Reglas como datos** globales y versionadas; solo cambia el estado; carga idempotente desde el YAML empaquetado.
+- **D-085 — Códigos usados en la fase 4**: calendario DJ/DJI, excepciones, IVA (tasas y liquidación), registro mensual, IRE (vencimientos) y estados financieros.
+- **D-086 — Días inhábiles**: fines de semana, feriados cargados y excepciones fechadas que reemplazan la fecha.
+- **D-087 — Obligaciones** por código y período, sincronizadas de forma idempotente; las presentadas no se recalculan; ninguna se borra.
+- **D-088 — Comprobantes** con importes con IVA incluido, IVA calculado (±1 ₲ aceptado), anti duplicado y vínculos con FK compuestas.
+- **D-089 — Registro confirmado bloquea el mes** (trigger); se corrige reabriendo con motivo.
+- **D-090 — Estimación del IVA y borrador del Formulario 120**, con control contra el mayor y aviso de prorrateo sin calcularlo.
+- **D-091 — Asiento desde un comprobante**, nunca dos asientos vivos para el mismo hecho.
+- **D-092 — Avisos** calculados en el momento, sin procesos en segundo plano.
+- **D-093 — Exportación XLSX**; formato de Marangatu solo con fuente identificada.
+- **D-094 — Permisos `tax.read`, `tax.manage`, `tax.verify`** (Administrador sin `verify`).
+- **D-095 — Auditoría de todo cambio tributario**; importes nunca `float`.
+

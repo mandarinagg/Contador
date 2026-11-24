@@ -71,13 +71,22 @@ Cada regla tiene un identificador estable, su estado y dónde se hace cumplir. *
 | BR-FIN-08 | Una importación no crea movimientos hasta que el usuario confirma el lote; confirmar dos veces no duplica | Implementada | `finance/imports.py`, `test_commit_is_idempotent_and_audited_once`, `test_cancel` |
 | BR-FIN-09 | Las transferencias entre cuentas propias no son ingreso ni gasto; un aporte entre contextos no es una transferencia | Implementada | `transfer_group_id`, `ck_transactions_transfer_without_category`, `test_transfer_creates_two_linked_movements_outside_income_and_expense`, `test_consolidated_identifies_each_context` |
 
-## Tributación (fase 4 — diseñadas)
+## Tributación (fase 4 — especificadas en `docs/specs/FASE4_TRIBUTACION.md`)
 
 | ID | Regla |
 |---|---|
-| BR-TAX-01 | Ninguna obligación, tasa ni vencimiento se activa sin una regla con fuente oficial y estado `verified` |
+| BR-TAX-01 | Toda obligación, vencimiento o estimación indica la regla aplicada; si no está `verified` se muestra «sin verificar» y nunca como oficial (D-082, reformulada el 2026-11-24) |
 | BR-TAX-02 | Todo cálculo indica la versión de la regla aplicada y su vigencia |
 | BR-TAX-03 | Un cálculo es una estimación interna, nunca una declaración oficial; la presentación es manual en Marangatu |
+| BR-TAX-04 | Sin perfil fiscal no se generan obligaciones (D-083) |
+| BR-TAX-05 | Un vencimiento en día inhábil pasa al siguiente hábil; las excepciones fechadas reemplazan la fecha (D-086) |
+| BR-TAX-06 | Las obligaciones presentadas no cambian de vencimiento ni de regla; ninguna se borra (D-087) |
+| BR-TAX-07 | Sin comprobantes duplicados: misma dirección, RUC, timbrado y número (D-088) |
+| BR-TAX-08 | Los comprobantes de un mes con el registro confirmado no se tocan sin reabrirlo (D-089) |
+| BR-TAX-09 | El IVA se calcula con la regla de tasas vigente a la fecha del comprobante; se acepta el impreso con ±1 ₲ (D-088) |
+| BR-TAX-10 | Nunca dos asientos vivos para el mismo hecho, desde el comprobante o desde el movimiento (D-091) |
+| BR-TAX-11 | El prorrateo del crédito fiscal no se calcula: se avisa (D-090) |
+| BR-TAX-12 | Solo `tax.verify` verifica reglas y perfiles, con nombre y matrícula (D-094) |
 
 ## Facturación (fase 5 — diseñadas)
 
