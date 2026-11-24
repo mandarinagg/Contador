@@ -1,6 +1,6 @@
 /**
  * Estado del formulario de un comprobante y su paso al cuerpo de la API (sin componentes,
- * con pruebas en `voucherForm.test.ts`). Los importes se escriben con formato paraguayo
+ * con pruebas en `voucherDraft.test.ts`). Los importes se escriben con formato paraguayo
  * (`1.100.000`) y se mandan como string entero (D-095).
  */
 import { parseAmountInput, toInputText } from '../../lib/money'
@@ -160,7 +160,7 @@ export type DraftErrors = Partial<Record<keyof VoucherDraft | 'amounts', string>
 
 /**
  * Valida lo que se puede validar antes de mandar (la API vuelve a validar todo) y arma el
- * cuerpo. `editingNotesOnly`: con asiento vivo solo se mandan las notas (D-091).
+ * cuerpo.
  */
 export function draftToBody(d: VoucherDraft, rates: Rates = DEFAULT_RATES): { body: VoucherIn | null; errors: DraftErrors } {
   const errors: DraftErrors = {}

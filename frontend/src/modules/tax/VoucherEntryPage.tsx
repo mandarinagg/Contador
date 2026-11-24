@@ -19,7 +19,7 @@ import { canProposeVoucher, hasLiveEntry } from './logic'
 import type { Direction, Voucher, VoucherIn } from './types'
 import { ProposeVoucherEntryForm, VoidVoucherForm, VoucherEntryBadge } from './VoucherDialogs'
 import { useRatesAt, VoucherForm } from './VoucherForm'
-import { type DraftErrors, draftFromVoucher, draftToBody, emptyDraft, fieldOfApiError, nextNumber, type VoucherDraft } from './voucherForm'
+import { type DraftErrors, draftFromVoucher, draftToBody, emptyDraft, fieldOfApiError, nextNumber, type VoucherDraft } from './voucherDraft'
 
 const MEMORY_KEY = 'contador.tax.voucher-entry'
 

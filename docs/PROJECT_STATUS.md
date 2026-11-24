@@ -62,7 +62,7 @@
 | Tributación: IVA del mes, control contra el mayor, F120 en borrador, copia a la obligación; avisos; configuración | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ + E2E | ✅ |
 
 ## Pruebas ejecutadas (2026-11-24)
-- Interfaz fase 4: Vitest 191/191; `tsc -b` y build OK; oxlint sin advertencias nuevas en tributación salvo la ya conocida de `VoucherForm.tsx` (exporta un hook); E2E 47/47 (38 previas + 9 de `tributacion.spec.ts`) en una base propia (`contador_e2e_f4`).
+- Interfaz fase 4: Vitest 212/212; `tsc -b` y build OK; oxlint sin advertencias nuevas en tributación salvo la ya conocida de `VoucherForm.tsx` (exporta un hook); E2E 47/47 (38 previas + 9 de `tributacion.spec.ts`) en una base propia (`contador_e2e_f4`).
 - Backend fase 4 (integrado en `main`, CI verde): `pytest` 322 aprobadas (241 previas + 81 nuevas de tributación, incluidas las lentas) contra PostgreSQL 18, 6 min 30 s; ruff, `ruff format` y mypy estricto sin errores; `alembic check` limpio; `downgrade 0004` → `upgrade head` con datos OK y la bajada se niega con comprobantes u obligaciones presentadas. Los 18 triggers nuevos se quitaron uno por uno (dentro de la transacción de la prueba) y su prueba falló cada vez. Estimación de IVA de un mes con 20.000 comprobantes ~44 ms; XLSX del año ~1,3 s. Ejecutable PyInstaller (`packaging/contador-backend.spec`, compila en ~31 s) probado sobre una base vacía: migra hasta 0005 al arrancar, `POST /tax/rules/load-candidates` carga 39 reglas (y 7 excepciones), feriados 45, el perfil con 211 y 955 genera 28 obligaciones (la sincronización siguiente no crea ninguna), las alertas responden y el XLSX del registro abre.
 - Interfaz 3B: Vitest 124/124 (34 nuevas); `tsc -b` y build OK; oxlint con las mismas 2 advertencias; E2E 38/38 (10 + 8 + 11 de `contabilidad.spec.ts` + 9 de `contabilidad-3b.spec.ts`), dos corridas seguidas en verde (~75 s cada una).
 - Backend 3B (rama del agente): 239/239 pytest (4 `slow`); ruff, `ruff format` y mypy estricto sin errores; `alembic check` limpio; `downgrade 0003` → `upgrade head` con datos OK. Las 22 reglas nuevas de la base se quitaron una por una y su prueba falló cada vez. Backend empaquetado (PyInstaller, Linux): migró una base nueva a la 0004, cargó las 34 categorías y exportó XLSX. Corrida de 2.000 bienes ~0,4 s; XLSX del diario con 20.000 líneas ~2,1 s.
@@ -112,11 +112,12 @@ D-001 a D-116 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 8. Revisar los hallazgos R-10 y R-11 de `DISCOVERY.md` (repositorio git en la carpeta personal con `.git-credentials`).
 
 ## Para retomar (traspaso, 2026-11-24)
-**Estado de `main`:** fases 0 a 3B y la fase 4 (tributación, backend e interfaz) integradas. Pruebas: backend 322 (pytest contra PostgreSQL real, incluidas las `slow`), Vitest 191, E2E 47 (`flujos`, `finanzas`, `contabilidad`, `contabilidad-3b`, `tributacion`). Migraciones hasta `0005_tributacion`.
+**Estado de `main`:** fases 0 a 3B y la fase 4 (tributación, backend e interfaz) integradas. Pruebas: backend 322 (pytest contra PostgreSQL real, incluidas las `slow`), Vitest 212, E2E 47 (`flujos`, `finanzas`, `contabilidad`, `contabilidad-3b`, `tributacion`). Migraciones hasta `0005_tributacion`.
 
 **Fase 4:** menú Impuestos (Resumen fiscal, Calendario, Comprobantes, IVA del mes, Perfil fiscal, Reglas y feriados, Configuración) y avisos en Inicio. Decisiones D-082 a D-116.
 - **Antes de usarlo en serio** (contador): cargar y verificar las reglas en uso y los feriados (Impuestos → Reglas y feriados), declarar y verificar el perfil fiscal con la constancia de RUC, y responder las dudas D-F4-1 a D-F4-14 de `docs/research/TRIBUTACION_FASE4.md`. Probar el archivo de Marangatu con uno o dos comprobantes antes de un mes entero.
 - Abierto: sábados como inhábiles (D-F4-11); redondeo del IVA por comprobante (D-F4-7); casillas 33/36/39 y 164 del F120 vacías hasta saber del prorrateo (D-F4-14); la nota de débito electrónica no controla el tipo del CDC (D-107).
+- **CI `performance` intermitente** (no frena el instalador): `test_journal_xlsx_with_20000_lines` (3B) tarda 3,0 a 3,1 s en el runner contra un límite de 3 s; falló en 3 de las 5 corridas del 2026-11-24. Decisión pendiente: usar el escritor propio de `tax/fast_xlsx.py` (D-100) para el diario o revisar el límite.
 - Sin E2E (probado solo con pruebas unitarias y del backend): presentar, pagar y reabrir obligaciones; anular y proponer el asiento de un comprobante; descarga del archivo de Marangatu; deprecar reglas; excepciones de vencimiento.
 
 **Lo primero:**
