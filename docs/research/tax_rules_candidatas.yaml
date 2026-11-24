@@ -537,3 +537,353 @@ rules:
     reviewed_by: null
     confidence: no_encontrada
     notes: "La guía del MIC menciona el trámite. No encontré la periodicidad ni el plazo en una norma leída."
+
+  # ================================================================ FASE 4 (agregadas el 2026-11-24)
+  # Detalle, citas y dudas: docs/research/TRIBUTACION_FASE4.md
+
+  # ---------------------------------------------------------------- IVA: CÁLCULO Y CRÉDITO
+  - code: IVA-INCLUIDO-CALCULO
+    description: >
+      Cálculo del IVA contenido en un precio con IVA incluido. Base gravada = total / 1,1 (10%) o
+      total / 1,05 (5%); IVA = base × tasa. Equivale a IVA = total / 11 (10%) y total / 21 (5%).
+      En el registro de comprobantes los montos gravados se cargan CON IVA incluido; en el
+      Formulario 120 se declaran las bases SIN IVA.
+    parameters:
+      rates: {"10": {base_divisor: 1.10, tax_divisor: 11}, "5": {base_divisor: 1.05, tax_divisor: 21}}
+      registro_comprobantes_amounts: iva_incluido
+      form_120_amounts: base_sin_iva
+      rounding: null
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2019-09-10"
+    source_url: "https://www.dnit.gov.py/documents/20123/420592/Manual+T%C3%A9cnico+Versi%C3%B3n+150.pdf"
+    legal_reference: "Ley N° 6380/2019, art. 90 (tasas); Manual Técnico SIFEN v150, campos E735 dBasGravIVA y E736 dLiqIVAItem; Instructivo Form. 120 v4 («deberán registrarse sin incluir el IVA»); Especificación técnica del registro de comprobantes (montos «IVA INCLUIDO»)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      La fórmula está leída en el Manual Técnico v150 («[EA008* (E733/100)] / 1,1 si la tasa es del 10%»,
+      «/ 1,05 si la tasa es del 5%»). Los divisores 11 y 21 son una consecuencia aritmética, no una cita.
+      No encontré una regla oficial de redondeo para el IVA de cada comprobante (D-F4-7). No revisé si
+      alguna de las 27 notas técnicas del MT v150 cambió E735/E736.
+
+  - code: IVA-BASES-DIFERENCIADAS
+    description: >
+      Casos en que la base imponible del IVA no es el precio neto: venta de inmuebles (30% del valor o de
+      la cuota mensual), uso o consumo personal y operaciones gratuitas (valor de costo), intereses
+      discriminados (solo intereses y recargos), importador casual (+30%), bienes afectados a servicios
+      personales (30%). Hay que calcular la base y consignarla en la casilla del Form. 120.
+    parameters:
+      inmuebles_enajenacion_base_pct: 0.30
+      bienes_servicios_personales_base_pct: 0.30
+      importador_casual_recargo_base_pct: 0.30
+      autoconsumo_gratuito_base: valor_de_costo
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2019-09-25"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/d-ley-n-6380-19"
+    legal_reference: "Ley N° 6380/2019, art. 85; Instructivo Form. 120 v4, Rubro 1"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      Importa para el prorrateo: el art. 88 de la ley y el art. 18 del Decreto 3107 tratan las operaciones
+      «con base imponible diferente al precio neto» junto con las no gravadas.
+
+  - code: IVA-CREDITO-REQUISITOS
+    description: >
+      El IVA de una compra solo es crédito si: (1) el bien o servicio está afectado directa o indistintamente
+      a operaciones gravadas; (2) es una erogación real; (3) el comprobante identifica nombre o razón social
+      y RUC del comprador, describe con precisión el bien o servicio y cumple los demás requisitos; (4) el
+      comprobante es timbrado, el timbrado está vigente, sin enmiendas ni adulteraciones, y refleja la
+      realidad. El comprador debe verificar el timbrado en los medios de la DNIT.
+    parameters:
+      requires_taxed_use: true
+      requires_real_outflow: true
+      requires_buyer_ruc_on_document: true
+      requires_valid_timbrado: true
+      buyer_must_verify_timbrado: true
+      credit_month: mes_de_la_compra
+      credit_sources: [compras_en_plaza_del_mes, iva_pagado_en_importaciones_del_mes, retenciones_a_no_residentes]
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2019-12-19"
+    source_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+3107-19.pdf/d723b322-e502-e34b-18bc-3df7bfd0f785?t=1681423809891"
+    legal_reference: "Ley N° 6380/2019, arts. 88, 89 y 92; Decreto N° 3107/2019, Anexo, arts. 22 y 26; Decreto N° 3107/2019, art. 5° (remite al Decreto N° 6539/2005 de timbrado)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      «credit_month» sale de la letra del art. 88, num. 1 («compras en plaza realizadas en el mes»). No
+      encontré una norma que fije un plazo para computar comprobantes de meses anteriores (D-F4-5).
+      El Decreto 3107 es un escaneo; los arts. 13 a 30 los confirmé mirando las páginas del PDF oficial.
+
+  - code: IVA-PRORRATEO
+    description: >
+      Si se realizan a la vez operaciones gravadas y no gravadas, exoneradas o con base imponible distinta
+      al precio neto, el IVA de las compras afectadas indistintamente se deduce en la proporción
+      ingresos gravados / ingresos totales de los últimos 6 meses, incluido el que se liquida. Quien se
+      inscribe usa un período transitorio desde su inicio hasta completar los 5 primeros meses.
+      El IVA no deducible por el prorrateo es costo o gasto (Form. 120, Rubro 6, casilla 64).
+    parameters:
+      window_months: 6
+      includes_current_month: true
+      new_taxpayer_transitional_months: 5
+      form_120_formula: "casilla 164 = casilla 39 × (casilla 160 + casilla 161) / casilla 27"
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2019-12-19"
+    source_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+3107-19.pdf/d723b322-e502-e34b-18bc-3df7bfd0f785?t=1681423809891"
+    legal_reference: "Ley N° 6380/2019, art. 88 (penúltimos párrafos); Decreto N° 3107/2019, Anexo, art. 18; Form. 120 v4, Rubro 2 y Rubro 3 inc. c (casilla 164)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      Si la EAS solo tiene operaciones gravadas, la proporción es 1 y el prorrateo no cambia nada.
+      La ley dice «operaciones gravadas con respecto a las totales»; el decreto dice «ingresos». Las compras
+      directas a operaciones gravadas no se prorratean (casillas 32/35/38).
+
+  - code: IVA-SALDOS-ARRASTRE
+    description: >
+      Saldo técnico: si el IVA crédito supera al débito, el excedente se usa desde el período siguiente,
+      sin devolución (Form. 120: casilla 47 del mes pasa a la casilla 46 del siguiente). Saldo financiero:
+      retenciones y percepciones que superan el impuesto determinado (casilla 54 pasa a la casilla 51);
+      no se traslada al Rubro 4. El saldo técnico puede remitirse al fisco (art. 91) y pasa a ser costo no
+      deducible en el IRE.
+    parameters:
+      technical_balance: {from_box: 47, to_box_next_period: 46, refundable: false}
+      financial_balance: {from_box: 54, to_box_next_period: 51}
+      remission_to_treasury_box: 167
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2019-12-19"
+    source_url: "https://www.dnit.gov.py/documents/47797/47809/Instructivo+del+Formulario+N%C2%B0+120+IVA+Versi%C3%B3n+4.pdf/63799cd8-6212-3c22-779b-51b2f97a136b?t=1680624028092.pdf"
+    legal_reference: "Ley N° 6380/2019, arts. 88 (último párrafo) y 91; Decreto N° 3107/2019, Anexo, arts. 20 y 21; Instructivo Form. 120 v4, Rubros 4 y 5"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: null
+
+  - code: IVA-MONEDA-EXTRANJERA
+    description: >
+      Operaciones en moneda extranjera: se convierten a guaraníes al tipo de cambio comprador o vendedor del
+      mercado libre bancario al cierre del día anterior (BCP, publicado por la DNIT), o a la cotización del
+      comprobante. Importación y exportación: tipo de cambio de Aduanas a la fecha del despacho.
+      En el registro de comprobantes los montos van ya convertidos a guaraníes.
+    parameters:
+      rate_source: [bcp_cierre_dia_anterior, cotizacion_del_comprobante]
+      import_export_rate: aduanas_fecha_despacho
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2019-12-19"
+    source_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+3107-19.pdf/d723b322-e502-e34b-18bc-3df7bfd0f785?t=1681423809891"
+    legal_reference: "Decreto N° 3107/2019, Anexo, art. 13; Guía de registro manual de comprobantes (pasos 7 y 15)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: "El decreto no dice cuándo se usa el comprador y cuándo el vendedor en operaciones locales (D-F4-8)."
+
+  - code: IVA-INCOBRABLES
+    description: >
+      Créditos incobrables: el primero de (1) 36 meses desde que fueron exigibles sin cobrarse; (2) deudor
+      con inhibición general inscripta (solo ese ejercicio); (3) quiebra; (4) quitas en concordato homologado.
+      Su IVA se deduce del débito; si después se cobra, vuelve a ser débito.
+    parameters:
+      months_since_due: 36
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2019-12-19"
+    source_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+3107-19.pdf/d723b322-e502-e34b-18bc-3df7bfd0f785?t=1681423809891"
+    legal_reference: "Ley N° 6380/2019, art. 87; Decreto N° 3107/2019, Anexo, arts. 15 y 17"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: "Con comprobantes electrónicos, el incobrable se documenta con nota de crédito electrónica (Decreto 872/2023, art. 12)."
+
+  - code: IVA-F120-ESTRUCTURA
+    description: >
+      Formulario 120 v4 (obligación 211), mensual. Casillas que la app puede precalcular como BORRADOR:
+      Rubro 1: casilla 10 (base 10%) y 22 (débito 10%); 151 (base 5%, otros bienes y servicios) y 157
+      (débito 5%); 150/156 (5% productos agrícolas); 12 (exoneradas o no alcanzadas); 15/23, 154/158 y
+      155/159 (ajustes); totales 18, 21, 24. Rubro 2: acumulado de 6 meses (160, 161, 26, 27).
+      Rubro 3: 32/35/38 (crédito directo), 33/36/39 (indistinto), 164 (proporcional), 34/37/42 (ajustes
+      por ventas ya declaradas), 43 (total). Rubro 4: 44 débito, 45 crédito, 46 saldo anterior, 47 o 48
+      resultado, 50 impuesto determinado. Rubro 5: 51 saldo financiero anterior, 52 retenciones, 169
+      percepciones, 54 saldo a favor, 58 a pagar. Rubro 6: compras ligadas a exoneradas (59-63) e IVA
+      costo (64). Las casillas 14, 29, 49, 152, 153, 162, 163, 165 y el Anexo son solo para exportadores.
+    parameters:
+      form: "120"
+      version: 4
+      obligation_code: 211
+      amounts_without_cents: true
+      amounts_exclude_iva: true
+      exporters_only_boxes: [14, 29, 49, 152, 153, 162, 163, 165]
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2020-01-07"
+    source_url: "https://www.dnit.gov.py/documents/44828/89027/Formulario+N%C2%B0+120+IVA+Versi%C3%B3n+4.pdf/ced4ba56-a201-5126-29ea-c233d01ed6a4?t=1680627132264"
+    legal_reference: "RG N° 33/2020, arts. 2°, 5° y 9°; Formulario 120 v4 e Instructivo del Formulario 120 v4 (04-01-2020)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      La app solo arma un borrador para copiar a mano; no presenta. No encontré una versión 5 en la página
+      de formularios de la DNIT. Duda D-F4-6: cómo llevar las notas de crédito recibidas y emitidas.
+
+  # ---------------------------------------------------------------- REGISTRO DE COMPROBANTES
+  - code: REG-COMPROB-IMPORTACION
+    description: >
+      Formato del archivo de importación del registro de comprobantes: CSV (o TXT con tabulaciones),
+      UTF-8, sin encabezado, zipeado con el mismo nombre, hasta 5.000 filas, nombre
+      <RUC sin DV>_REG_<MMAAAA>_<id de hasta 5>. Columnas, códigos y validaciones en
+      formato_registro_comprobantes.yaml. No incluye comprobantes electrónicos ni virtuales.
+    parameters:
+      spec_file: docs/research/formato_registro_comprobantes.yaml
+      spec_version: "1 (junio de 2021)"
+      max_rows: 5000
+      encoding: UTF-8
+      excludes: [electronicos_sifen, virtuales]
+    valid_from: "2021-06-01"
+    valid_to: null
+    published_at: "2021-06-03"
+    source_url: "https://www.dnit.gov.py/documents/20123/203596/Especificaciones+T%C3%A9cnicas+para+registro+de+comprobantes+en+Marangatu.pdf/fca12623-f680-a630-e624-8c825db31b7d?t=1684176028356"
+    legal_reference: "RG N° 90/2021, arts. 5° (texto RG DNIT N° 12/2024) y 6°; Especificación Técnica para Importación, versión 1"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      published_at es la fecha de creación del PDF (3-6-2021). valid_from inferido del mes de la versión.
+      Contradicción coma o punto y coma (D-F4-1). Probar con un archivo chico antes de usarlo en serio.
+
+  - code: REG-COMPROB-IMPUTACION-ELECTRONICOS
+    description: >
+      Los comprobantes electrónicos (SIFEN) y virtuales no se cargan ni se importan: se obtienen en
+      Marangatu y se imputan (individual hasta 200, «Imputar todo» o archivo generado por el sistema).
+      Si el emisor electrónico informó la obligación al transmitir, la imputación es automática.
+      «IRE» en la imputación aplica solo al IRE SIMPLE; para el IRE General se marca «No imputar».
+    parameters:
+      manual_selection_max: 200
+      auto_imputation_if_obligation_informed: true
+      ire_imputation_applies_to: [IRE_SIMPLE]
+    valid_from: null
+    valid_to: null
+    published_at: "2024-05-31"
+    source_url: "https://www.dnit.gov.py/documents/20123/437212/Gu%C3%ADa+Paso+a+Paso+-+C%C3%B3mo+obtener+comprobantes+electr%C3%B3nicos+y+virtuales.pdf/31a43846-a0e3-9ad9-7003-bc19bc5bc92d?t=1778092596059"
+    legal_reference: "RG N° 90/2021, arts. 5°, 6° y 9° (texto RG DNIT N° 12/2024); RG DNIT N° 12/2024, arts. 2° y 3°; Guía DNIT «Cómo obtener comprobantes electrónicos y virtuales» (mayo de 2026)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      La RG DNIT 12/2024 (31-05-2024) aplica la imputación automática desde el día hábil siguiente a su
+      publicación; no encontré la fecha de publicación, por eso valid_from queda en null.
+
+  # ---------------------------------------------------------------- COMPROBANTES Y FORMATOS
+  - code: COMPROB-FORMATO-NUMERACION
+    description: >
+      Formatos de los comprobantes: timbrado de 8 dígitos; número de comprobante
+      establecimiento (3) - punto de expedición (3) - número (7), «###-###-#######», 13 dígitos.
+      En documentos electrónicos: establecimiento y punto de 3 cifras con ceros a la izquierda, número de
+      7 cifras que empieza en 1 con cada timbrado nuevo; agotado el 9999999 se usa una serie de 2 letras.
+    parameters:
+      timbrado_digits: 8
+      number_pattern: '^\d{3}-\d{3}-\d{7}$'
+      number_digits: 13
+      de_max_number: 9999999
+      de_series_length: 2
+    valid_from: null
+    valid_to: null
+    published_at: "2021-06-03"
+    source_url: "https://www.dnit.gov.py/documents/20123/203596/Especificaciones+T%C3%A9cnicas+para+registro+de+comprobantes+en+Marangatu.pdf/fca12623-f680-a630-e624-8c825db31b7d?t=1684176028356"
+    legal_reference: "Especificación técnica del registro de comprobantes (campos 7 y 8); Manual Técnico SIFEN v150, campos C004 a C007 y C010"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: "No leí el Decreto N° 6539/2005 (reglamento de timbrado de comprobantes preimpresos)."
+
+  - code: RUC-DV-MODULO11
+    description: >
+      Dígito verificador del RUC y del CDC: módulo 11. De derecha a izquierda, cada dígito se multiplica
+      por un peso que va de 2 a 11 y vuelve a 2; se suma; resto = suma mod 11; DV = 11 − resto si
+      resto > 1, si no 0.
+    parameters:
+      algorithm: mod11
+      weights: "2..11 cíclico, de derecha a izquierda"
+      dv_if_remainder_le_1: 0
+      official_examples: {"44444401": 7, "0144444401700100100145282201701251587326098": 8}
+    valid_from: null
+    valid_to: null
+    published_at: "2019-09-10"
+    source_url: "https://www.dnit.gov.py/documents/20123/420592/Manual+T%C3%A9cnico+Versi%C3%B3n+150.pdf"
+    legal_reference: "Manual Técnico SIFEN v150, secciones 10.1 y 10.2 («se debe utilizar el módulo 11»)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: secundaria
+    notes: >
+      El Manual dice «módulo 11» y remite a un PDF de la SET (set.gov.py/.../digito-verificador.pdf) que hoy
+      redirige a la portada de la DNIT: los pesos y la regla del resto NO están leídos en una fuente oficial.
+      Implementación tomada de ~/Escritorio/facturacion-sifen-zestia/packages/contracts/src/sifen.ts
+      (setCheckDigit). La probé contra los dos ejemplos oficiales del Manual (RUC 44444401 → 7 y el CDC
+      del ejemplo → 8) y contra los 2 CDC de 44 dígitos del texto del Manual: todos coinciden.
+      Duda D-F4-10: RUC antiguos con letra.
+
+  - code: SIFEN-CDC-ESTRUCTURA
+    description: >
+      CDC de 44 dígitos: tipo de documento (2) + RUC del emisor (8, ceros a la izquierda) + DV del emisor (1)
+      + establecimiento (3) + punto (3) + número (7) + tipo de contribuyente (1) + fecha de emisión
+      AAAAMMDD (8) + tipo de emisión (1) + código de seguridad (9) + DV del CDC (1). En el KuDE se muestra
+      en grupos de 4. Tipos de DE: 1 factura, 4 autofactura, 5 nota de crédito, 6 nota de débito,
+      7 nota de remisión (2, 3 y 8 marcados «Futuro» en el MT v150).
+    parameters:
+      length: 44
+      parts: ["tipo_de:2", "ruc:8", "dv_ruc:1", "establecimiento:3", "punto:3", "numero:7", "tipo_contribuyente:1", "fecha_aaaammdd:8", "tipo_emision:1", "codigo_seguridad:9", "dv_cdc:1"]
+      de_types: {"1": "Factura electrónica", "4": "Autofactura electrónica", "5": "Nota de crédito electrónica", "6": "Nota de débito electrónica", "7": "Nota de remisión electrónica"}
+    valid_from: null
+    valid_to: null
+    published_at: "2019-09-10"
+    source_url: "https://www.dnit.gov.py/documents/20123/420592/Manual+T%C3%A9cnico+Versi%C3%B3n+150.pdf"
+    legal_reference: "Manual Técnico SIFEN v150, sección 10.1 y campo C002; Decreto N° 872/2023, arts. 2° (num. 7 y 21) y 3°"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      El Decreto 872/2023 enumera más tipos (factura cambiaria, de exportación, boleta resimple, comprobantes
+      de retención, percepción, importación, donación, recibo de dinero). No revisé cuáles habilitaron las
+      notas técnicas posteriores al MT v150.
+
+  # ---------------------------------------------------------------- CALENDARIO
+  - code: CAL-DIA-INHABIL
+    description: >
+      Días inhábiles para correr vencimientos: domingos, feriados nacionales de la Ley 7544/2025 (fijos,
+      Jueves y Viernes Santo, móviles con sus traslados por decreto y hasta 3 adicionales por año) y,
+      según el indicio de la RG DNIT 60/2026, sábados. Los asuetos son hábiles, pero un plazo que vence
+      ese día pasa al siguiente hábil.
+    parameters:
+      holidays_file: docs/research/feriados_py.yaml
+      sunday_non_business: true
+      saturday_non_business: null
+      asueto_shifts_deadline: true
+    valid_from: "2025-09-03"
+    valid_to: null
+    published_at: "2025-09-03"
+    source_url: "https://www.bacn.gov.py/leyes-paraguayas/12908/ley-n-7544-2025"
+    legal_reference: "Ley N° 7544/2025, arts. 1° a 4° y 7°; RG N° 38/2020, art. 3°; RG DNIT N° 60/2026, art. 1° (indicio sobre sábados)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      saturday_non_business queda en null a propósito (D-F4-11). Antes del 03-09-2025 regían las leyes
+      08/1990 y siguientes, derogadas por la Ley 7544; no las leí.

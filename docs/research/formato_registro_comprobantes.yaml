@@ -1,0 +1,255 @@
+# Formato de importación del Registro de Comprobantes de Marangatu (RG N° 90/2021).
+#
+# ESTADO: `pending`. NADA ESTÁ VERIFICADO.
+# - Lo transcribió un asistente de IA el 2026-11-24 desde documentos oficiales de la DNIT.
+# - Un contador debe revisarlo antes de que la aplicación genere archivos con este formato.
+# - Probar siempre primero con un archivo chico en Marangatu (Herramientas / Consulta de
+#   Archivos Importados) antes de confiar en una exportación masiva.
+# - Detalle, citas y dudas: docs/research/TRIBUTACION_FASE4.md, sección 1.
+#
+# Regla de oro: los comprobantes ELECTRÓNICOS (SIFEN, con CDC) y VIRTUALES NO van en este archivo.
+# Marangatu los trae solo ("Obtener Comprobantes Electrónicos y Virtuales"). Ver `exclusiones`.
+
+meta:
+  validation_status: pending
+  reviewed_by: null
+  consulted_at: "2026-11-24"
+  confidence: oficial_leida
+  sources:
+    especificacion:
+      title: "Especificación Técnica para Importación. Registro de Comprobantes de Ventas, Compras, Ingresos y/o Egresos"
+      version: "1"
+      date: "2021-06"          # «JUNIO 2021»; control de cambios: versión 1, 06/2021, versión inicial
+      url: "https://www.dnit.gov.py/documents/20123/203596/Especificaciones+T%C3%A9cnicas+para+registro+de+comprobantes+en+Marangatu.pdf/fca12623-f680-a630-e624-8c825db31b7d?t=1684176028356"
+      url_alternativa: "https://www.dnit.gov.py/documents/44828/0/Especificaciones+T%C3%A9cnicas+para+registro+de+comprobantes+en+Marangatu.pdf/fd50732c-4232-750a-b253-5b14843cdccb?t=1682430005384.pdf"
+      note: "Las dos URL sirven el mismo PDF (comparados byte a byte). Es la única versión publicada que encontré."
+    modelo_planilla:
+      title: "Modelo de Planilla para Registro de Comprobantes en Marangatu.xlsx"
+      date: "creado 2021-05-18, modificado 2022-09-08 (metadatos del archivo)"
+      url: "https://www.dnit.gov.py/documents/44828/0/Modelo+de+Planilla+para+Registro+de+Comprobantes+en+Marangatu.xlsx/3012e5a2-57d7-86b4-db8b-6212d39c81f3?t=1682441199202"
+      note: "Cuatro hojas (VENTAS, COMPRAS, INGRESOS, EGRESOS) con los encabezados en la fila 10. Las columnas coinciden con la especificación."
+    guia_importacion:
+      title: "Guía Paso a Paso - Registro de comprobantes a través de Importación"
+      date: "2021-07"
+      url: "https://www.dnit.gov.py/documents/20123/203596/Guia+Paso+a+Paso+-+Registro+de+comprobantes+a+trav%C3%A9s+de+Importaci%C3%B3n.pdf/c0d1917c-8952-79e5-9e72-a64777916fa8?t=1684165228356.pdf"
+    presentacion_importar:
+      title: "Registro de comprobantes a través del Sistema Marangatú «Opción Importar»"
+      date: "2021-08 (metadatos)"
+      url: "https://www.dnit.gov.py/documents/47797/47809/Registro+de+comprobantes+en+el+Marangatu+-+Opci%C3%B3n+Importar.pdf/67b5cd0a-b20c-a25a-d368-c4df072ee84d?t=1681834631316"
+    guia_registro_manual:
+      title: "Guía Paso a Paso - Registro manual de comprobantes a través del sistema Marangatu"
+      date: "2022-09 (metadatos)"
+      url: "https://www.dnit.gov.py/documents/44828/0/Guia+Paso+a+Paso-+Registro+manual+de+comprobantes+a+trav%C3%A9s+del+sistema+Marangatu.pdf/5dc720af-2425-187a-ff92-0bbfbbfbb578?t=1682441119323"
+    pagina_dnit: "https://www.dnit.gov.py/web/portal-institucional/registro-de-comprobantes"
+    norma: "RG N° 90/2021, arts. 5° y 6° (art. 5° según RG DNIT N° 12/2024)"
+
+archivo:
+  formatos:
+    - extension: ".csv"
+      separador_segun_texto: ","          # «.CSV (delimitado por comas)»
+      separador_en_el_ejemplo_oficial: ";" # el «Modelo del Formato y contenido» del anexo usa punto y coma
+      note: >
+        CONTRADICCIÓN dentro de la especificación (duda D-F4-1): el texto dice «delimitado por comas»,
+        pero la línea de ejemplo del anexo es
+        «1;11;80024627;MINISTERIO DE HACIENDA;109;05/05/2021;11138251;001-002-0000250;3630000;0;0;3630000;1;N;S;N;N;;».
+        Excel en configuración regional española guarda «CSV» con punto y coma. Probar en Marangatu.
+    - extension: ".txt"
+      separador: "\t"                      # «.TXT (delimitado por tabulaciones)»
+  codificacion: "UTF-8"
+  encabezado: false                       # «no debe contener los títulos utilizados como cabecera»
+  compresion: "ZIP con el mismo nombre del archivo contenido"
+  max_filas_por_archivo: 5000
+  mezcla_de_tipos_de_registro: true       # ventas, compras, ingresos y egresos pueden ir en el mismo archivo
+  orden_de_campos: "obligatorio, el de cada tabla"
+  nombre:
+    obligacion_955_mensual: "<RUC>_REG_<MMAAAA>_<XXXXX>"
+    obligacion_956_anual: "<RUC>_REG_<AAAA>_<XXXXX>"
+    ruc: "sin dígito verificador"
+    xxxxx: "identificador alfanumérico elegido por el contribuyente, hasta 5 posiciones, distinto en cada archivo"
+    ejemplos: ["80000000_REG_012021_V0001.zip", "80000000_REG_2021_E0001.zip"]
+    unicidad: "No se puede importar más de un archivo con el mismo nombre para el mismo período (guía de importación)."
+  procesamiento:
+    validacion_hasta_horas: 72
+    estados: [RECIBIDO, PROCESADO_TOTAL, PROCESADO_PARCIAL, PROCESADO_ERROR]
+    errores: "Se informan al buzón Marandu con un enlace al detalle (línea y descripción)."
+    despues_de_confirmar: >
+      La guía de 2021 dice que, confirmado el talón, solo queda la carga manual. El art. 9° de la RG 90/2021
+      (texto RG DNIT 12/2024) permite incorporar registros después del talón «de manera individual (carga
+      manual) o mediante la importación de archivos». Rige la resolución (ver D-F4-3).
+
+reglas_generales:
+  ruc_sin_dv: "En los campos de RUC se carga el número sin el dígito verificador."
+  montos:
+    tipo: "entero positivo, sin decimales (guaraníes)"
+    separador_de_miles: "opcional; solo el punto (.)"
+    gravados_con_iva_incluido: true      # «MONTO GRAVADO AL 10% (IVA INCLUIDO)»
+    cero_si_no_hay: "consignar 0"
+    total: "MONTO TOTAL = gravado 10% + gravado 5% + no gravado/exento, y mayor que 0 (salvo excepciones por tipo)"
+  moneda_extranjera: >
+    El archivo solo tiene un indicador S/N. Los montos se cargan en guaraníes: «Si la operación se realizó en
+    moneda extranjera, los montos a registrar deben estar cambiados/convertidos a guaraníes» (guía de registro
+    manual). Tipo de cambio: Decreto 3107/2019, art. 13.
+  fechas: "dd/mm/aaaa; período mm/aaaa solo para los tipos 206 y 208. No se aceptan fechas anteriores al 01/01/2021, salvo condición crédito (2) en ventas y compras."
+  numero_de_comprobante: "###-###-####### (establecimiento-punto-número, 13 dígitos)"
+  timbrado: "8 dígitos numéricos"
+  imputacion: >
+    Cada comprobante se imputa al menos a una obligación activa a la fecha de emisión (IVA, IRE o IRP-RSP).
+    «IRE» es aplicable únicamente al IRE SIMPLE (guía de registro manual de 2022 y guía de comprobantes
+    electrónicos de 2026); un contribuyente del IRE GENERAL marca «No imputar» en lo que use solo para el IRE.
+    «NO IMPUTA» = S solo si además se imputa a otra obligación (una parte del comprobante no se imputa).
+    Marangatu no pide repartir el monto entre impuestos.
+  nombre_no_requerido_para: "tipos de identificación 11 (RUC) y 12 (CI); en ventas también 15 (SIN NOMBRE). Marangatu lo toma de sus registros."
+  notas_de_credito_y_debito: >
+    Guía de registro manual (2022): en VENTAS se registran «las Notas de Crédito recibidas y las Notas de
+    Débito emitidas»; en COMPRAS, «las Notas de Crédito emitidas y las Notas de Débito recibidas».
+    Requieren número y timbrado del comprobante asociado.
+
+tipos_de_registro:   # Tabla 1
+  1: VENTAS
+  2: COMPRAS
+  3: INGRESOS
+  4: EGRESOS
+
+condicion_de_la_operacion:   # Tabla 2
+  1: CONTADO
+  2: CREDITO
+
+tipos_de_identificacion:   # Tabla 3
+  11: RUC
+  12: CEDULA DE IDENTIDAD
+  13: PASAPORTE
+  14: CEDULA EXTRANJERO
+  15: SIN NOMBRE
+  16: DIPLOMATICO
+  17: IDENTIFICACION TRIBUTARIA
+
+booleanos:   # Tabla 5
+  S: SI
+  N: NO
+
+tipos_de_comprobante:   # Tabla 4: código, nombre, tipos de registro donde se admite
+  101: {nombre: "AUTOFACTURA", registros: [COMPRAS]}
+  102: {nombre: "BOLETA DE TRANSPORTE PÚBLICO DE PASAJEROS", registros: [VENTAS, COMPRAS]}
+  103: {nombre: "BOLETA DE VENTA", registros: [VENTAS, COMPRAS]}
+  104: {nombre: "BOLETA RESIMPLE", registros: [COMPRAS]}
+  105: {nombre: "BOLETOS DE LOTERÍAS, JUEGOS DE AZAR", registros: [VENTAS, COMPRAS]}
+  106: {nombre: "BOLETO O TICKET DE TRANSPORTE AÉREO", registros: [VENTAS, COMPRAS]}
+  107: {nombre: "DESPACHO DE IMPORTACIÓN", registros: [COMPRAS]}
+  108: {nombre: "ENTRADA A ESPECTÁCULOS PÚBLICOS", registros: [VENTAS, COMPRAS]}
+  109: {nombre: "FACTURA", registros: [VENTAS, COMPRAS]}
+  110: {nombre: "NOTA DE CRÉDITO", registros: [VENTAS, COMPRAS]}
+  111: {nombre: "NOTA DE DÉBITO", registros: [VENTAS, COMPRAS]}
+  112: {nombre: "TICKET MÁQUINA REGISTRADORA", registros: [VENTAS, COMPRAS]}
+  201: {nombre: "COMPROBANTE DE EGRESOS POR COMPRAS A CRÉDITO", registros: [EGRESOS]}
+  202: {nombre: "COMPROBANTE DEL EXTERIOR LEGALIZADO", registros: [EGRESOS]}
+  203: {nombre: "COMPROBANTE DE INGRESO POR VENTAS A CRÉDITO", registros: [INGRESOS]}
+  204: {nombre: "COMPROBANTE DE INGRESOS ENTIDADES PÚBLICAS, RELIGIOSAS O DE BENEFICIO PÚBLICO", registros: [EGRESOS]}
+  205: {nombre: "EXTRACTO DE CUENTA – BILLETAJE ELECTRÓNICO", registros: [EGRESOS]}
+  206: {nombre: "EXTRACTO DE CUENTA DE IPS", registros: [EGRESOS]}
+  207: {nombre: "EXTRACTO DE CUENTA TC/TD", registros: [EGRESOS]}
+  208: {nombre: "LIQUIDACIÓN DE SALARIO", registros: [INGRESOS, EGRESOS]}
+  209: {nombre: "OTROS COMPROBANTES DE EGRESOS", registros: [EGRESOS]}
+  210: {nombre: "OTROS COMPROBANTES DE INGRESOS", registros: [INGRESOS]}
+  211: {nombre: "TRANSFERENCIAS O GIROS BANCARIOS/ BOLETA DE DEPÓSITO", registros: [EGRESOS]}
+
+# Columnas en orden. tipo: NUM (solo números) o ALF (números, letras y caracteres como / -).
+# max = longitud máxima. requerido: true | false | texto con la condición.
+registros:
+
+  VENTAS:   # 19 columnas; modelo XLSX hoja VENTAS, columnas A a S
+    - {orden: 1,  campo: CODIGO_TIPO_REGISTRO, tipo: NUM, max: 1, requerido: true, valores: [1]}
+    - {orden: 2,  campo: CODIGO_TIPO_IDENTIFICACION_COMPRADOR, tipo: NUM, max: 2, requerido: true, tabla: tipos_de_identificacion}
+    - {orden: 3,  campo: NUMERO_IDENTIFICACION_COMPRADOR, tipo: ALF, max: 20, requerido: true, nota: "RUC sin DV"}
+    - {orden: 4,  campo: NOMBRE_RAZON_SOCIAL_COMPRADOR, tipo: ALF, max: 250, requerido: "salvo identificación 11, 12 o 15"}
+    - {orden: 5,  campo: CODIGO_TIPO_COMPROBANTE, tipo: NUM, max: 3, requerido: true, tabla: tipos_de_comprobante}
+    - {orden: 6,  campo: FECHA_EMISION, tipo: ALF, max: 10, requerido: true, formato: "dd/mm/aaaa", nota: "no anterior al 01/01/2021 salvo condición 2"}
+    - {orden: 7,  campo: NUMERO_TIMBRADO, tipo: NUM, max: 8, requerido: true}
+    - {orden: 8,  campo: NUMERO_COMPROBANTE, tipo: ALF, max: 20, requerido: "salvo tipos 112 y 106", formato: "###-###-#######"}
+    - {orden: 9,  campo: MONTO_GRAVADO_10_IVA_INCLUIDO, tipo: NUM, max: 20, requerido: true, nota: "entero; 0 si no hay"}
+    - {orden: 10, campo: MONTO_GRAVADO_5_IVA_INCLUIDO, tipo: NUM, max: 20, requerido: true, nota: "entero; 0 si no hay"}
+    - {orden: 11, campo: MONTO_NO_GRAVADO_O_EXENTO, tipo: NUM, max: 20, requerido: true, nota: "entero; 0 si no hay"}
+    - {orden: 12, campo: MONTO_TOTAL, tipo: NUM, max: 20, requerido: true, nota: "suma de 9+10+11; mayor que 0"}
+    - {orden: 13, campo: CODIGO_CONDICION_VENTA, tipo: NUM, max: 1, requerido: "para tipo 109 (factura)", tabla: condicion_de_la_operacion, vacio_equivale_a: 1}
+    - {orden: 14, campo: OPERACION_EN_MONEDA_EXTRANJERA, tipo: ALF, max: 1, requerido: false, tabla: booleanos, vacio_equivale_a: N}
+    - {orden: 15, campo: IMPUTA_IVA, tipo: ALF, max: 1, requerido: true, tabla: booleanos}
+    - {orden: 16, campo: IMPUTA_IRE, tipo: ALF, max: 1, requerido: true, tabla: booleanos, nota: "solo IRE SIMPLE"}
+    - {orden: 17, campo: IMPUTA_IRP_RSP, tipo: ALF, max: 1, requerido: true, tabla: booleanos}
+    - {orden: 18, campo: NUMERO_COMPROBANTE_VENTA_ASOCIADO, tipo: ALF, max: 20, requerido: "para tipos 110 y 111", formato: "###-###-#######"}
+    - {orden: 19, campo: TIMBRADO_COMPROBANTE_VENTA_ASOCIADO, tipo: NUM, max: 8, requerido: "para tipos 110 y 111"}
+    # Ventas NO tiene la columna «NO IMPUTA». La guía de registro manual (2022) lo confirma: «El botón
+    # "No imputar" solo se expondrá en los casos que haya seleccionado los tipos de registro COMPRAS o EGRESOS».
+
+  COMPRAS:   # 20 columnas; modelo XLSX hoja COMPRAS, columnas A a T
+    - {orden: 1,  campo: CODIGO_TIPO_REGISTRO, tipo: NUM, max: 1, requerido: true, valores: [2]}
+    - {orden: 2,  campo: CODIGO_TIPO_IDENTIFICACION_PROVEEDOR, tipo: NUM, max: 2, requerido: true, tabla: tipos_de_identificacion, nota: "siempre 11 (RUC), salvo tipos 101 (autofactura) y 107 (despacho de importación)"}
+    - {orden: 3,  campo: NUMERO_IDENTIFICACION_PROVEEDOR, tipo: ALF, max: 20, requerido: true, nota: "RUC sin DV"}
+    - {orden: 4,  campo: NOMBRE_RAZON_SOCIAL_PROVEEDOR, tipo: ALF, max: 250, requerido: "salvo identificación 11 o 12"}
+    - {orden: 5,  campo: CODIGO_TIPO_COMPROBANTE, tipo: NUM, max: 3, requerido: true, tabla: tipos_de_comprobante}
+    - {orden: 6,  campo: FECHA_EMISION, tipo: ALF, max: 10, requerido: true, formato: "dd/mm/aaaa", nota: "no anterior al 01/01/2021 salvo condición 2"}
+    - {orden: 7,  campo: NUMERO_TIMBRADO, tipo: NUM, max: 8, requerido: true, nota: "para 107 (despacho de importación) consignar 0"}
+    - {orden: 8,  campo: NUMERO_COMPROBANTE, tipo: ALF, max: 20, requerido: "salvo tipos 112, 106 y 107", formato: "###-###-#######"}
+    - {orden: 9,  campo: MONTO_GRAVADO_10_IVA_INCLUIDO, tipo: NUM, max: 20, requerido: true, nota: "0 para tipos 101, 112, 104 y 105"}
+    - {orden: 10, campo: MONTO_GRAVADO_5_IVA_INCLUIDO, tipo: NUM, max: 20, requerido: true, nota: "0 para tipos 101, 112, 104 y 105"}
+    - {orden: 11, campo: MONTO_NO_GRAVADO_O_EXENTO, tipo: NUM, max: 20, requerido: true, nota: "0 para tipos 101, 112, 104 y 105"}
+    - {orden: 12, campo: MONTO_TOTAL, tipo: NUM, max: 20, requerido: true, nota: "suma de 9+10+11 y mayor que 0; para 101, 112, 104 y 105 solo se carga el total"}
+    - {orden: 13, campo: CODIGO_CONDICION_COMPRA, tipo: NUM, max: 1, requerido: "para tipo 109 (factura)", tabla: condicion_de_la_operacion, vacio_equivale_a: 1}
+    - {orden: 14, campo: OPERACION_EN_MONEDA_EXTRANJERA, tipo: ALF, max: 1, requerido: false, tabla: booleanos, vacio_equivale_a: N}
+    - {orden: 15, campo: IMPUTA_IVA, tipo: ALF, max: 1, requerido: true, tabla: booleanos}
+    - {orden: 16, campo: IMPUTA_IRE, tipo: ALF, max: 1, requerido: true, tabla: booleanos, nota: "solo IRE SIMPLE"}
+    - {orden: 17, campo: IMPUTA_IRP_RSP, tipo: ALF, max: 1, requerido: true, tabla: booleanos}
+    - {orden: 18, campo: NO_IMPUTA, tipo: ALF, max: 1, requerido: true, tabla: booleanos, nota: "si es S, el comprobante debe estar imputado además a alguna obligación"}
+    - {orden: 19, campo: NUMERO_COMPROBANTE_VENTA_ASOCIADO, tipo: ALF, max: 20, requerido: "para tipos 110 y 111", formato: "###-###-#######"}
+    - {orden: 20, campo: TIMBRADO_COMPROBANTE_VENTA_ASOCIADO, tipo: NUM, max: 8, requerido: "para tipos 110 y 111"}
+
+  INGRESOS:   # 15 columnas; modelo XLSX hoja INGRESOS, columnas A a O. Para IRP-RSP e IRE SIMPLE.
+    - {orden: 1,  campo: CODIGO_TIPO_REGISTRO, tipo: NUM, max: 1, requerido: true, valores: [3]}
+    - {orden: 2,  campo: CODIGO_TIPO_COMPROBANTE, tipo: NUM, max: 3, requerido: true, tabla: tipos_de_comprobante}
+    - {orden: 3,  campo: FECHA_EMISION_O_PERIODO, tipo: ALF, max: 10, requerido: true, formato: "dd/mm/aaaa; mm/aaaa para 208", nota: "no anterior al 01/01/2021"}
+    - {orden: 4,  campo: NUMERO_COMPROBANTE, tipo: ALF, max: 20, requerido: "salvo tipo 208"}
+    - {orden: 5,  campo: CODIGO_TIPO_IDENTIFICACION_PAGADOR, tipo: NUM, max: 2, requerido: true, tabla: tipos_de_identificacion, nota: "210: 11, 12 o 13; 208: 11"}
+    - {orden: 6,  campo: NUMERO_IDENTIFICACION_PAGADOR, tipo: ALF, max: 20, requerido: true}
+    - {orden: 7,  campo: NOMBRE_RAZON_SOCIAL_PAGADOR, tipo: ALF, max: 250, requerido: "salvo identificación 11 o 12"}
+    - {orden: 8,  campo: MONTO_GRAVADO, tipo: NUM, max: 20, requerido: true}
+    - {orden: 9,  campo: MONTO_NO_GRAVADO_EXONERADO, tipo: NUM, max: 20, requerido: true}
+    - {orden: 10, campo: MONTO_TOTAL, tipo: NUM, max: 20, requerido: true, nota: "8+9, mayor que 0; para 203 solo el total cobrado"}
+    - {orden: 11, campo: IMPUTA_IRE, tipo: ALF, max: 1, requerido: true, tabla: booleanos}
+    - {orden: 12, campo: IMPUTA_IRP_RSP, tipo: ALF, max: 1, requerido: true, tabla: booleanos}
+    - {orden: 13, campo: ESPECIFICAR_TIPO_DOCUMENTO, tipo: ALF, max: 50, requerido: "para tipo 210"}
+    - {orden: 14, campo: NUMERO_COMPROBANTE_VENTA_ASOCIADO, tipo: ALF, max: 20, requerido: "para tipo 203", formato: "###-###-#######"}
+    - {orden: 15, campo: TIMBRADO_COMPROBANTE_VENTA_ASOCIADO, tipo: NUM, max: 8, requerido: "para tipo 203"}
+
+  EGRESOS:   # 18 columnas; modelo XLSX hoja EGRESOS, columnas A a R. Para IRP-RSP e IRE SIMPLE.
+    - {orden: 1,  campo: CODIGO_TIPO_REGISTRO, tipo: NUM, max: 1, requerido: true, valores: [4]}
+    - {orden: 2,  campo: CODIGO_TIPO_COMPROBANTE, tipo: NUM, max: 3, requerido: true, tabla: tipos_de_comprobante}
+    - {orden: 3,  campo: FECHA_EMISION_O_PERIODO, tipo: ALF, max: 10, requerido: true, formato: "dd/mm/aaaa; mm/aaaa para 206 y 208", nota: "no anterior al 01/01/2021"}
+    - {orden: 4,  campo: NUMERO_COMPROBANTE_O_TRANSACCION, tipo: ALF, max: 20, requerido: "salvo tipos 205, 206, 207 y 208"}
+    - {orden: 5,  campo: CODIGO_TIPO_IDENTIFICACION_CONTRAPARTE, tipo: NUM, max: 2, requerido: "salvo tipos 206, 207 y 211", tabla: tipos_de_identificacion, nota: "204 y 205: 11; 202: 17"}
+    - {orden: 6,  campo: NUMERO_IDENTIFICACION_CONTRAPARTE, tipo: ALF, max: 20, requerido: "salvo tipos 206, 207 y 211"}
+    - {orden: 7,  campo: NOMBRE_O_DESCRIPCION, tipo: ALF, max: 250, requerido: "salvo identificación 11 o 12, o tipo 206"}
+    - {orden: 8,  campo: MONTO_TOTAL, tipo: NUM, max: 20, requerido: true, nota: "entero mayor que 0"}
+    - {orden: 9,  campo: IMPUTA_IVA, tipo: ALF, max: 1, requerido: true, tabla: booleanos, nota: "S solo se admite para 207; en los demás tipos, N"}
+    - {orden: 10, campo: IMPUTA_IRE, tipo: ALF, max: 1, requerido: true, tabla: booleanos}
+    - {orden: 11, campo: IMPUTA_IRP_RSP, tipo: ALF, max: 1, requerido: true, tabla: booleanos}
+    - {orden: 12, campo: NO_IMPUTA, tipo: ALF, max: 1, requerido: true, tabla: booleanos}
+    - {orden: 13, campo: NUMERO_CUENTA_O_TARJETA, tipo: ALF, max: 30, requerido: "para tipos 207 y 211"}
+    - {orden: 14, campo: BANCO_FINANCIERA_COOPERATIVA, tipo: ALF, max: 250, requerido: "para tipos 207 y 211"}
+    - {orden: 15, campo: NUMERO_EMPLEADOR_IPS, tipo: ALF, max: 30, requerido: "para tipo 206"}
+    - {orden: 16, campo: ESPECIFICAR_TIPO_DOCUMENTO, tipo: ALF, max: 50, requerido: "para tipo 209"}
+    - {orden: 17, campo: NUMERO_COMPROBANTE_COMPRA_ASOCIADO, tipo: ALF, max: 20, requerido: "para tipo 201", formato: "###-###-#######"}
+    - {orden: 18, campo: TIMBRADO_COMPROBANTE_COMPRA_ASOCIADO, tipo: NUM, max: 8, requerido: "para tipo 201"}
+    # El modelo XLSX titula las columnas 17 y 18 «...DE VENTA ASOCIADO»; la especificación dice «DE COMPRA ASOCIADO».
+
+exclusiones:
+  comprobantes_electronicos_y_virtuales: >
+    «Este archivo no deberá incluir comprobantes emitidos a través del Sistema de Facturación Electrónica
+    Nacional (E-kuatia) ni del Sistema de Comprobantes Virtuales, los cuales el contribuyente obtendrá
+    directamente del Sistema Marangatu» (especificación, Consideraciones generales; RG 90/2021, art. 6°).
+  cdc: >
+    El archivo de importación no tiene columna para el CDC. Los documentos electrónicos se imputan en
+    «Obtener Comprobantes Electrónicos y Virtuales» (selección individual hasta 200 comprobantes, «Imputar
+    todo», o «Adjuntar Archivo»: un TXT que genera Marangatu, separado por comas, con una columna
+    «NÚMERO DE IDENTIFICADOR DEL COMPROBANTE» y columnas S/N por impuesto; se devuelve en CSV o TXT,
+    zipeado, con el nombre generado «RUC_AAAAMM_TIPO DE REGISTRO_ID_NÚMERO DE ARCHIVO»). La estructura
+    completa de ese archivo generado no está publicada. Si el emisor informó la obligación al transmitir
+    al SIFEN, la imputación es automática (RG DNIT 12/2024, art. 2°).
+    Fuente: https://www.dnit.gov.py/documents/20123/437212/Gu%C3%ADa+Paso+a+Paso+-+C%C3%B3mo+obtener+comprobantes+electr%C3%B3nicos+y+virtuales.pdf/31a43846-a0e3-9ad9-7003-bc19bc5bc92d?t=1778092596059 (mayo de 2026)

@@ -1,0 +1,142 @@
+# Feriados nacionales de Paraguay, para correr los vencimientos que caen en día inhábil.
+#
+# ESTADO: TODO EN `pending`. NADA ESTÁ VERIFICADO.
+# - Lo armó un asistente de IA el 2026-11-24. Un contador debe revisarlo.
+# - La regla de traslado de vencimientos es la de la RG N° 38/2020, art. 3°: si el vencimiento cae en
+#   día inhábil, pasa «al primer día hábil inmediato siguiente sin que ello implique el diferimiento de
+#   los demás vencimientos» (ver CAL-PERPETUO-DJ y CAL-DIA-INHABIL en tax_rules_candidatas.yaml).
+# - Los traslados y los feriados adicionales se fijan por decreto cada año: la aplicación debe permitir
+#   cargarlos a mano, con su fuente, y no inventarlos.
+# - Detalle y dudas: docs/research/TRIBUTACION_FASE4.md, sección 5.
+#
+# confidence: oficial_leida | oficial_citada_por_terceros | secundaria | no_encontrada | calculado
+#   `calculado` = fecha obtenida con un algoritmo a partir de una regla leída (p. ej. Semana Santa),
+#   no leída en una fuente para ese año.
+
+meta:
+  validation_status: pending
+  reviewed_by: null
+  consulted_at: "2026-11-24"
+
+ley_vigente:
+  norma: "Ley N° 7544/2025 «Que determina los feriados nacionales de la República del Paraguay, se establecen los feriados móviles y se faculta al Poder Ejecutivo a instituir otros feriados en situaciones especiales»"
+  promulgada: "2025-09-03"
+  publicada: "2025-09-03"   # Gaceta Oficial N° 200 del 3 de setiembre de 2025
+  source_url: "https://www.bacn.gov.py/leyes-paraguayas/12908/ley-n-7544-2025"
+  pdf_bacn: "https://www.bacn.gov.py/descarga/12908/2025_7544.pdf"
+  confidence: oficial_leida
+  deroga: ["Ley 08/1990", "Ley 715/1995", "Ley 1601/2000", "Ley 1723/2001", "Ley 4531/2011"]
+  reglas:
+    domingos: "Art. 1°: feriados «además de los días domingos»."
+    traslado_moviles: "Art. 3°: el Poder Ejecutivo puede trasladar cada año, por decreto, los feriados del art. 2° «a los días lunes, anterior o siguiente al feriado que se traslada»."
+    adicionales: "Art. 4°: el Poder Ejecutivo puede fijar cada año, por decreto, «hasta un máximo de tres días adicionales de Feriados Nacionales»; tienen «los mismos efectos que los demás Feriados Nacionales»."
+    asuetos: "Art. 7°: «Los asuetos serán considerados días hábiles y no tendrán los efectos de los Feriados Nacionales, salvo cuando fenezca algún plazo el día del asueto, el cual se trasladará al día siguiente hábil para su vencimiento.»"
+    percepcion_de_tributos: "Art. 8°: los feriados no afectan la labor de los funcionarios de «comercio exterior y percepción de tributos». No dice que los vencimientos tributarios se mantengan (duda D-F4-12)."
+
+sabados:
+  status: no_encontrada
+  note: >
+    La Ley 7544 no dice nada de los sábados. La RG 38/2020 habla de «día inhábil» sin definirlo.
+    Indicio oficial: la RG DNIT 60/2026 da como vencimiento «conforme RG n.° 38/2020» de la terminación 0
+    el 9 de noviembre de 2026 (lunes), cuando el día fijo es el 7 (sábado); y para la terminación 4 el 16
+    (lunes) en vez del 15 (domingo). Es decir, trata el sábado como inhábil. En cambio, la RG DNIT 48/2026
+    lista como vencimiento de la terminación 7 el «21 de marzo de 2026» (sábado) sin correrlo. Duda D-F4-11.
+  source_url: "https://www.dnit.gov.py/documents/20123/2664257/RG+60+-+2026_firmado.pdf/cadc1f8b-47cd-7ec3-491a-42a0feb6265d?t=1794273017967"
+
+calendario_propio_dnit:
+  status: no_encontrada
+  note: >
+    No encontré un calendario de días inhábiles publicado por la DNIT. La DNIT publica resoluciones de
+    traslado excepcional (p. ej. RG DNIT 48/2026, 55/2026 y 60/2026) y la prensa difunde cronogramas
+    mensuales, pero no hallé en dnit.gov.py una lista oficial de feriados o días inhábiles.
+
+fijos:   # Ley 7544/2025, art. 1°. No se trasladan (art. 2°, último párrafo).
+  - {fecha: "01-01", nombre: "Año Nuevo", movil: false, source: ley_vigente, confidence: oficial_leida}
+  - {fecha: "05-01", nombre: "Día de los Trabajadores", movil: false, source: ley_vigente, confidence: oficial_leida}
+  - {fecha: "05-14", nombre: "Día de la Independencia Nacional", movil: false, source: ley_vigente, confidence: oficial_leida}
+  - {fecha: "05-15", nombre: "Día de la Independencia Nacional", movil: false, source: ley_vigente, confidence: oficial_leida}
+  - {fecha: "08-15", nombre: "Día de la Fundación de Asunción (y eventualmente de la Transmisión del Mando Presidencial)", movil: false, source: ley_vigente, confidence: oficial_leida}
+  - {fecha: "12-08", nombre: "Día de la Virgen de Caacupé", movil: false, source: ley_vigente, confidence: oficial_leida}
+  - {fecha: "12-25", nombre: "Día de la Navidad", movil: false, source: ley_vigente, confidence: oficial_leida}
+
+moviles:   # Ley 7544/2025, art. 2°. El Ejecutivo puede pasarlos al lunes anterior o siguiente (art. 3°).
+  - {fecha: "03-01", nombre: "Día de los Héroes de la Patria", movil: true, source: ley_vigente, confidence: oficial_leida}
+  - {fecha: "06-12", nombre: "Día de la Paz del Chaco", movil: true, source: ley_vigente, confidence: oficial_leida}
+  - {fecha: "06-20", nombre: "Día de la Jura de la Constitución Nacional", movil: true, source: ley_vigente, confidence: oficial_leida}
+  - {fecha: "09-29", nombre: "Día de la Batalla de Boquerón", movil: true, source: ley_vigente, confidence: oficial_leida}
+
+semana_santa:
+  regla: "Ley 7544/2025, art. 1°: «Jueves y Viernes, Semana Santa». No son móviles en el sentido del art. 2° (no se trasladan)."
+  calculo: "Jueves Santo = domingo de Pascua − 3 días; Viernes Santo = Pascua − 2 días. Pascua según el cómputo gregoriano (algoritmo de Meeus/Jones/Butcher)."
+  confidence_regla: oficial_leida
+  fechas:
+    "2026": {jueves: "2026-04-02", viernes: "2026-04-03", confidence: calculado, note: "Coincide con el listado de BVPASA (secundaria)."}
+    "2027": {jueves: "2027-03-25", viernes: "2027-03-26", confidence: calculado}
+    "2028": {jueves: "2028-04-13", viernes: "2028-04-14", confidence: calculado}
+
+por_anio:
+
+  "2025":   # Solo los feriados adicionales encontrados; no revisé los traslados de 2025.
+    adicionales:
+      - fecha: "2025-09-05"
+        motivo: "Clasificación de la selección al Mundial 2026"
+        decreto: null
+        confidence: secundaria
+        source_url: "https://www.hoy.com.py/nacionales/2025/09/06/pena-cuenta-lo-que-le-paso-por-la-cabeza-cuando-decreto-feriado-por-la-albirroja"
+        note: "La nota del 06-09-2025 habla del «feriado adicional decretado ayer». No vi el decreto; la fecha exacta del feriado no está confirmada."
+      - fecha: "2025-12-26"
+        motivo: "Feriado adicional (art. 4° de la Ley 7544) por Navidad"
+        decreto: "Decreto N° 5040/2025 (Ministerio del Interior), «3 de diciembre de 2025» según el texto extraído"
+        confidence: secundaria
+        source_url: "https://grupovierci.brightspotcdn.com/23/0b/b887cf2b40b0ad71ec3245a1e6c5/decreto5040.PDF"
+        note: "Copia del decreto alojada por un medio de prensa. No la encontré en un sitio oficial."
+
+  "2026":
+    traslados:
+      - original: "2026-03-01"   # domingo
+        trasladado_a: "2026-03-02"
+        nombre: "Día de los Héroes de la Patria"
+        decreto: null
+        confidence: secundaria
+        source_url: "https://www.abc.com.py/nacionales/2025/11/13/estos-son-los-feriados-para-el-2026/"
+        note: "ABC y el listado de BVPASA lo dicen; no encontré el número del decreto."
+      - original: "2026-06-20"   # sábado
+        trasladado_a: "2026-06-22"
+        nombre: "Día de la Jura de la Constitución Nacional"
+        decreto: "Decreto N° 6215/2026, «Art. 1º.- Trasládase el feriado del 20 de junio de 2026 al día Lunes 22 de junio de [2026]»"
+        confidence: secundaria
+        source_url: "https://grupovierci.brightspotcdn.com/39/cd/808fd5cf4b2a91e60a5b066dcbd0/decreto-6215-traslado-feriado-20-al-22-de-junio.pdf"
+        note: "Copia del decreto en un medio de prensa; el número y la fecha del decreto son poco legibles en el escaneo."
+      - original: "2026-09-29"   # martes
+        trasladado_a: "2026-09-28"
+        nombre: "Día de la Batalla de Boquerón"
+        decreto: "Decreto N° 6601/2026, firmado el 20-08-2026 según la prensa"
+        confidence: secundaria
+        source_url: "https://www.lanacion.com.py/politica/2026/08/24/batalla-de-boqueron-ultimo-feriado-movil-se-traslada-al-28-de-setiembre/"
+    sin_traslado:
+      - {fecha: "2026-06-12", nombre: "Día de la Paz del Chaco", note: "Viernes; BVPASA: «NO» se traslada", confidence: secundaria}
+    adicionales:
+      - fecha: "2026-06-30"
+        motivo: "Clasificación a octavos de final del Mundial 2026"
+        decreto: "Decreto N° 6280/2026"
+        confidence: secundaria
+        source_url: "https://www.pj.gov.py/notas/30118-poder-judicial-se-adhiere-al-feriado-nacional-del-martes-30-de-junio"
+        note: >
+          El Poder Judicial (sitio oficial, pero no es la norma) se adhirió al feriado del martes 30 de junio
+          y corrió sus plazos al 1 de julio. El número del decreto sale de la prensa. Puede haber otros
+          adicionales de 2026 (hasta 3) que no encontré.
+    listado_secundario:
+      source_url: "https://www.bolsadevalores.com.py/wp-content/uploads/2026/01/Listado-de-Feriados-2026.pdf"
+      confidence: secundaria
+      note: "Listado de la Bolsa de Valores (BVPASA), enero de 2026. No incluye el 30 de junio (posterior)."
+
+  "2027":
+    traslados: []
+    adicionales: []
+    status: no_encontrada
+    note: >
+      Al 2026-11-24 no encontré decretos de traslado ni de feriados adicionales para 2027.
+      Fechas fijas que caen en fin de semana en 2027 (calculado, no hay traslado posible para los fijos):
+      1 de mayo (sábado), 15 de mayo (sábado), 15 de agosto (domingo), 25 de diciembre (sábado).
+      Móviles en fin de semana (candidatos a traslado por decreto): 12 de junio (sábado), 20 de junio (domingo).
+      1 de marzo de 2027 es lunes; 29 de setiembre es miércoles.
