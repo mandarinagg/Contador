@@ -7,6 +7,7 @@ import {
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
+  type Ref,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
   useEffect,
@@ -97,7 +98,8 @@ const controlBase =
   'placeholder:text-ink-3 transition-colors hover:border-ink-3 ' +
   'aria-invalid:border-debit disabled:bg-sunken disabled:text-ink-3'
 
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+/** Acepta `ref` (React 19: es una prop más) para enfocar el campo desde afuera. */
+export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> }) {
   return <input {...props} className={cx(controlBase, className)} />
 }
 

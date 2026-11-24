@@ -61,15 +61,25 @@ Variables opcionales: `CONTADOR_E2E_DB_NAME` (base, por defecto `contador_e2e`),
 - `e2e/fixtures.ts` hace fallar cualquier prueba con `console.error` o `pageerror`. Un error de consola esperado (el 401 de un ingreso fallido, el corte de red simulado) se declara de forma explícita en la prueba con `test.use({ expectedConsoleErrors: /.../ })`.
 
 - `e2e/finanzas.spec.ts` corre después de `flujos.spec.ts` (proyecto `finanzas` con `dependencies: ['chromium']` en `playwright.config.ts`) y parte de su empresa y usuarios; si se corre solo con la base vacía, los crea por la API.
+- `e2e/contabilidad.spec.ts` corre después de `finanzas.spec.ts` (proyecto `contabilidad` con `dependencies: ['finanzas']`): usa las cuentas «Banco E2E» y «Dólares E2E» de la empresa y crea por la API un usuario Administrador. Los flujos que provocan 409/422 esperados los declaran con `expectedConsoleErrors`; los largos van con `test.slow()`.
 - Puertos configurables con `CONTADOR_E2E_API_PORT` y `CONTADOR_E2E_WEB_PORT` (por defecto 8794 / 5174), para correr varias copias a la vez.
 
 **Flujos cubiertos:** configuración inicial (empresa + propietario) -> inicio; cierre de sesión y nuevo ingreso; ingreso con contraseña incorrecta sin revelar si el email existe; RUC con DV erróneo y correcto (`44444401` -> `7`); alta de usuarios con rol Contador y Consulta; permisos de cada rol al ingresar; auditoría con cadena íntegra; tema claro/oscuro; servicio local caído ("Iniciando Contador AI…").
 
 **Finanzas** (`finanzas.spec.ts`): alta de cuentas en PYG y USD con saldo inicial en formato paraguayo; contexto en la URL tras recargar; alta manual de salida y entrada; anulación que exige motivo, queda tachada y deja de sumar; transferencia (dos movimientos enlazados, sin categoría); importación de un CSV con títulos del banco, un duplicado contra la base y una fila con fecha inválida (nada se crea hasta confirmar; se omite una fila; los importados quedan sin revisar); `IMPORT_NEW_DUPLICATES` cuando aparece un movimiento igual entre el análisis y la confirmación; resumen con un bloque por moneda sin mezclar ₲ y US$ y consolidado; privacidad del contexto personal (el Contador recibe "no existe" en la interfaz y 404 en la API; Consulta lee la empresa sin botones de escritura y opera su propio espacio).
 
+**Contabilidad** (`contabilidad.spec.ts`): carga del plan propuesto (159 cuentas) con el aviso «sin validar» en el plan y en el resto de las pantallas, búsqueda por código y cuenta de resultados del ejercicio; ejercicio 2026 con 12 períodos; asiento manual desbalanceado (se ve la diferencia y no se contabiliza), balanceado y contabilizado como N° 1, y revertido (N° 2, enlaces en los dos sentidos); asiento propuesto desde un movimiento de la empresa configurando en el momento las cuentas contables del banco y de la categoría, contabilizado como N° 3, enlace al movimiento de origen, y el movimiento ya no se puede anular (aviso con enlace al asiento); movimiento en dólares con cotización y elección de redondeo; libro diario, mayor, balance de comprobación, balance general y estado de resultados con totales conocidos; período con borradores que no cierra (lista con enlace), descarte con motivo, cierre, asiento en el período cerrado que no se contabiliza, reapertura con motivo y contabilización; el Administrador guarda borradores pero no ve «Contabilizar» ni «Marcar como validado»; Consulta solo lee; validación del plan con nombre y matrícula y reportes sin aviso.
+
+**Unitarias de contabilidad** (Vitest, `src/modules/accounting/*.test.ts`): sumas y restas de importes con BigInt, producto exacto con la cotización, lectura de cotizaciones en formato paraguayo; balance en vivo del editor, línea nueva con la diferencia, armado del cuerpo con errores por línea; árbol del plan, orden por código, búsqueda y código sugerido para una subcuenta; cuándo se puede proponer un asiento y cuándo un asiento contabilizado bloquea el movimiento.
+
 **Unitarias de finanzas** (Vitest): formato y lectura de importes (`lib/money.test.ts`), DV del RUC, cliente HTTP con `FormData` y `qs`, lectura de CSV y mapeo de columnas (`importMapping.test.ts`), lectura mínima de XLSX con un ZIP armado en la prueba (`xlsxPreview.test.ts`) y conteo/filtros de filas importadas (`importRows.test.ts`).
 
-## Estado actual (2026-11-24, interfaz de finanzas)
+## Estado actual (2026-11-24, interfaz de contabilidad)
+- Frontend: **90 pruebas** Vitest pasan (36 de contabilidad); `tsc -b` sin errores; oxlint con las mismas 2 advertencias de antes.
+- E2E: **27 pruebas** (10 de `flujos.spec.ts` + 8 de `finanzas.spec.ts` + 9 de `contabilidad.spec.ts`), dos corridas seguidas en verde (52 y 62 s).
+- No tiene E2E (probado a mano): cierre del ejercicio con refundición, alta y edición de subcuentas, archivo de cuentas, vuelta del plan a «sin validar».
+
+## Estado anterior (2026-11-24, interfaz de finanzas)
 - Frontend: **53 pruebas** Vitest pasan; `tsc -b` sin errores; oxlint con las mismas 2 advertencias de antes.
 - E2E: **18 pruebas** (10 de `flujos.spec.ts` + 8 de `finanzas.spec.ts`), ~30 s por corrida.
 

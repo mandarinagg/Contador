@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Building2, FileUp, Home, Landmark, LayoutDashboard, LogOut, ScrollText, Tags, UserRound, Users, Contact } from 'lucide-react'
+import { ArrowLeftRight, Building2, CalendarRange, Contact, FileUp, Home, Landmark, LayoutDashboard, ListTree, LogOut, NotebookPen, Scale, ScrollText, Tags, UserRound, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { NavLink, Outlet, useMatch } from 'react-router'
 import { cx } from '../lib/cx'
@@ -60,6 +60,14 @@ const NAV: { group: string; items: NavItem[] }[] = [
   },
 ]
 
+/** Contabilidad de la organización (D-035): todos los roles la leen (`accounting.read`). */
+const ACCOUNTING_NAV: NavItem[] = [
+  { to: '/contabilidad/plan', label: 'Plan de cuentas', icon: <ListTree size={16} />, permission: 'accounting.read' },
+  { to: '/contabilidad/ejercicios', label: 'Ejercicios y períodos', icon: <CalendarRange size={16} />, permission: 'accounting.read' },
+  { to: '/contabilidad/asientos', label: 'Asientos', icon: <NotebookPen size={16} />, permission: 'accounting.read' },
+  { to: '/contabilidad/reportes', label: 'Libros y balances', icon: <Scale size={16} />, permission: 'accounting.read' },
+]
+
 function BrandMark() {
   // Cinco pétalos: la flor del lapacho, reducida a una marca geométrica.
   return (
@@ -75,8 +83,10 @@ function BrandMark() {
 export function AppLayout() {
   const { me, can, logout } = useSession()
   const financeNav = useFinanceNav()
+  // Los libros contables necesitan más ancho que el resto (columnas de debe, haber y saldo).
+  const wide = useMatch('/contabilidad/*')
   if (!me) return null
-  const nav = [NAV[0], { group: 'Finanzas', items: financeNav }, ...NAV.slice(1)]
+  const nav = [NAV[0], { group: 'Finanzas', items: financeNav }, { group: 'Contabilidad', items: ACCOUNTING_NAV }, ...NAV.slice(1)]
 
   return (
     <div className="flex h-full">
@@ -151,7 +161,7 @@ export function AppLayout() {
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-5xl px-10 py-9">
+        <div className={cx('mx-auto px-10 py-9', wide ? 'max-w-6xl' : 'max-w-5xl')}>
           <Outlet />
         </div>
       </main>

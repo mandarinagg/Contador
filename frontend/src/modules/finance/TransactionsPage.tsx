@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeftRight, Ban, Check as CheckIcon, FileUp, Pencil, Plus, Search, X } from 'lucide-react'
-import { useDeferredValue, useState } from 'react'
+import { ArrowLeftRight, Ban, BookPlus, Check as CheckIcon, FileUp, Pencil, Plus, Search, X } from 'lucide-react'
+import { useDeferredValue, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { Badge, Button, EmptyState, Field, Input, Modal, PageHeader, Sheet } from '../../components/ui'
 import { useToast } from '../../components/ui/toast'
@@ -14,14 +14,30 @@ import { categoryLabel, formatBookDate } from './labels'
 import { AccountSelect, CategorySelect, CounterpartySelect } from './pickers'
 import { TransactionForm, TransferForm, VoidForm } from './TransactionForms'
 import type { Transaction } from './types'
+import { useSession } from '../../stores/session'
+import { canPropose } from '../accounting/entryRefs'
+import { ProposeEntryForm } from '../accounting/ProposeEntry'
+import { JournalEntryLink } from '../accounting/financeBridge'
+import { TransactionDetail } from './TransactionDetail'
 
 const PAGE = 50
 const FILTER_KEYS = ['account_id', 'category_id', 'counterparty_id', 'from', 'to', 'q', 'unreviewed', 'include_voided'] as const
 
-type Dialog = { kind: 'new' } | { kind: 'transfer' } | { kind: 'edit'; tx: Transaction } | { kind: 'void'; tx: Transaction }
+type Dialog =
+  | { kind: 'new' }
+  | { kind: 'transfer' }
+  | { kind: 'edit'; tx: Transaction }
+  | { kind: 'void'; tx: Transaction }
+  | { kind: 'propose'; tx: Transaction }
+/** Hasta cuántas páginas se recorren buscando el movimiento de `?tx=` (la API no tiene GET por id). */
+const DETAIL_MAX_PAGES = 20
 
 export function TransactionsPage() {
-  const { cid, canWrite, readOnlyReason } = useFinance()
+  const { cid, canWrite, readOnlyReason, context } = useFinance()
+  const { can } = useSession()
+  const business = context.kind === 'business'
+  // Proponer asientos: solo en la empresa y con permiso de preparar borradores (D-041).
+  const canManageAccounting = business && can('accounting.manage')
   const qc = useQueryClient()
   const toast = useToast()
   const accounts = useAccounts(cid)
@@ -63,6 +79,25 @@ export function TransactionsPage() {
   })
 
   const rows = list.data?.pages.flat() ?? []
+  // Detalle de un movimiento por URL (`?tx=`): lo busca en las páginas ya cargadas y, si no está,
+  // pide más (hasta un tope), porque la API no ofrece leer un movimiento por su id.
+  const detailId = params.get('tx')
+  const detailTx = detailId ? rows.find((t) => t.id === detailId) : undefined
+  const pagesLoaded = list.data?.pages.length ?? 0
+  const searching = Boolean(detailId && !detailTx && list.hasNextPage && pagesLoaded < DETAIL_MAX_PAGES)
+  useEffect(() => {
+    if (searching && !list.isFetchingNextPage) list.fetchNextPage()
+  }, [searching, list])
+  const openDetail = (id: string | null) => {
+    const next = new URLSearchParams(params)
+    if (id) next.set('tx', id)
+    else next.delete('tx')
+    setParams(next, { replace: !id })
+  }
+  const fromDetail = (d: Dialog) => {
+    openDetail(null)
+    setDialog(d)
+  }
   const accountsById = new Map((accounts.data ?? []).map((a) => [a.id, a]))
   const cpById = new Map((counterparties.data ?? []).map((c) => [c.id, c]))
   const hasAccounts = (accounts.data ?? []).some((a) => !a.archived_at)
@@ -215,7 +250,7 @@ export function TransactionsPage() {
                 <col />
                 <col className="w-56" />
                 <col className="w-40" />
-                {canWrite && <col className="w-34" />}
+                {canWrite && <col className={canManageAccounting ? 'w-42' : 'w-34'} />}
               </colgroup>
               <thead className="border-b border-line bg-sunken text-sm text-ink-2">
                 <tr>
@@ -240,7 +275,13 @@ export function TransactionsPage() {
                     <tr key={tx.id} className={cx('align-top', voided && 'bg-sunken/50 text-ink-3')}>
                       <td className={cx('px-4 py-3 text-sm tabular-nums', voided ? 'text-ink-3' : 'text-ink-2')}>{formatBookDate(tx.booked_on)}</td>
                       <td className="px-4 py-3">
-                        <p className={cx('break-words', voided ? 'line-through decoration-1' : 'font-medium')}>{tx.description}</p>
+                        <button
+                          type="button"
+                          onClick={() => openDetail(tx.id)}
+                          className={cx('text-left break-words hover:underline', voided ? 'line-through decoration-1' : 'font-medium')}
+                        >
+                          {tx.description}
+                        </button>
                         <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-2">
                           <span>{account?.name ?? 'Cuenta'}</span>
                           {cp && <span>· {cp.name}</span>}
@@ -249,6 +290,7 @@ export function TransactionsPage() {
                           {tx.source === 'import' && <Badge>Importado</Badge>}
                           {!tx.reviewed_at && !voided && <Badge tone="warn">Sin revisar</Badge>}
                           {voided && <Badge tone="bad">Anulado</Badge>}
+                          {business && tx.journal_entry && <JournalEntryLink entry={tx.journal_entry} />}
                         </p>
                         {voided && (
                           <p className="mt-1 text-sm text-ink-2">
@@ -290,6 +332,17 @@ export function TransactionsPage() {
                                   onClick={() => quick.mutate({ tx, body: { reviewed: true } })}
                                 >
                                   <CheckIcon size={15} />
+                                </Button>
+                              )}
+                              {canManageAccounting && canPropose(tx) && (
+                                <Button
+                                  variant="ghost"
+                                  className="h-8 px-2 text-ledger"
+                                  aria-label={`Proponer asiento: ${tx.description}`}
+                                  title="Proponer asiento"
+                                  onClick={() => setDialog({ kind: 'propose', tx })}
+                                >
+                                  <BookPlus size={15} />
                                 </Button>
                               )}
                               <Button variant="ghost" className="h-8 px-2" aria-label={`Editar: ${tx.description}`} title="Editar" onClick={() => setDialog({ kind: 'edit', tx })}>
@@ -342,6 +395,40 @@ export function TransactionsPage() {
       </Modal>
       <Modal open={dialog?.kind === 'void'} title="Anular movimiento" onClose={close}>
         {dialog?.kind === 'void' && <VoidForm key={dialog.tx.id} transaction={dialog.tx} onDone={close} />}
+      </Modal>
+      <Modal open={dialog?.kind === 'propose'} size="lg" title="Proponer asiento" onClose={close}>
+        {dialog?.kind === 'propose' && (
+          <ProposeEntryForm key={dialog.tx.id} tx={dialog.tx} cid={cid} accounts={accounts.data ?? []} categories={categories.data ?? []} onDone={close} />
+        )}
+      </Modal>
+      <Modal open={Boolean(detailId)} size="lg" title="Movimiento" onClose={() => openDetail(null)}>
+        {detailTx ? (
+          <TransactionDetail
+            tx={detailTx}
+            business={business}
+            account={accountsById.get(detailTx.account_id)}
+            categories={categories.data ?? []}
+            counterparty={detailTx.counterparty_id ? cpById.get(detailTx.counterparty_id) : undefined}
+            canWrite={canWrite}
+            canManageAccounting={canManageAccounting}
+            onEdit={() => fromDetail({ kind: 'edit', tx: detailTx })}
+            onVoid={() => fromDetail({ kind: 'void', tx: detailTx })}
+            onPropose={() => fromDetail({ kind: 'propose', tx: detailTx })}
+          />
+        ) : list.isPending || searching ? (
+          <p className="text-ink-2">Buscando el movimiento…</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <p>No encontramos ese movimiento en la lista con los filtros actuales.</p>
+            {filter.include_voided !== '1' && (
+              <div>
+                <Button variant="secondary" onClick={() => setFilter('include_voided', '1')}>
+                  Buscar también entre los anulados
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
       <Modal open={dialog?.kind === 'transfer'} size="lg" title="Transferencia entre cuentas propias" onClose={close}>
         {dialog?.kind === 'transfer' && <TransferForm accounts={accounts.data ?? []} onDone={close} />}

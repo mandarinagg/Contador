@@ -13,6 +13,8 @@ import { financeKeys, useFinance } from './data'
 import { formatBookDate, todayIso } from './labels'
 import { AccountSelect, CategorySelect, CounterpartySelect } from './pickers'
 import type { Account, Category, Counterparty, Transaction, TransferResult } from './types'
+import { postedEntryFromError, postedEntryOf } from '../accounting/entryRefs'
+import { PostedEntryNotice } from '../accounting/financeBridge'
 
 function useInvalidateFinance() {
   const qc = useQueryClient()
@@ -23,8 +25,11 @@ function useInvalidateFinance() {
   }
 }
 
-function FormError({ error }: { error: unknown }) {
+function FormError({ error, action = 'edit' }: { error: unknown; action?: 'edit' | 'void' }) {
   if (!(error instanceof ApiError)) return null
+  // 409 TRANSACTION_HAS_POSTED_ENTRY (D-048): además del mensaje, el enlace al asiento.
+  const posted = postedEntryFromError(error)
+  if (posted) return <PostedEntryNotice entry={posted} action={action} />
   const fields = Object.values(error.fieldErrors())
   return (
     <Notice tone="bad" title={error.message}>
@@ -81,7 +86,9 @@ export function TransactionForm({
   const invalidate = useInvalidateFinance()
   const isTransfer = Boolean(transaction?.transfer_group_id)
   // Fecha, importe y cuenta: solo en movimientos manuales que no sean transferencia.
-  const coreEditable = !transaction || (transaction.source === 'manual' && !isTransfer)
+  // Con asiento contabilizado tampoco (D-048): primero se revierte el asiento.
+  const posted = postedEntryOf(transaction?.journal_entry)
+  const coreEditable = !transaction || (transaction.source === 'manual' && !isTransfer && !posted)
   const active = accounts.filter((a) => !a.archived_at)
   const [accountId, setAccountId] = useState(transaction?.account_id ?? active[0]?.id ?? '')
   const [direction, setDirection] = useState<'in' | 'out'>(transaction && !isNegative(transaction.amount) ? 'in' : 'out')
@@ -135,7 +142,12 @@ export function TransactionForm({
           <FormError error={save.error} />
         </div>
       ) : null}
-      {transaction && !coreEditable && (
+      {transaction && posted && (
+        <div className="col-span-2">
+          <PostedEntryNotice entry={posted} action="edit" />
+        </div>
+      )}
+      {transaction && !coreEditable && !posted && (
         <p className="col-span-2 rounded-sm bg-sunken px-3 py-2 text-sm text-ink-2">
           {isTransfer
             ? 'Es una pata de una transferencia: la fecha, el importe y la cuenta no se cambian. Si está mal, anulala (se anulan las dos patas) y cargala de nuevo.'
@@ -209,6 +221,7 @@ export function VoidForm({ transaction, onDone }: { transaction: Transaction; on
   const [reason, setReason] = useState('')
   const [touched, setTouched] = useState(false)
   const tooShort = reason.trim().length < 3
+  const posted = postedEntryOf(transaction.journal_entry)
   const voidTx = useMutation({
     mutationFn: () => post<Transaction[]>(`/finance/contexts/${cid}/transactions/${transaction.id}/void`, { reason: reason.trim() }),
     onSuccess: (list) => {
@@ -220,7 +233,7 @@ export function VoidForm({ transaction, onDone }: { transaction: Transaction; on
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     setTouched(true)
-    if (!tooShort) voidTx.mutate()
+    if (!tooShort && !posted) voidTx.mutate()
   }
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
@@ -234,7 +247,8 @@ export function VoidForm({ transaction, onDone }: { transaction: Transaction; on
         Nada se borra: el movimiento queda a la vista como anulado, con tu motivo, y deja de contar en saldos y resúmenes.
         {transaction.transfer_group_id && ' Es una transferencia: se anulan sus dos movimientos.'}
       </p>
-      {voidTx.error ? <FormError error={voidTx.error} /> : null}
+      {posted && <PostedEntryNotice entry={posted} action="void" />}
+      {voidTx.error ? <FormError error={voidTx.error} action="void" /> : null}
       <Field label="Motivo de la anulación" error={touched && tooShort ? 'Escribí el motivo (al menos 3 caracteres).' : undefined}>
         {(p) => <Textarea {...p} autoFocus required maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} />}
       </Field>
@@ -242,7 +256,7 @@ export function VoidForm({ transaction, onDone }: { transaction: Transaction; on
         <Button type="button" variant="ghost" onClick={onDone}>
           Cancelar
         </Button>
-        <Button type="submit" variant="danger" busy={voidTx.isPending}>
+        <Button type="submit" variant="danger" busy={voidTx.isPending} disabled={Boolean(posted)}>
           Anular movimiento
         </Button>
       </div>
