@@ -1,4 +1,5 @@
 /** Piezas compartidas de contabilidad. Solo tokens del sistema de diseño (styles/index.css). */
+import { useQuery } from '@tanstack/react-query'
 import { ShieldAlert, ShieldCheck } from 'lucide-react'
 import { type KeyboardEvent, type ReactNode, type Ref, useId, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router'
@@ -6,7 +7,9 @@ import { Badge, Notice } from '../../components/ui'
 import { cx } from '../../lib/cx'
 import { formatDateTime } from '../../lib/format'
 import { formatMoney, isNegative } from '../../lib/money'
+import { get } from '../../services/api'
 import { useSession } from '../../stores/session'
+import type { Organization } from '../../types/api'
 import { matchesAccount } from './chartTree'
 import { KIND_LABELS, STATUS_LABELS } from './labels'
 import type { AccountingSettings, ChartStatus, EntryStatus, LedgerAccount } from './types'
@@ -300,18 +303,30 @@ export function LedgerAccountSelect({
   )
 }
 
-/** Encabezado de un libro o estado contable: empresa, título, alcance y la moneda. */
+/**
+ * Encabezado de un libro o estado contable: empresa con su RUC, título, alcance y la moneda.
+ * Al imprimir es el encabezado del papel (con la fecha de emisión); las acciones de `aside`
+ * no se imprimen.
+ */
 export function ReportHeading({ title, scope, status, aside }: { title: string; scope: string; status: ChartStatus; aside?: ReactNode }) {
   const { me } = useSession()
+  const org = useQuery({ queryKey: ['organization'], queryFn: () => get<Organization>('/organization'), staleTime: 60_000 })
+  // La fecha de emisión se fija al montar (no en cada render).
+  const [issuedAt] = useState(() => new Date().toISOString())
+  const ruc = org.data?.ruc ? `RUC ${org.data.ruc}-${org.data.ruc_check_digit}` : org.data ? 'RUC sin cargar' : ''
   return (
-    <div className="border-b border-line px-6 pt-5 pb-4">
+    <div className="report-heading border-b border-line px-6 pt-5 pb-4">
       <div className="flex items-start justify-between gap-6">
         <div>
-          <p className="text-sm text-ink-2">{me?.organization.legal_name}</p>
+          <p className="text-sm text-ink-2">
+            <span className="font-medium text-ink">{org.data?.legal_name ?? me?.organization.legal_name}</span>
+            {ruc && <span className="ml-2">{ruc}</span>}
+          </p>
           <h2 className="mt-0.5 text-lg font-semibold tracking-tight">{title}</h2>
           <p className="mt-0.5 text-sm text-ink-2">
             {scope}. Importes en guaraníes.
           </p>
+          <p className="print-only mt-0.5 text-sm text-ink-2">Emitido el {formatDateTime(issuedAt)}</p>
         </div>
         {aside}
       </div>

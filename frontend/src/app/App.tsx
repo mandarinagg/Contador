@@ -109,6 +109,17 @@ const accounting = {
   entries: () => import('../modules/accounting/EntriesPage').then((m) => ({ Component: m.EntriesPage })),
   entry: () => import('../modules/accounting/EntryPage').then((m) => ({ Component: m.EntryPage })),
   reports: () => import('../modules/accounting/reports/ReportsPage').then((m) => ({ Component: m.ReportsPage })),
+  // Fase 3B
+  assetsLayout: () => import('../modules/accounting/assets/AssetsLayout').then((m) => ({ Component: m.AssetsLayout })),
+  assets: () => import('../modules/accounting/assets/AssetsPage').then((m) => ({ Component: m.AssetsPage })),
+  assetForm: () => import('../modules/accounting/assets/AssetFormPage').then((m) => ({ Component: m.AssetFormPage })),
+  asset: () => import('../modules/accounting/assets/AssetDetailPage').then((m) => ({ Component: m.AssetDetailPage })),
+  categories: () => import('../modules/accounting/assets/CategoriesPage').then((m) => ({ Component: m.AssetCategoriesPage })),
+  depreciation: () => import('../modules/accounting/assets/DepreciationPage').then((m) => ({ Component: m.DepreciationPage })),
+  schedule: () => import('../modules/accounting/assets/SchedulePage').then((m) => ({ Component: m.SchedulePage })),
+  centers: () => import('../modules/accounting/CostCentersPage').then((m) => ({ Component: m.CostCentersPage })),
+  recurring: () => import('../modules/accounting/recurring/RecurringPage').then((m) => ({ Component: m.RecurringPage })),
+  template: () => import('../modules/accounting/recurring/TemplatePage').then((m) => ({ Component: m.TemplatePage })),
 }
 
 const router = createBrowserRouter([
@@ -162,6 +173,23 @@ const router = createBrowserRouter([
                   { path: 'asientos/:id', lazy: accounting.entry },
                   { path: 'reportes', element: <Navigate to="/contabilidad/reportes/diario" replace /> },
                   { path: 'reportes/:report', lazy: accounting.reports },
+                  {
+                    path: 'activos',
+                    lazy: accounting.assetsLayout,
+                    children: [
+                      { index: true, lazy: accounting.assets },
+                      { path: 'categorias', lazy: accounting.categories },
+                      { path: 'depreciacion', lazy: accounting.depreciation },
+                      { path: 'cuadro', lazy: accounting.schedule },
+                    ],
+                  },
+                  { path: 'activos/nuevo', lazy: accounting.assetForm },
+                  { path: 'activos/:id', lazy: accounting.asset },
+                  { path: 'activos/:id/editar', lazy: accounting.assetForm },
+                  { path: 'centros', lazy: accounting.centers },
+                  { path: 'recurrentes', lazy: accounting.recurring },
+                  { path: 'recurrentes/nueva', lazy: accounting.template },
+                  { path: 'recurrentes/:id', lazy: accounting.template },
                 ],
               },
             ],

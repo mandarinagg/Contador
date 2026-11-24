@@ -13,6 +13,7 @@ import { accountingKeys } from '../data'
 import { ENTRY_KIND_LABELS, rangeText } from '../labels'
 import type { JournalReport as Journal } from '../types'
 import { ReportControls, ReportSheet } from './common'
+import { ReportActions } from './ReportActions'
 import { amountTh, textTh, useReportParams } from './params'
 
 export function JournalReport() {
@@ -42,7 +43,12 @@ export function JournalReport() {
           </div>
         ) : (
           <>
-            <ReportHeading title="Libro diario" scope={`Asientos contabilizados ${rangeText(from, to)}`} status={first.chart_status} />
+            <ReportHeading
+              title="Libro diario"
+              scope={`Asientos contabilizados ${rangeText(from, to)}`}
+              status={first.chart_status}
+              aside={<ReportActions path={`/accounting/reports/journal${qs({ from, to })}`} report="journal" scope={{ from, to }} disabled={entries.length === 0} />}
+            />
             {entries.length === 0 ? (
               <EmptyState title="Sin asientos contabilizados en el rango">
                 Los borradores no aparecen en el diario hasta que se contabilizan. Probá con otro rango o revisá los{' '}
@@ -84,6 +90,10 @@ export function JournalReport() {
                             {e.status === 'reversed' && <Badge>Revertido</Badge>}
                           </span>
                           {e.document_reference && <span className="ml-3 text-sm text-ink-2">Comprobante {e.document_reference}</span>}
+                          <span className="block text-sm text-ink-3">
+                            Cargado por {e.created_by_name ?? 'un usuario sin nombre registrado'}
+                            {e.posted_by_name ? `; contabilizado por ${e.posted_by_name}` : ''}.
+                          </span>
                         </td>
                       </tr>
                       {(e.lines ?? []).map((l) => (

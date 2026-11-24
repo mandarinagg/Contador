@@ -135,3 +135,75 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Solo en papel (fecha de emisión del reporte, por ejemplo). */
+.print-only { display: none; }
+
+/*
+ * Impresión de los libros y estados (D-063): el PDF sale de acá («Guardar como PDF» o
+ * «Microsoft Print to PDF»). Solo el reporte, en A4, con tinta negra sobre blanco aunque la app
+ * esté en tema oscuro, sin menú ni botones, y con el encabezado de la empresa del reporte.
+ */
+@page {
+  size: A4 portrait;
+  margin: 14mm 12mm 16mm;
+}
+/* Tablas anchas (cuadro de depreciación, comprobación con saldos): A4 apaisado. */
+@page apaisado {
+  size: A4 landscape;
+  margin: 12mm 10mm 14mm;
+}
+
+@media print {
+  :root,
+  :root[data-theme="dark"] {
+    --paper: #ffffff;
+    --surface: #ffffff;
+    --sunken: #f1f3f1;
+    --ink: #000000;
+    --ink-2: #333a37;
+    --ink-3: #5d6763;
+    --line: #c9d0cc;
+    --line-strong: #8e9893;
+    --ledger: #1f5c4a;
+    --ledger-soft: #eef4f1;
+    --debit-red: #9e2f1f;
+    --debit-red-soft: #fbeeeb;
+    --amber: #6e4900;
+    --amber-soft: #fbf3e2;
+    color-scheme: light;
+  }
+  html, body, #root { height: auto !important; background: #fff !important; }
+  body {
+    font-size: 9pt;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  /* Todo lo que no es el reporte. */
+  aside, [data-print="hide"], form[aria-label="Alcance del reporte"], [role="note"][aria-label="Estado del plan de cuentas"], [aria-live] {
+    display: none !important;
+  }
+  .print-only { display: block; }
+  /* El contenedor desplazable de la app deja de recortar: el reporte fluye por las páginas. */
+  .h-full { height: auto !important; }
+  main { overflow: visible !important; }
+  main > div { max-width: none !important; padding: 0 !important; margin: 0 !important; }
+  section { border: 0 !important; box-shadow: none !important; border-radius: 0 !important; overflow: visible !important; }
+  .overflow-x-auto, .overflow-hidden { overflow: visible !important; }
+  .report-heading { padding: 0 0 3mm !important; border-bottom: 1.5px solid #000 !important; }
+  .report-heading h2 { font-size: 13pt; }
+  a { color: inherit !important; text-decoration: none !important; }
+  table { width: 100% !important; font-size: 8.5pt; }
+  td, th { padding-top: 1.2mm !important; padding-bottom: 1.2mm !important; }
+  /* El encabezado de la tabla se repite en cada hoja; los totales salen una sola vez, al final. */
+  thead { display: table-header-group; }
+  tfoot { display: table-row-group; }
+  tr, .avoid-break { break-inside: avoid; }
+  h2, h3 { break-after: avoid; }
+  .ledger-rule { border-bottom: 3px double #000 !important; }
+  .print-landscape { page: apaisado; }
+  /* Cuadros anchos (RG 77/2020): letra chica, sin columna fija ni mínimo de ancho. */
+  .print-dense table { min-width: 0 !important; }
+  .print-dense table, .print-dense th, .print-dense td { font-size: 6.8pt !important; }
+  .print-dense td, .print-dense th { padding-left: 0.8mm !important; padding-right: 0.8mm !important; position: static !important; }
+}

@@ -106,3 +106,50 @@ export function qs(params: Record<string, string | number | boolean | null | und
   const text = search.toString()
   return text ? `?${text}` : ''
 }
+
+/**
+ * Descarga binaria autenticada (XLSX de los reportes). Devuelve el archivo y el nombre que
+ * manda la API en `Content-Disposition`, si el navegador lo deja leer: en un pedido entre
+ * orígenes solo se ve si la API lo expone en `Access-Control-Expose-Headers`.
+ */
+export async function getBlob(path: string): Promise<{ blob: Blob; filename: string | null }> {
+  const headers: Record<string, string> = {}
+  const token = session.token
+  if (token) headers.Authorization = `Bearer ${token}`
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { headers })
+  } catch {
+    throw new ApiError(0, 'NETWORK', 'No se pudo conectar con el servicio local de CONTADOR AI.')
+  }
+  if (!res.ok) {
+    const data = (await res.json().catch(() => null)) as ApiErrorBody | null
+    if (res.status === 401 && token) {
+      session.clear()
+      onUnauthorized?.()
+    }
+    throw new ApiError(res.status, data?.error?.code ?? `HTTP_${res.status}`, data?.error?.message ?? 'Respuesta inesperada del servicio.', data?.error?.details)
+  }
+  return { blob: await res.blob(), filename: filenameFromDisposition(res.headers.get('Content-Disposition')) }
+}
+
+/** `attachment; filename="libro-diario-2026-01-01-2026-12-31.xlsx"` → el nombre (también `filename*=UTF-8''…`). */
+export function filenameFromDisposition(header: string | null): string | null {
+  if (!header) return null
+  const star = /filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/.exec(header)
+  if (star) {
+    try {
+      return safeName(decodeURIComponent(star[1].trim().replace(/^"|"$/g, '')))
+    } catch {
+      // Codificación rota: sigue con `filename=`.
+    }
+  }
+  const plain = /filename\s*=\s*(?:"([^"]*)"|([^;]+))/.exec(header)
+  return safeName((plain?.[1] ?? plain?.[2] ?? '').trim())
+}
+
+/** Nunca una ruta: solo el nombre del archivo. */
+function safeName(name: string): string | null {
+  const base = name.replace(/^.*[\\/]/, '').trim()
+  return base && base !== '.' && base !== '..' ? base : null
+}

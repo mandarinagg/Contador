@@ -35,8 +35,10 @@ export function ReportsPage() {
   }
   return (
     <>
-      <PageHeader title="Libros y balances" description="Calculados en el momento desde los asientos contabilizados (también los revertidos y sus reversiones, que se compensan). Los borradores no cuentan." />
-      <nav aria-label="Reportes contables" className="mb-5 flex flex-wrap gap-1 border-b border-line">
+      <div data-print="hide">
+        <PageHeader title="Libros y balances" description="Calculados en el momento desde los asientos contabilizados (también los revertidos y sus reversiones, que se compensan). Los borradores no cuentan." />
+      </div>
+      <nav aria-label="Reportes contables" data-print="hide" className="mb-5 flex flex-wrap gap-1 border-b border-line">
         {REPORTS.map((r) => (
           <Link
             key={r.slug}

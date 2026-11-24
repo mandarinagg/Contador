@@ -7,6 +7,7 @@ import { LEGAL_FORM_LABELS, plural } from '../../lib/format'
 import { get } from '../../services/api'
 import { useSession } from '../../stores/session'
 import type { ChainVerification, Member, Organization } from '../../types/api'
+import { RecurringDueBanner } from '../accounting/recurring/RecurringDueBanner'
 
 function ChecklistItem({ done, title, children, action }: { done: boolean; title: string; children: ReactNode; action?: ReactNode }) {
   return (
@@ -47,6 +48,7 @@ export function HomePage() {
         title={`Hola, ${firstName}`}
         description="Este es el estado de la configuración de tu empresa en Contador AI. Los indicadores financieros aparecen cuando cargues cuentas y movimientos (fase 2)."
       />
+      <RecurringDueBanner className="mb-6" />
 
       <div className="grid grid-cols-[1fr_18rem] gap-6">
         <Sheet>
