@@ -2,27 +2,29 @@
  * Un asiento: editor del borrador (con totales en vivo y la diferencia hasta que balancea) o
  * vista de solo lectura del contabilizado, revertido o descartado, con sus vínculos.
  */
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, BookCheck, CircleCheck, Coins, Keyboard, Plus, Trash2, Undo2, X } from 'lucide-react'
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, BookCheck, Trash2, Undo2 } from 'lucide-react'
+import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from 'react'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router'
-import { Button, EmptyState, Field, Input, Modal, Notice, PageHeader, Select, Sheet, Skeleton, Textarea } from '../../components/ui'
+import { Button, EmptyState, Field, Input, Modal, Notice, PageHeader, Sheet, Skeleton, Textarea } from '../../components/ui'
 import { useToast } from '../../components/ui/toast'
 import { cx } from '../../lib/cx'
 import { formatDateTime } from '../../lib/format'
-import { CURRENCY_SYMBOLS, formatMoney, parseAmountInput, toInputText } from '../../lib/money'
-import { ApiError, patch, post } from '../../services/api'
-import { ApiErrorNotice } from '../finance/components'
+import { CURRENCY_SYMBOLS, formatMoney } from '../../lib/money'
+import { ApiError, get, patch, post } from '../../services/api'
+import { Amount, ApiErrorNotice } from '../finance/components'
+import { financeKeys } from '../finance/data'
+import type { Transaction } from '../finance/types'
 import { formatBookDate, todayIso } from '../finance/labels'
-import { absPyg, formatDecimal, isWholeDecimal, multiplyDecimal, parseRateInput } from './amounts'
+import { formatDecimal } from './amounts'
 import { postableAccounts } from './chartTree'
-import { AccountCombobox, Blank, EntryStatusBadge, Pyg, RuledTotal } from './components'
-import { accountingKeys, useAccountingPerms, useAccountsById, useChart, useEntry, useFiscalYears, useInvalidateAccounting, useUserName } from './data'
-import { buildEntry, emptyLine, fingerprint, type HeaderDraft, type LineDraft, linesFromEntry, readPyg, remainderFor, totalsOf } from './editor'
-import { ENTRY_KIND_LABELS, entryLabel, longDate, monthName } from './labels'
-import type { Entry, FiscalYear, LedgerAccount } from './types'
-
-const FX_CURRENCIES = ['USD', 'BRL', 'ARS', 'EUR'] as const
+import { Blank, EntryStatusBadge, Pyg, RuledTotal } from './components'
+import { accountingKeys, useAccountingPerms, useAccountsById, useChart, useCostCenters, useEntry, useFiscalYears, useInvalidateAccounting, useUserName } from './data'
+import { buildEntry, emptyLine, fingerprint, type HeaderDraft, type LineDraft, linesFromEntry, missingCenters, totalsOf } from './editor'
+import { LinesEditor } from './LinesEditor'
+import { DISPOSAL_KIND_LABELS, ENTRY_KIND_LABELS, entryLabel, GENERATED_KINDS, longDate, monthName, REVERSIBLE_KINDS } from './labels'
+import type { DepreciationRun, FixedAsset } from './types3b'
+import type { Entry, FiscalYear } from './types'
 
 /** El ejercicio y el período de una fecha, si existen. */
 function locate(years: FiscalYear[] | undefined, date: string) {
@@ -32,49 +34,7 @@ function locate(years: FiscalYear[] | undefined, date: string) {
   return year ? { year, period } : { year: undefined, period: undefined }
 }
 
-// --- Celda de importe -------------------------------------------------------------------
-
-function AmountCell({
-  value,
-  onChange,
-  label,
-  invalid,
-  inputRef,
-  onKeyDown,
-}: {
-  value: string
-  onChange: (v: string) => void
-  label: string
-  invalid?: boolean
-  inputRef: (el: HTMLInputElement | null) => void
-  onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void
-}) {
-  return (
-    <input
-      ref={inputRef}
-      aria-label={label}
-      aria-invalid={invalid || undefined}
-      inputMode="numeric"
-      autoComplete="off"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onKeyDown={onKeyDown}
-      onBlur={() => {
-        const r = readPyg(value)
-        if ('value' in r && r.value) onChange(toInputText(r.value, 'PYG'))
-      }}
-      className={cx(
-        'h-9 w-full rounded-sm border border-transparent bg-transparent px-2.5 text-right tabular-nums',
-        'hover:border-line-strong focus:border-line-strong focus:bg-surface aria-invalid:border-debit',
-        value && 'font-medium',
-      )}
-    />
-  )
-}
-
 // --- Editor ---------------------------------------------------------------------------------
-
-type Col = 'account' | 'description' | 'debit' | 'credit'
 
 function EntryEditor({ entry }: { entry?: Entry }) {
   const perms = useAccountingPerms()
@@ -86,6 +46,7 @@ function EntryEditor({ entry }: { entry?: Entry }) {
   const invalidate = useInvalidateAccounting()
   const byId = useAccountsById(chart.data?.accounts)
   const options = useMemo(() => postableAccounts(chart.data?.accounts ?? []), [chart.data])
+  const centers = useCostCenters()
 
   const [header, setHeader] = useState<HeaderDraft>(() => ({
     entry_date: entry?.entry_date ?? todayIso(),
@@ -97,47 +58,16 @@ function EntryEditor({ entry }: { entry?: Entry }) {
   const [saved, setSaved] = useState(() => fingerprint(header, lines))
   const [showErrors, setShowErrors] = useState(false)
   const [dialog, setDialog] = useState<'discard' | null>(null)
-  const cells = useRef(new Map<string, HTMLInputElement>())
-  const pendingFocus = useRef<string | null>(null)
+  const kindOf = (id: string) => byId.get(id)?.kind
 
   const totals = totalsOf(lines)
-  const build = buildEntry(header, lines)
+  const build = buildEntry(header, lines, kindOf)
+  const missing = missingCenters(lines, kindOf, Boolean(chart.data?.cost_centers_required))
   const dirty = fingerprint(header, lines) !== saved
   const where = locate(years.data, header.entry_date)
   const periodClosed = where?.period?.status === 'closed'
   const yearClosed = where?.year?.status === 'closed'
   const noYear = Boolean(header.entry_date && years.data && !where?.year)
-
-  useEffect(() => {
-    if (pendingFocus.current) {
-      cells.current.get(pendingFocus.current)?.focus()
-      pendingFocus.current = null
-    }
-  })
-
-  const setLine = (key: string, change: Partial<LineDraft>) => setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...change } : l)))
-  const addLine = (focus = true) => {
-    const line = emptyLine(remainderFor(lines))
-    setLines((ls) => [...ls, line])
-    if (focus) pendingFocus.current = `${line.key}:account`
-  }
-  const removeLine = (key: string) => setLines((ls) => (ls.length > 1 ? ls.filter((l) => l.key !== key) : [emptyLine()]))
-
-  const cellKeys = (index: number, col: Col): HTMLInputElement | undefined => {
-    const target = lines[index]
-    return target ? cells.current.get(`${target.key}:${col}`) : undefined
-  }
-  const navKeys = (index: number, col: Col) => (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'ArrowDown' || (e.key === 'Enter' && !e.ctrlKey && !e.metaKey)) {
-      e.preventDefault()
-      if (index === lines.length - 1) {
-        if (e.key === 'Enter') addLine()
-      } else cellKeys(index + 1, col)?.focus()
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      cellKeys(index - 1, col)?.focus()
-    }
-  }
 
   const persist = async (): Promise<Entry | null> => {
     setShowErrors(true)
@@ -187,9 +117,11 @@ function EntryEditor({ entry }: { entry?: Entry }) {
   }
 
   const lineErrors = showErrors ? build.lines : {}
-  const canPostNow = perms.canPost && totals.balanced && !periodClosed && !yearClosed && !noYear
+  const canPostNow = perms.canPost && totals.balanced && !periodClosed && !yearClosed && !noYear && missing.length === 0
   const postBlocker = !totals.balanced
     ? 'Para contabilizar, el debe y el haber tienen que sumar lo mismo.'
+    : missing.length > 0
+      ? 'Falta el centro de costos en las líneas de ingreso o gasto marcadas: la configuración lo exige.'
     : noYear
       ? 'La fecha no cae en ningún ejercicio.'
       : yearClosed
@@ -199,7 +131,6 @@ function EntryEditor({ entry }: { entry?: Entry }) {
           : ''
   const error = save.error ?? postEntry.error
   const apiError = error instanceof ApiError ? error : null
-  const diffPositive = !totals.difference.startsWith('-')
 
   return (
     <div onKeyDown={onShortcut}>
@@ -208,7 +139,9 @@ function EntryEditor({ entry }: { entry?: Entry }) {
         description={
           entry?.kind === 'finance'
             ? 'Propuesto desde un movimiento de la empresa. Revisalo: no está en los libros hasta que alguien lo contabilice.'
-            : 'Un borrador se puede guardar desbalanceado y corregir cuantas veces haga falta. Al contabilizarlo recibe su número y ya no cambia.'
+            : entry?.kind === 'recurring'
+              ? 'Generado desde una plantilla recurrente. Ajustalo si hace falta: no está en los libros hasta que alguien lo contabilice.'
+              : 'Un borrador se puede guardar desbalanceado y corregir cuantas veces haga falta. Al contabilizarlo recibe su número y ya no cambia.'
         }
         actions={
           <Link to="/contabilidad/asientos" className="inline-flex h-9 items-center gap-2 rounded-sm px-3 text-ink-2 hover:bg-sunken hover:text-ink">
@@ -248,123 +181,16 @@ function EntryEditor({ entry }: { entry?: Entry }) {
         </Field>
       </Sheet>
 
-      <Sheet>
-        <table className="w-full table-fixed" aria-label="Líneas del asiento">
-          <colgroup>
-            <col className="w-10" />
-            <col className="w-[34%]" />
-            <col />
-            <col className="w-40" />
-            <col className="w-40" />
-            <col className="w-20" />
-          </colgroup>
-          <thead className="border-b border-line bg-sunken text-sm text-ink-2">
-            <tr>
-              <th scope="col" className="py-2.5 pl-4 text-left font-medium">
-                <span className="sr-only">Línea</span>#
-              </th>
-              <th scope="col" className="px-2.5 py-2.5 text-left font-medium">Cuenta</th>
-              <th scope="col" className="px-2.5 py-2.5 text-left font-medium">Detalle de la línea</th>
-              <th scope="col" className="px-2.5 py-2.5 text-right font-medium">Debe</th>
-              <th scope="col" className="px-2.5 py-2.5 text-right font-medium">Haber</th>
-              <th scope="col">
-                <span className="sr-only">Acciones</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {lines.map((l, i) => {
-              const errs = lineErrors[l.key]
-              const n = i + 1
-              return (
-                <LineRows
-                  key={l.key}
-                  line={l}
-                  n={n}
-                  errors={errs}
-                  options={options}
-                  known={byId}
-                  register={(col, el) => {
-                    const k = `${l.key}:${col}`
-                    if (el) cells.current.set(k, el)
-                    else cells.current.delete(k)
-                  }}
-                  nav={(col) => navKeys(i, col)}
-                  onChange={(change) => setLine(l.key, change)}
-                  onRemove={() => removeLine(l.key)}
-                  onAccountKey={(e, open) => {
-                    if (!open && e.key === 'Enter') {
-                      e.preventDefault()
-                      cells.current.get(`${l.key}:${l.credit ? 'credit' : 'debit'}`)?.focus()
-                    }
-                  }}
-                />
-              )
-            })}
-          </tbody>
-          <tfoot className="border-t-2 border-line-strong">
-            <tr>
-              <td colSpan={3} className="px-4 py-3">
-                <Button type="button" variant="ghost" className="-ml-2" onClick={() => addLine()}>
-                  <Plus size={15} />
-                  Agregar línea
-                </Button>
-              </td>
-              <td className="py-3 pr-4 pl-1.5 text-right">
-                <RuledTotal value={totals.debit} label={`Total debe ${formatMoney(totals.debit, 'PYG')}`} />
-              </td>
-              <td className="py-3 pr-4 pl-1.5 text-right">
-                <RuledTotal value={totals.credit} label={`Total haber ${formatMoney(totals.credit, 'PYG')}`} />
-              </td>
-              <td />
-            </tr>
-          </tfoot>
-        </table>
-        <div
-          role="status"
-          aria-live="polite"
-          aria-label="Balance del asiento"
-          className={cx(
-            'flex flex-wrap items-center gap-x-5 gap-y-1 rounded-b-md border-t px-5 py-3.5',
-            totals.balanced ? 'border-line bg-ledger-soft' : totals.hasAmounts ? 'border-amber/40 bg-amber-soft' : 'border-line bg-sunken',
-          )}
-        >
-          {totals.balanced ? (
-            <p className="flex items-center gap-2 font-medium text-ledger">
-              <CircleCheck size={18} aria-hidden />
-              Balancea: el debe y el haber suman {formatMoney(totals.debit, 'PYG')}.
-            </p>
-          ) : !totals.hasAmounts ? (
-            <p className="text-ink-2">Todavía sin importes: cada línea va al debe o al haber. Los totales y la diferencia se calculan mientras escribís.</p>
-          ) : (
-            <>
-              <p className="flex items-baseline gap-3">
-                <span className="text-sm font-medium text-amber">Diferencia</span>
-                <span className="text-lg font-semibold text-ink tabular-nums" data-testid="diferencia">
-                  {formatMoney(absPyg(totals.difference), 'PYG')}
-                </span>
-              </p>
-              <p className="text-sm text-ink-2">
-                {diffPositive ? 'Sobra debe: falta ese importe en el haber.' : 'Sobra haber: falta ese importe en el debe.'} Una línea nueva lo propone
-                sola.
-              </p>
-            </>
-          )}
-        </div>
-      </Sheet>
-
-      <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-3">
-        <Keyboard size={15} aria-hidden />
-        <span>
-          <Kbd>Tab</Kbd> pasa de celda en celda
-        </span>
-        <span>
-          <Kbd>Enter</Kbd> o <Kbd>↓</Kbd> baja de línea; en la última, agrega otra
-        </span>
-        <span>
-          <Kbd>Ctrl</Kbd> + <Kbd>S</Kbd> guarda el borrador
-        </span>
-      </p>
+      <LinesEditor
+        lines={lines}
+        setLines={setLines}
+        errors={lineErrors}
+        options={options}
+        known={byId}
+        kindOf={kindOf}
+        centers={centers.data ?? []}
+        missingCenterKeys={totals.balanced ? missing : []}
+      />
 
       {showErrors && build.general && (
         <div className="mt-4">
@@ -418,161 +244,6 @@ function EntryEditor({ entry }: { entry?: Entry }) {
   )
 }
 
-const Kbd = ({ children }: { children: ReactNode }) => (
-  <kbd className="rounded-sm border border-line-strong bg-surface px-1.5 py-px font-sans text-xs text-ink-2">{children}</kbd>
-)
-
-function LineRows({
-  line,
-  n,
-  errors,
-  options,
-  known,
-  register,
-  nav,
-  onChange,
-  onRemove,
-  onAccountKey,
-}: {
-  line: LineDraft
-  n: number
-  errors?: Partial<Record<'account' | 'amount' | 'fx', string>>
-  options: LedgerAccount[]
-  known: Map<string, LedgerAccount>
-  register: (col: Col, el: HTMLInputElement | null) => void
-  nav: (col: Col) => (e: KeyboardEvent<HTMLInputElement>) => void
-  onChange: (change: Partial<LineDraft>) => void
-  onRemove: () => void
-  onAccountKey: (e: KeyboardEvent<HTMLInputElement>, open: boolean) => void
-}) {
-  const debitErr = readPyg(line.debit)
-  const creditErr = readPyg(line.credit)
-  const cellError = 'error' in debitErr ? debitErr.error : 'error' in creditErr ? creditErr.error : undefined
-  const message = errors?.account ?? errors?.amount ?? cellError
-  const fx = line.fx
-  const fxProduct = (() => {
-    if (!fx) return null
-    const a = parseAmountInput(fx.amount, fx.currency)
-    const r = parseRateInput(fx.rate)
-    if (!a.ok || !r.ok || a.value.startsWith('-')) return null
-    return multiplyDecimal(a.value, r.value)
-  })()
-  return (
-    <>
-      <tr className={cx('border-t border-line first:border-t-0', message && 'bg-debit-soft/40')}>
-        <td className="py-1.5 pl-4 text-sm text-ink-3 tabular-nums">{n}</td>
-        <td className="px-1.5 py-1.5">
-          <AccountCombobox
-            aria-label={`Cuenta de la línea ${n}`}
-            aria-invalid={Boolean(errors?.account) || undefined}
-            accounts={options}
-            known={known}
-            value={line.account_id}
-            onChange={(id) => onChange({ account_id: id })}
-            inputRef={(el) => register('account', el)}
-            onKeyDown={onAccountKey}
-          />
-        </td>
-        <td className="px-1.5 py-1.5">
-          <input
-            ref={(el) => register('description', el)}
-            aria-label={`Detalle de la línea ${n}`}
-            maxLength={300}
-            value={line.description}
-            onChange={(e) => onChange({ description: e.target.value })}
-            onKeyDown={nav('description')}
-            placeholder="Opcional"
-            className="h-9 w-full rounded-sm border border-transparent bg-transparent px-2.5 placeholder:text-ink-3 hover:border-line-strong focus:border-line-strong focus:bg-surface"
-          />
-        </td>
-        <td className="px-1.5 py-1.5">
-          <AmountCell
-            label={`Debe de la línea ${n}`}
-            value={line.debit}
-            invalid={Boolean(errors?.amount) || 'error' in debitErr}
-            inputRef={(el) => register('debit', el)}
-            onKeyDown={nav('debit')}
-            onChange={(v) => onChange(v.trim() ? { debit: v, credit: '' } : { debit: v })}
-          />
-        </td>
-        <td className="px-1.5 py-1.5">
-          <AmountCell
-            label={`Haber de la línea ${n}`}
-            value={line.credit}
-            invalid={Boolean(errors?.amount) || 'error' in creditErr}
-            inputRef={(el) => register('credit', el)}
-            onKeyDown={nav('credit')}
-            onChange={(v) => onChange(v.trim() ? { credit: v, debit: '' } : { credit: v })}
-          />
-        </td>
-        <td className="pr-2">
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              variant="ghost"
-              className={cx('h-8 px-1.5', fx && 'text-ledger')}
-              aria-label={fx ? `Quitar moneda extranjera de la línea ${n}` : `Moneda extranjera en la línea ${n}`}
-              aria-pressed={Boolean(fx)}
-              title="Moneda extranjera (informativa)"
-              onClick={() => onChange({ fx: fx ? null : { currency: 'USD', amount: '', rate: '' } })}
-            >
-              <Coins size={15} />
-            </Button>
-            <Button type="button" variant="ghost" className="h-8 px-1.5 hover:text-debit" aria-label={`Quitar la línea ${n}`} title="Quitar la línea" onClick={onRemove}>
-              <X size={15} />
-            </Button>
-          </div>
-        </td>
-      </tr>
-      {fx && (
-        <tr className="bg-sunken/50">
-          <td />
-          <td colSpan={5} className="px-1.5 pt-1 pb-2.5">
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1 text-sm text-ink-2">
-                Moneda
-                <Select className="h-8 w-24" value={fx.currency} onChange={(e) => onChange({ fx: { ...fx, currency: e.target.value } })}>
-                  {FX_CURRENCIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </Select>
-              </label>
-              <label className="flex flex-col gap-1 text-sm text-ink-2">
-                Importe en {fx.currency}
-                <Input className="h-8 w-36 text-right tabular-nums" inputMode="decimal" value={fx.amount} onChange={(e) => onChange({ fx: { ...fx, amount: e.target.value } })} />
-              </label>
-              <label className="flex flex-col gap-1 text-sm text-ink-2">
-                Cotización (₲ por 1 {fx.currency})
-                <Input className="h-8 w-36 text-right tabular-nums" inputMode="decimal" value={fx.rate} onChange={(e) => onChange({ fx: { ...fx, rate: e.target.value } })} />
-              </label>
-              <p className="pb-1.5 text-sm text-ink-3">
-                {fxProduct ? (
-                  <>
-                    Producto: ₲ {formatDecimal(fxProduct)}
-                    {!isWholeDecimal(fxProduct) && ' (no es entero: redondealo en el debe o el haber)'}.{' '}
-                  </>
-                ) : null}
-                Informativo: el asiento balancea en guaraníes.
-              </p>
-            </div>
-            {errors?.fx && <p className="mt-1 text-sm text-debit">{errors.fx}</p>}
-          </td>
-        </tr>
-      )}
-      {message && (
-        <tr className="bg-debit-soft/40">
-          <td />
-          <td colSpan={5} className="px-3 pb-2 text-sm text-debit">
-            Línea {n}: {message}
-          </td>
-        </tr>
-      )}
-    </>
-  )
-}
-
 function DiscardForm({ entry, onDone }: { entry: Entry; onDone: () => void }) {
   const toast = useToast()
   const qc = useQueryClient()
@@ -602,6 +273,9 @@ function DiscardForm({ entry, onDone }: { entry: Entry; onDone: () => void }) {
       <p className="text-ink-2">
         Nada se borra: el borrador queda como descartado, sin número, con el motivo.
         {entry.kind === 'finance' && ' El movimiento de finanzas vuelve a quedar sin asiento y se puede proponer de nuevo.'}
+        {entry.kind === 'depreciation' && ' La depreciación del mes queda libre: se puede volver a correr.'}
+        {entry.kind === 'disposal' && ' El bien vuelve a quedar activo, sin los datos de la baja.'}
+        {entry.kind === 'recurring' && ' La plantilla se puede volver a generar para este período.'}
       </p>
       {run.error ? <ApiErrorNotice error={run.error} /> : null}
       <Field label="Motivo" error={touched && bad ? 'Escribí el motivo (al menos 3 caracteres).' : undefined}>
@@ -726,14 +400,143 @@ function RelatedLink({ id, prefix }: { id: string; prefix: string }) {
   )
 }
 
+/** Movimiento de finanzas de origen, leído por su id (P-9): se ve qué es sin ir a buscarlo. */
+function SourceTransaction({ cid, tid }: { cid: string; tid: string }) {
+  const tx = useQuery({
+    queryKey: [...financeKeys.transactions(cid), 'detail', tid],
+    queryFn: () => get<Transaction>(`/finance/contexts/${cid}/transactions/${tid}`),
+  })
+  return (
+    <span className="flex flex-col">
+      <Link to={`/finanzas/${cid}/movimientos?tx=${tid}`} className="font-medium text-ledger hover:underline">
+        Movimiento de finanzas de origen
+      </Link>
+      {tx.data ? (
+        <span className="text-sm text-ink-2" data-testid="movimiento-origen">
+          {formatBookDate(tx.data.booked_on)}, {tx.data.description}, <Amount value={tx.data.amount} currency={tx.data.currency} flow />
+          {tx.data.voided_at && ' (anulado)'}
+        </span>
+      ) : tx.isError ? (
+        <span className="text-sm text-ink-3">{tx.error instanceof ApiError ? tx.error.message : 'No se pudo leer el movimiento.'}</span>
+      ) : null}
+    </span>
+  )
+}
+
+/** Detalle por bien de un asiento de depreciación (la corrida que lo generó). */
+function DepreciationDetail({ entry }: { entry: Entry }) {
+  const runs = useQuery({
+    queryKey: accountingKeys.runs(entry.fiscal_year_id),
+    queryFn: () => get<DepreciationRun[]>(`/accounting/depreciation/runs?fiscal_year_id=${entry.fiscal_year_id}`),
+  })
+  const runId = runs.data?.find((r) => r.entry_id === entry.id)?.id
+  const run = useQuery({
+    enabled: Boolean(runId),
+    queryKey: [...accountingKeys.runs(entry.fiscal_year_id), runId],
+    queryFn: () => get<DepreciationRun>(`/accounting/depreciation/runs/${runId}`),
+  })
+  const items = run.data?.items ?? []
+  if (!runId || items.length === 0) return null
+  return (
+    <Sheet className="mt-5">
+      <h2 className="border-b border-line px-5 py-3 font-semibold">Detalle por bien</h2>
+      <table className="w-full" aria-label="Detalle por bien">
+        <thead className="border-b border-line bg-sunken text-sm text-ink-2">
+          <tr>
+            <th scope="col" className="px-4 py-2 text-left font-medium">Bien</th>
+            <th scope="col" className="w-32 px-4 py-2 text-right font-medium">Cuota N°</th>
+            <th scope="col" className="w-40 px-4 py-2 text-right font-medium">Importe</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {items.map((i) => (
+            <tr key={i.asset_id}>
+              <td className="px-4 py-2">
+                <Link to={`/contabilidad/activos/${i.asset_id}`} className="hover:text-ledger hover:underline">
+                  {i.asset_name}
+                </Link>
+              </td>
+              <td className="px-4 py-2 text-right tabular-nums">{i.installment}</td>
+              <td className="px-4 py-2 text-right">
+                <Pyg value={i.amount} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Sheet>
+  )
+}
+
+/** El bien de un asiento de baja (mientras el bien conserve el vínculo). */
+function DisposalAsset({ entry }: { entry: Entry }) {
+  const assets = useQuery({ queryKey: [...accountingKeys.assets(), 'list', {}], queryFn: () => get<FixedAsset[]>('/accounting/fixed-assets') })
+  const asset = assets.data?.find((a) => a.disposal_entry_id === entry.id)
+  if (!asset) return null
+  return (
+    <span className="flex flex-col">
+      <Link to={`/contabilidad/activos/${asset.id}`} className="font-medium text-ledger hover:underline">
+        Bien: {asset.name}
+      </Link>
+      {asset.disposal_kind && (
+        <span className="text-sm text-ink-2">
+          {DISPOSAL_KIND_LABELS[asset.disposal_kind]}. Motivo: {asset.disposal_reason}. Documento: {asset.disposal_document_reference}.
+        </span>
+      )}
+    </span>
+  )
+}
+
+function GeneratedDraftActions({ entry, onDiscard }: { entry: Entry; onDiscard: () => void }) {
+  const perms = useAccountingPerms()
+  const qc = useQueryClient()
+  const toast = useToast()
+  const invalidate = useInvalidateAccounting()
+  const run = useMutation({
+    mutationFn: () => post<Entry>(`/accounting/entries/${entry.id}/post`),
+    onSuccess: (result) => {
+      qc.setQueryData(accountingKeys.entry(result.id), result)
+      invalidate()
+      toast('ok', `Asiento N° ${result.number} contabilizado.`)
+    },
+  })
+  return (
+    <div className="mt-6 border-t border-line pt-5">
+      {run.error ? (
+        <div className="mb-4">
+          <ApiErrorNotice error={run.error} />
+        </div>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-3">
+        {perms.canPost && (
+          <Button onClick={() => run.mutate()} busy={run.isPending} disabled={!entry.balanced}>
+            <BookCheck size={16} />
+            Contabilizar
+          </Button>
+        )}
+        {perms.canManage && (
+          <Button variant="ghost" className="hover:text-debit" onClick={onDiscard}>
+            <Trash2 size={15} />
+            Descartar borrador
+          </Button>
+        )}
+        <p className="ml-auto max-w-md text-right text-sm text-ink-3">{perms.canPost ? 'Al contabilizar recibe el próximo número del ejercicio.' : perms.postReason}</p>
+      </div>
+    </div>
+  )
+}
+
 function EntryView({ entry }: { entry: Entry }) {
   const perms = useAccountingPerms()
   const userName = useUserName()
-  const [dialog, setDialog] = useState<'reverse' | null>(null)
-  const reversible = entry.status === 'posted' && (entry.kind === 'manual' || entry.kind === 'finance')
+  const [dialog, setDialog] = useState<'reverse' | 'discard' | null>(null)
+  const reversible = entry.status === 'posted' && REVERSIBLE_KINDS.includes(entry.kind)
+  const generatedDraft = entry.status === 'draft' && GENERATED_KINDS.includes(entry.kind)
   const lines = entry.lines ?? []
+  const withCenters = lines.some((l) => l.cost_center_id)
   const yearOf = entry.entry_date.slice(0, 4)
   const title = entry.number !== null ? `Asiento N° ${entry.number}` : entry.status === 'discarded' ? 'Asiento descartado' : 'Borrador de asiento'
+  const hasLinks = entry.reverses_entry_id || entry.reversed_by_entry_id || entry.source_transaction_id || entry.kind === 'disposal'
 
   return (
     <>
@@ -756,12 +559,22 @@ function EntryView({ entry }: { entry: Entry }) {
         }
       />
       {reversible && !perms.canPost && <p className="-mt-3 mb-4 text-sm text-ink-3">{perms.postReason}</p>}
-      {entry.status === 'draft' && (
+      {generatedDraft ? (
         <div className="mb-4">
-          <Notice tone="warn" title="Borrador: todavía no está en los libros">
-            {perms.manageReason || 'Lo puede corregir y contabilizar alguien con permiso.'}
+          <Notice tone="warn" title="Borrador generado: todavía no está en los libros">
+            {entry.kind === 'depreciation'
+              ? 'Lo armó la corrida de depreciación del mes, con una línea por cuenta y el detalle por bien. No se edita: si algo no está bien, descartalo, corregí el bien o la categoría y volvé a correr el mes.'
+              : 'Lo armó la baja del bien: da de baja el costo y la depreciación acumulada, y el neto va a la cuenta de resultado por bajas. No se edita: si algo no está bien, descartalo y volvé a dar de baja el bien.'}
           </Notice>
         </div>
+      ) : (
+        entry.status === 'draft' && (
+          <div className="mb-4">
+            <Notice tone="warn" title="Borrador: todavía no está en los libros">
+              {perms.manageReason || 'Lo puede corregir y contabilizar alguien con permiso.'}
+            </Notice>
+          </div>
+        )
       )}
       {entry.status === 'discarded' && (
         <div className="mb-4">
@@ -782,24 +595,21 @@ function EntryView({ entry }: { entry: Entry }) {
           {entry.posted_at && (
             <Meta label="Contabilizado">
               {formatDateTime(entry.posted_at)}
-              <span className="block text-sm text-ink-2">por {userName(entry.posted_by)}</span>
+              <span className="block text-sm text-ink-2">por {entry.posted_by_name ?? 'un usuario sin nombre registrado'}</span>
             </Meta>
           )}
           <Meta label="Creado">
             {formatDateTime(entry.created_at)}
-            <span className="block text-sm text-ink-2">por {userName(entry.created_by)}</span>
+            <span className="block text-sm text-ink-2">por {entry.created_by_name ?? 'un usuario sin nombre registrado'}</span>
           </Meta>
-          {(entry.reverses_entry_id || entry.reversed_by_entry_id || entry.source_transaction_id) && (
+          {hasLinks && (
             <div className="col-span-2 flex flex-col gap-1">
               <dt className="text-sm text-ink-3">Vínculos</dt>
-              <dd className="flex flex-col gap-1">
+              <dd className="flex flex-col gap-1.5">
                 {entry.reverses_entry_id && <RelatedLink id={entry.reverses_entry_id} prefix="Revierte el asiento" />}
                 {entry.reversed_by_entry_id && <RelatedLink id={entry.reversed_by_entry_id} prefix="Revertido por el asiento" />}
-                {entry.source_transaction_id && entry.source_context_id && (
-                  <Link to={`/finanzas/${entry.source_context_id}/movimientos?tx=${entry.source_transaction_id}`} className="font-medium text-ledger hover:underline">
-                    Movimiento de finanzas de origen
-                  </Link>
-                )}
+                {entry.source_transaction_id && entry.source_context_id && <SourceTransaction cid={entry.source_context_id} tid={entry.source_transaction_id} />}
+                {entry.kind === 'disposal' && <DisposalAsset entry={entry} />}
               </dd>
             </div>
           )}
@@ -813,6 +623,7 @@ function EntryView({ entry }: { entry: Entry }) {
               <th scope="col" className="w-10 py-2.5 pl-4 text-left font-medium">#</th>
               <th scope="col" className="px-3 py-2.5 text-left font-medium">Cuenta</th>
               <th scope="col" className="px-3 py-2.5 text-left font-medium">Detalle</th>
+              {withCenters && <th scope="col" className="w-36 px-3 py-2.5 text-left font-medium">Centro</th>}
               <th scope="col" className="w-40 px-4 py-2.5 text-right font-medium">Debe</th>
               <th scope="col" className="w-40 px-4 py-2.5 text-right font-medium">Haber</th>
             </tr>
@@ -835,6 +646,7 @@ function EntryView({ entry }: { entry: Entry }) {
                     </span>
                   )}
                 </td>
+                {withCenters && <td className="px-3 py-2.5 text-sm">{l.cost_center_code ?? <span className="text-ink-3">—</span>}</td>}
                 <td className="px-4 py-2.5 text-right">{l.debit !== '0' ? <Pyg value={l.debit} /> : <Blank />}</td>
                 <td className="px-4 py-2.5 text-right">{l.credit !== '0' ? <Pyg value={l.credit} /> : <Blank />}</td>
               </tr>
@@ -842,7 +654,7 @@ function EntryView({ entry }: { entry: Entry }) {
           </tbody>
           <tfoot className="border-t-2 border-line-strong">
             <tr>
-              <td colSpan={3} className="px-4 py-3 font-medium">
+              <td colSpan={withCenters ? 4 : 3} className="px-4 py-3 font-medium">
                 Totales
               </td>
               <td className="px-4 py-3 text-right">
@@ -856,8 +668,14 @@ function EntryView({ entry }: { entry: Entry }) {
         </table>
       </Sheet>
 
+      {entry.kind === 'depreciation' && <DepreciationDetail entry={entry} />}
+      {generatedDraft && <GeneratedDraftActions entry={entry} onDiscard={() => setDialog('discard')} />}
+
       <Modal open={dialog === 'reverse'} title={`Revertir el asiento N° ${entry.number}`} onClose={() => setDialog(null)}>
         {dialog === 'reverse' && <ReverseForm entry={entry} onDone={() => setDialog(null)} />}
+      </Modal>
+      <Modal open={dialog === 'discard'} title="Descartar borrador" onClose={() => setDialog(null)}>
+        {dialog === 'discard' && <DiscardForm entry={entry} onDone={() => setDialog(null)} />}
       </Modal>
     </>
   )
@@ -891,6 +709,6 @@ export function EntryPage() {
       </EmptyState>
     )
   }
-  if (entry.data.status === 'draft' && perms.canManage) return <EntryEditor key={entry.data.id} entry={entry.data} />
+  if (entry.data.status === 'draft' && perms.canManage && !GENERATED_KINDS.includes(entry.data.kind)) return <EntryEditor key={entry.data.id} entry={entry.data} />
   return <EntryView key={entry.data.id} entry={entry.data} />
 }

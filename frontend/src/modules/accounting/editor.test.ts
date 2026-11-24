@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildEntry, emptyLine, fingerprint, linesFromEntry, remainderFor, totalsOf } from './editor'
+import { buildEntry, buildLines, centerAllowed, emptyLine, fingerprint, isBlankLine, linesFromEntry, missingCenters, remainderFor, totalsOf } from './editor'
 import type { Entry } from './types'
 
 const header = { entry_date: '2026-03-05', description: 'Cobro de factura', document_reference: '' }
@@ -101,5 +101,39 @@ describe('líneas desde un borrador de la API', () => {
     const a = [emptyLine({ account_id: 'a', debit: '1' })]
     const b = [emptyLine({ account_id: 'a', debit: '1' }), emptyLine()]
     expect(fingerprint(header, a)).toBe(fingerprint(header, b))
+  })
+})
+
+describe('centro de costos en las líneas (D-060)', () => {
+  const kinds: Record<string, 'expense' | 'income' | 'asset'> = { gasto: 'expense', venta: 'income', banco: 'asset' }
+  const kindOf = (id: string) => kinds[id]
+
+  it('solo se ofrece en cuentas de ingreso o de gasto', () => {
+    expect(centerAllowed('expense')).toBe(true)
+    expect(centerAllowed('income')).toBe(true)
+    expect(centerAllowed('asset')).toBe(false)
+    expect(centerAllowed('liability')).toBe(false)
+    expect(centerAllowed(undefined)).toBe(false)
+  })
+
+  it('se envía en la línea de gasto y se descarta si la cuenta pasó a ser patrimonial', () => {
+    const lines = [emptyLine({ account_id: 'gasto', debit: '100', cost_center_id: 'adm' }), emptyLine({ account_id: 'banco', credit: '100', cost_center_id: 'adm' })]
+    const built = buildLines(lines, kindOf)
+    expect(built.lines[0].cost_center_id).toBe('adm')
+    expect(built.lines[1]).not.toHaveProperty('cost_center_id')
+  })
+
+  it('si la empresa lo exige, marca las líneas de resultado sin centro (no las patrimoniales)', () => {
+    const lines = [
+      emptyLine({ account_id: 'gasto', debit: '100' }),
+      emptyLine({ account_id: 'venta', credit: '50', cost_center_id: 'ven' }),
+      emptyLine({ account_id: 'banco', credit: '50' }),
+    ]
+    expect(missingCenters(lines, kindOf, true)).toEqual([lines[0].key])
+    expect(missingCenters(lines, kindOf, false)).toEqual([])
+  })
+
+  it('una línea con solo el centro elegido no es una línea vacía', () => {
+    expect(isBlankLine(emptyLine({ cost_center_id: 'adm' }))).toBe(false)
   })
 })

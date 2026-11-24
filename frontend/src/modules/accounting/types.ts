@@ -8,7 +8,8 @@ export type NormalSide = 'debit' | 'credit'
 export type LedgerOrigin = 'rg49_2014' | 'proposed' | 'user'
 export type ChartStatus = 'none' | 'pending' | 'validated'
 export type EntryStatus = 'draft' | 'posted' | 'reversed' | 'discarded'
-export type EntryKind = 'manual' | 'finance' | 'reversal' | 'closing'
+export type EntryKind = 'manual' | 'finance' | 'reversal' | 'closing' | 'depreciation' | 'disposal' | 'recurring'
+export type StartRule = 'next_month' | 'next_fiscal_year'
 export type FxCurrency = 'USD' | 'BRL' | 'ARS' | 'EUR'
 
 export interface LedgerAccount {
@@ -33,6 +34,10 @@ export interface AccountingSettings {
   chart_validated_reference: string | null
   chart_validated_at: string | null
   retained_earnings_account_id: string | null
+  /** 3B: cuenta de resultado por bajas (null = la 17.01 del plan propuesto). */
+  asset_disposal_account_id: string | null
+  cost_centers_required: boolean
+  default_asset_start_rule: StartRule
 }
 
 export interface Chart extends AccountingSettings {
@@ -75,6 +80,8 @@ export interface EntryLine {
   fx_currency: string | null
   fx_amount: string | null
   fx_rate: string | null
+  cost_center_id: string | null
+  cost_center_code: string | null
 }
 
 export interface Entry {
@@ -94,8 +101,11 @@ export interface Entry {
   total_credit: string
   balanced: boolean
   created_by: string
+  /** Nombre visible de quien lo creó y de quien lo contabilizó (P-10). */
+  created_by_name: string | null
   created_at: string
   posted_by: string | null
+  posted_by_name: string | null
   posted_at: string | null
   discarded_by: string | null
   discarded_at: string | null
@@ -118,6 +128,7 @@ export interface EntryLineIn {
   fx_currency?: string | null
   fx_amount?: string | null
   fx_rate?: string | null
+  cost_center_id?: string | null
 }
 
 export interface EntryIn {
@@ -172,20 +183,31 @@ export interface TrialRow {
   code: string
   name: string
   kind: LedgerKind
+  /** Saldo antes de `from` (D-062, D-075), en el sentido deudor o acreedor. */
+  opening_debit: string
+  opening_credit: string
   debit: string
   credit: string
+  /** Saldo del rango (compatibilidad con el núcleo). */
   debit_balance: string
   credit_balance: string
+  /** Saldo inicial más el rango. */
+  closing_debit: string
+  closing_credit: string
 }
 
 export interface TrialBalance extends Report {
   date_from: string
   date_to: string
   rows: TrialRow[]
+  total_opening_debit: string
+  total_opening_credit: string
   total_debit: string
   total_credit: string
   total_debit_balance: string
   total_credit_balance: string
+  total_closing_debit: string
+  total_closing_credit: string
   balanced: boolean
 }
 
@@ -197,6 +219,8 @@ export interface StatementNode {
   is_postable: boolean
   amount: string
   children: StatementNode[]
+  /** Solo con `by_cost_center`: el importe en cada columna de `cost_center_columns`. */
+  column_amounts?: string[] | null
 }
 
 export interface BalanceSheet extends Report {
@@ -216,6 +240,17 @@ export interface IncomeStatement extends Report {
   date_from: string
   date_to: string
   accounts: StatementNode[]
+  total_income: string
+  total_expense: string
+  result: string
+  cost_center_columns: CostCenterColumn[] | null
+}
+
+/** Columna del estado de resultados por centro; `cost_center_id` null = «Sin centro». */
+export interface CostCenterColumn {
+  cost_center_id: string | null
+  code: string | null
+  name: string
   total_income: string
   total_expense: string
   result: string

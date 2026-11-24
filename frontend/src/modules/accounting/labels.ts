@@ -1,4 +1,5 @@
-import type { EntryKind, EntryStatus, LedgerKind, LedgerOrigin, NormalSide } from './types'
+import type { EntryKind, EntryStatus, LedgerKind, LedgerOrigin, NormalSide, StartRule } from './types'
+import type { DisposalKind, InstallmentStatus } from './types3b'
 
 export const KIND_LABELS: Record<LedgerKind, string> = {
   asset: 'Activo',
@@ -47,6 +48,32 @@ export const ENTRY_KIND_LABELS: Record<EntryKind, string> = {
   finance: 'Desde finanzas',
   reversal: 'Reversión',
   closing: 'Refundición',
+  depreciation: 'Depreciación',
+  disposal: 'Baja de bien',
+  recurring: 'Recurrente',
+}
+
+/** Borradores generados que no se editan: se descartan y se vuelven a generar (409 ENTRY_NOT_EDITABLE). */
+export const GENERATED_KINDS: EntryKind[] = ['closing', 'depreciation', 'disposal']
+
+/** Tipos que se pueden revertir (las reversiones y la refundición, no). */
+export const REVERSIBLE_KINDS: EntryKind[] = ['manual', 'finance', 'depreciation', 'disposal', 'recurring']
+
+export const START_RULE_LABELS: Record<StartRule, string> = {
+  next_month: 'Desde el mes siguiente a la compra',
+  next_fiscal_year: 'Desde el ejercicio siguiente',
+}
+
+export const DISPOSAL_KIND_LABELS: Record<DisposalKind, string> = {
+  sale: 'Venta',
+  scrap: 'Destrucción o desuso',
+  donation: 'Donación',
+}
+
+export const INSTALLMENT_STATUS_LABELS: Record<InstallmentStatus, string> = {
+  posted: 'Contabilizada',
+  draft: 'En borrador',
+  pending: 'Pendiente',
 }
 
 const MONTHS_LONG = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
@@ -74,4 +101,23 @@ export function monthName(iso: string): string {
 /** Etiqueta corta de un asiento: "N° 12" o "Borrador". */
 export function entryLabel(e: { number: number | null; status: EntryStatus }): string {
   return e.number !== null ? `N° ${e.number}` : e.status === 'discarded' ? 'Descartado' : 'Borrador'
+}
+
+/** "2026-03-01" → "marzo de 2026". */
+export function monthYear(iso: string): string {
+  return `${MONTHS_LONG[Number(iso.slice(5, 7)) - 1]} de ${iso.slice(0, 4)}`
+}
+
+/** Meses en años legibles: 24 → "2 años"; 18 → "1 año y 6 meses"; 6 → "6 meses". */
+export function monthsText(months: number): string {
+  const y = Math.floor(months / 12)
+  const m = months % 12
+  const years = y === 0 ? '' : y === 1 ? '1 año' : `${y} años`
+  const rest = m === 0 ? '' : m === 1 ? '1 mes' : `${m} meses`
+  return years && rest ? `${years} y ${rest}` : years || rest || '0 meses'
+}
+
+/** Porcentaje de la API ("10", "12.5") en formato local: "10 %", "12,5 %". */
+export function percentText(rate: string | null): string {
+  return rate === null ? '—' : `${rate.replace('.', ',')} %`
 }

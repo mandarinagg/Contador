@@ -18,7 +18,7 @@ export function useReportParams() {
     }
     setParams(next, { replace: true })
   }
-  return { from, to, at, accountId, set }
+  return { from, to, at, accountId, params, set }
 }
 
 export const amountTh = 'w-40 px-4 py-2.5 text-right font-medium'

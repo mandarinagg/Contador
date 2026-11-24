@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Building2, CalendarRange, Contact, FileUp, Home, Landmark, LayoutDashboard, ListTree, LogOut, NotebookPen, Scale, ScrollText, Tags, UserRound, Users } from 'lucide-react'
+import { ArrowLeftRight, Boxes, Building2, CalendarRange, Contact, FileUp, Home, Landmark, LayoutDashboard, ListTree, LogOut, Network, NotebookPen, Repeat, Scale, ScrollText, Tags, UserRound, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { NavLink, Outlet, useMatch } from 'react-router'
 import { cx } from '../lib/cx'
@@ -65,6 +65,9 @@ const ACCOUNTING_NAV: NavItem[] = [
   { to: '/contabilidad/plan', label: 'Plan de cuentas', icon: <ListTree size={16} />, permission: 'accounting.read' },
   { to: '/contabilidad/ejercicios', label: 'Ejercicios y períodos', icon: <CalendarRange size={16} />, permission: 'accounting.read' },
   { to: '/contabilidad/asientos', label: 'Asientos', icon: <NotebookPen size={16} />, permission: 'accounting.read' },
+  { to: '/contabilidad/recurrentes', label: 'Asientos recurrentes', icon: <Repeat size={16} />, permission: 'accounting.read' },
+  { to: '/contabilidad/activos', label: 'Activos fijos', icon: <Boxes size={16} />, permission: 'accounting.read' },
+  { to: '/contabilidad/centros', label: 'Centros de costos', icon: <Network size={16} />, permission: 'accounting.read' },
   { to: '/contabilidad/reportes', label: 'Libros y balances', icon: <Scale size={16} />, permission: 'accounting.read' },
 ]
 

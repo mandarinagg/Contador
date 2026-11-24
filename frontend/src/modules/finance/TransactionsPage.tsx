@@ -1,6 +1,6 @@
-import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeftRight, Ban, BookPlus, Check as CheckIcon, FileUp, Pencil, Plus, Search, X } from 'lucide-react'
-import { useDeferredValue, useEffect, useState } from 'react'
+import { useDeferredValue, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { Badge, Button, EmptyState, Field, Input, Modal, PageHeader, Sheet } from '../../components/ui'
 import { useToast } from '../../components/ui/toast'
@@ -29,9 +29,6 @@ type Dialog =
   | { kind: 'edit'; tx: Transaction }
   | { kind: 'void'; tx: Transaction }
   | { kind: 'propose'; tx: Transaction }
-/** Hasta cuántas páginas se recorren buscando el movimiento de `?tx=` (la API no tiene GET por id). */
-const DETAIL_MAX_PAGES = 20
-
 export function TransactionsPage() {
   const { cid, canWrite, readOnlyReason, context } = useFinance()
   const { can } = useSession()
@@ -79,15 +76,15 @@ export function TransactionsPage() {
   })
 
   const rows = list.data?.pages.flat() ?? []
-  // Detalle de un movimiento por URL (`?tx=`): lo busca en las páginas ya cargadas y, si no está,
-  // pide más (hasta un tope), porque la API no ofrece leer un movimiento por su id.
+  // Detalle de un movimiento por URL (`?tx=`): se lee por id (P-9), aunque los filtros de la
+  // lista lo excluyan (anulado, otra cuenta, otro rango).
   const detailId = params.get('tx')
-  const detailTx = detailId ? rows.find((t) => t.id === detailId) : undefined
-  const pagesLoaded = list.data?.pages.length ?? 0
-  const searching = Boolean(detailId && !detailTx && list.hasNextPage && pagesLoaded < DETAIL_MAX_PAGES)
-  useEffect(() => {
-    if (searching && !list.isFetchingNextPage) list.fetchNextPage()
-  }, [searching, list])
+  const detail = useQuery({
+    enabled: Boolean(detailId),
+    queryKey: [...financeKeys.transactions(cid), 'detail', detailId ?? ''],
+    queryFn: () => get<Transaction>(`/finance/contexts/${cid}/transactions/${detailId}`),
+  })
+  const detailTx = detailId ? (detail.data ?? rows.find((t) => t.id === detailId)) : undefined
   const openDetail = (id: string | null) => {
     const next = new URLSearchParams(params)
     if (id) next.set('tx', id)
@@ -415,19 +412,10 @@ export function TransactionsPage() {
             onVoid={() => fromDetail({ kind: 'void', tx: detailTx })}
             onPropose={() => fromDetail({ kind: 'propose', tx: detailTx })}
           />
-        ) : list.isPending || searching ? (
-          <p className="text-ink-2">Buscando el movimiento…</p>
+        ) : detail.isPending ? (
+          <p className="text-ink-2">Cargando el movimiento…</p>
         ) : (
-          <div className="flex flex-col gap-3">
-            <p>No encontramos ese movimiento en la lista con los filtros actuales.</p>
-            {filter.include_voided !== '1' && (
-              <div>
-                <Button variant="secondary" onClick={() => setFilter('include_voided', '1')}>
-                  Buscar también entre los anulados
-                </Button>
-              </div>
-            )}
-          </div>
+          <ApiErrorNotice error={detail.error} title="No se pudo abrir el movimiento." />
         )}
       </Modal>
       <Modal open={dialog?.kind === 'transfer'} size="lg" title="Transferencia entre cuentas propias" onClose={close}>

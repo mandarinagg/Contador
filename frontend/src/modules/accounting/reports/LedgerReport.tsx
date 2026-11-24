@@ -13,6 +13,7 @@ import { accountingKeys, useAccountsById, useChart } from '../data'
 import { KIND_LABELS, longDate, rangeText, SIDE_LABELS } from '../labels'
 import type { LedgerReport as Ledger } from '../types'
 import { ReportControls, ReportSheet, SideBalance } from './common'
+import { ReportActions } from './ReportActions'
 import { amountTh, textTh, useReportParams } from './params'
 
 export function LedgerReport() {
@@ -71,6 +72,7 @@ export function LedgerReport() {
               title={`Libro mayor: ${account.code} ${account.name}`}
               scope={`${KIND_LABELS[account.kind]}, naturaleza ${SIDE_LABELS[account.normal_side].toLowerCase()}. Movimientos ${rangeText(from, to)}`}
               status={first.chart_status}
+              aside={<ReportActions path={`/accounting/reports/ledger/${accountId}${qs({ from, to })}`} report="ledger" scope={{ from, to }} />}
             />
             <table className="w-full" aria-label="Libro mayor">
               <thead className="border-b border-line bg-sunken text-sm text-ink-2">

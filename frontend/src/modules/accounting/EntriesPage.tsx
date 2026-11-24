@@ -12,6 +12,7 @@ import { postableAccounts } from './chartTree'
 import { AccountCombobox, EntryStatusBadge, Pyg } from './components'
 import { accountingKeys, useAccountingPerms, useAccountsById, useChart, useFiscalYears } from './data'
 import { ENTRY_KIND_LABELS, STATUS_LABELS } from './labels'
+import { RecurringDueBanner } from './recurring/RecurringDueBanner'
 import type { Entry, EntryKind, EntryStatus } from './types'
 
 const PAGE = 50
@@ -63,6 +64,7 @@ export function EntriesPage() {
           )
         }
       />
+      <RecurringDueBanner className="mb-5" />
       {!perms.canManage && <p className="-mt-3 mb-4 text-sm text-ink-3">{perms.manageReason}</p>}
 
       <form

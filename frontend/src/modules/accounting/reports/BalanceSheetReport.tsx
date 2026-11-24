@@ -15,6 +15,7 @@ import { accountingKeys } from '../data'
 import { longDate } from '../labels'
 import type { BalanceSheet, StatementNode } from '../types'
 import { ReportControls, ReportSheet, StatementRows } from './common'
+import { ReportActions } from './ReportActions'
 import { useReportParams } from './params'
 
 /** Una sola raíz agrupadora («1 ACTIVO»): su nombre es el título y se listan sus hijas. */
@@ -77,7 +78,12 @@ export function BalanceSheetReport() {
           </div>
         ) : (
           <>
-            <ReportHeading title="Balance general" scope={`Al ${longDate(at)}, con todo lo contabilizado hasta esa fecha`} status={data.chart_status} />
+            <ReportHeading
+              title="Balance general"
+              scope={`Al ${longDate(at)}, con todo lo contabilizado hasta esa fecha`}
+              status={data.chart_status}
+              aside={<ReportActions path={`/accounting/reports/balance-sheet${qs({ at })}`} report="balance-sheet" scope={{ at }} />}
+            />
             {data.assets.length + data.liabilities.length + data.equity.length === 0 && isZeroAmount(data.result) ? (
               <EmptyState title="Sin saldos a la fecha">Todavía no hay asientos contabilizados hasta el {longDate(at)}.</EmptyState>
             ) : (
