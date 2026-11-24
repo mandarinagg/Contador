@@ -43,3 +43,7 @@ Thumbs.db
 
 # Binarios descargados para empaquetar (PostgreSQL portable)
 /build/
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/

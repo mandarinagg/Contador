@@ -54,6 +54,15 @@ cd backend && .venv/bin/pytest && .venv/bin/ruff check . && .venv/bin/mypy app
 cd frontend && npm test && npm run typecheck && npm run lint
 ```
 
+Pruebas de punta a punta (Playwright, Chromium real contra la API y una base PostgreSQL vacía que se recrea sola; requiere el PostgreSQL de desarrollo y el venv del backend):
+
+```bash
+cd frontend && npx playwright install chromium   # una sola vez
+npm run e2e                                       # o npm run e2e:ui para el modo interactivo
+```
+
+Detalles en [`docs/TESTING_STRATEGY.md`](docs/TESTING_STRATEGY.md#e2e-playwright).
+
 ## App de escritorio (Tauri 2)
 
 Dependencias del sistema (Ubuntu/Debian), una sola vez:

@@ -1,5 +1,6 @@
 # CI de CONTADOR AI.
 # - test: pruebas, lint y tipos de backend y frontend (Linux, PostgreSQL 18 real).
+# - e2e: Playwright (Chromium) contra la API real y una base PostgreSQL vacía.
 # - secrets: el repositorio es público; gitleaks revisa todo el historial.
 # - windows: backend empaquetado + PostgreSQL portable + lanzador + instalador NSIS,
 #   probado de punta a punta en Windows real (lo mismo que se instala en Windows 11).
@@ -84,6 +85,54 @@ jobs:
           npm run lint
           npm test
           npm run build
+
+  e2e:
+    # Navegador real (Chromium) contra la API y el build del frontend, con una base vacía propia.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: contador
+          POSTGRES_PASSWORD: contador_dev
+          POSTGRES_DB: contador
+        ports: ["55433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U contador -d contador"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Backend — dependencias
+        working-directory: backend
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -e .
+      - name: Frontend — dependencias y Chromium
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: E2E (Playwright)
+        working-directory: frontend
+        run: npm run e2e
+      - name: Publicar reporte de E2E
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 14
 
   windows:
     # Todo lo que llega a la PC con Windows 11: backend empaquetado, PostgreSQL portable,
