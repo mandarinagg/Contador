@@ -21,7 +21,7 @@ import { useRules } from './data'
 import { CONDITION_LABELS, DIRECTION_LABELS, DOC_TYPE_LABELS, VOUCHER_TYPE_LABELS } from './labels'
 import { addDays, cdcMismatches, checkCounterpartyRuc, expandVoucherNumber, maskCdc, maskTimbrado, maskVoucherNumber, parseCdc, splitRucInput, sumBig } from './logic'
 import type { Direction, DocType, Rule, Voucher, VoucherType } from './types'
-import { DEFAULT_RATES, type DraftErrors, draftToBody, type Rates, readPyg, type VoucherDraft, vatLine } from './voucherForm'
+import { DEFAULT_RATES, type DraftErrors, draftToBody, type Rates, readPyg, type VoucherDraft, vatLine } from './voucherDraft'
 
 /** Tasas de la regla `IVA-GENERAL-TASAS` vigente a la fecha (BR-TAX-09); sin regla, las de la ley y la marca. */
 export function useRatesAt(day: string): { rates: Rates; rule: Rule | undefined } {
