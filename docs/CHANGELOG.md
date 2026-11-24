@@ -4,6 +4,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Agregado — Pruebas E2E (2026-11-24)
+- `frontend/e2e/`: pruebas de punta a punta con `@playwright/test` (Chromium) contra la API real y una base PostgreSQL vacía que se recrea en cada corrida (`reset-db.ts`). Flujos: configuración inicial, cierre de sesión e ingreso, ingreso fallido, RUC con DV, alta de usuarios y permisos por rol, auditoría, tema claro/oscuro y servicio caído. Toda prueba falla ante `console.error` o `pageerror`.
+- Scripts `npm run e2e` y `npm run e2e:ui`; `tsconfig.e2e.json` para tipar `e2e/` y `playwright.config.ts`.
+- Job `e2e` en `.github/workflows/ci.yml` (reporte HTML como artefacto solo si falla).
+- Cierra el pendiente P-3.
+
 ### Agregado — Fase 0 (2026-11-23)
 - `docs/PROMPT_MAESTRO.md`: prompt del propietario convertido a Markdown como documento rector.
 - `docs/DISCOVERY.md`: diagnóstico del entorno, repositorios y riesgos.

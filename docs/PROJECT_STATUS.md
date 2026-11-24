@@ -37,7 +37,7 @@
 - Ruedas para Windows + Python 3.14 verificadas para todas las dependencias del backend; zip de PostgreSQL 18.7 para Windows verificado (estructura `pgsql/bin|lib|share`).
 - Backend: 28/28 pytest contra PostgreSQL 18.7; ruff y mypy estricto sin errores; `alembic check` sin diferencias; `downgrade base` → `upgrade head` OK.
 - Frontend: 10/10 Vitest; `tsc -b` OK; build de producción OK (397 kB JS, 123 kB gzip).
-- E2E en Chromium con base aislada: flujo completo sin errores de consola (ver `TESTING_STRATEGY.md`).
+- E2E: 10 pruebas de Playwright en `frontend/e2e/` (Chromium, base aislada, sin errores de consola), en el job `e2e` del CI (ver `TESTING_STRATEGY.md`).
 
 ## Problemas conocidos / pendientes técnicos
 | # | Pendiente | Motivo |
@@ -46,7 +46,7 @@
 | P-2 | Instalador sin firma de código | Windows muestra "Windows protegió su PC" → "Más información" → "Ejecutar de todas formas" |
 | P-8 | Ruta de datos con caracteres no ASCII | Si el usuario de Windows tiene tildes o ñ en el nombre, PostgreSQL podría fallar en `initdb`; a verificar en la PC real |
 | P-7 | Advertencia de PyInstaller `psycopg_binary._uuid` | Inofensiva: la receta de psycopg menciona un módulo que no existe en 3.3.9; el ejecutable usa la implementación binaria (verificado) |
-| P-3 | Script E2E fuera del repo | Se incorpora como `frontend/e2e/` con Playwright en fase 2 |
+| P-3 | ~~Script E2E fuera del repo~~ | **Resuelto**: `frontend/e2e/` con `@playwright/test` y job `e2e` en el CI |
 | P-4 | 2 advertencias de oxlint (`only-export-components`) | Hooks junto a sus providers; solo afecta la recarga en caliente |
 | P-6 | La política de contraseñas del frontend cuenta como "símbolo" las letras con tilde | El backend es quien decide (Unicode); solo cambia el aviso previo |
 
