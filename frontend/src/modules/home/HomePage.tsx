@@ -8,6 +8,9 @@ import { get } from '../../services/api'
 import { useSession } from '../../stores/session'
 import type { ChainVerification, Member, Organization } from '../../types/api'
 import { RecurringDueBanner } from '../accounting/recurring/RecurringDueBanner'
+import { AlertsPanel } from '../tax/AlertsPanel'
+import { useTaxProfile } from '../tax/data'
+import { IRE_REGIME_LABELS } from '../tax/labels'
 
 function ChecklistItem({ done, title, children, action }: { done: boolean; title: string; children: ReactNode; action?: ReactNode }) {
   return (
@@ -39,6 +42,7 @@ export function HomePage() {
     queryFn: () => get<ChainVerification>('/audit/verify'),
     enabled: can('audit.read'),
   })
+  const taxProfile = useTaxProfile(can('tax.read'))
   if (!me) return null
   const firstName = me.user.full_name.split(' ')[0]
 
@@ -46,9 +50,20 @@ export function HomePage() {
     <>
       <PageHeader
         title={`Hola, ${firstName}`}
-        description="Este es el estado de la configuración de tu empresa en Contador AI. Los indicadores financieros aparecen cuando cargues cuentas y movimientos (fase 2)."
+        description="El estado de tu empresa en Contador AI: lo que vence, lo que falta cargar y la puesta en marcha."
       />
       <RecurringDueBanner className="mb-6" />
+      {can('tax.read') && (
+        <Sheet className="mb-6">
+          <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+            <h2 className="font-semibold">Impuestos</h2>
+            <Link to="/impuestos" className="text-sm font-medium text-ledger hover:underline">
+              Ver el resumen fiscal
+            </Link>
+          </div>
+          <AlertsPanel compact />
+        </Sheet>
+      )}
 
       <div className="grid grid-cols-[1fr_18rem] gap-6">
         <Sheet>
@@ -95,10 +110,23 @@ export function HomePage() {
                     : 'Por ahora solo vos tenés acceso. Podés sumar a tu contador con el rol Contador.'}
                 </ChecklistItem>
               )}
-              <ChecklistItem done={false} title="Régimen tributario">
-                Pendiente de verificación documental. Se configura en el módulo de tributación (fase 4); el sistema no asume
-                impuestos ni vencimientos hasta entonces.
-              </ChecklistItem>
+              {can('tax.read') && (
+                <ChecklistItem
+                  done={taxProfile.data?.current?.origin === 'verified'}
+                  title="Perfil fiscal"
+                  action={
+                    <Link to="/impuestos/perfil" className="text-sm font-medium text-ledger hover:underline">
+                      {taxProfile.data?.current ? 'Ver el perfil' : 'Cargar el perfil'}
+                    </Link>
+                  }
+                >
+                  {taxProfile.data?.current
+                    ? `${IRE_REGIME_LABELS[taxProfile.data.current.ire_regime]}, ${taxProfile.data.current.obligations.length} obligaciones. ${
+                        taxProfile.data.current.origin === 'verified' ? 'Verificado por un contador.' : 'Declarado: falta que un contador lo verifique con la constancia de RUC.'
+                      }`
+                    : 'Régimen, cierre del ejercicio y obligaciones, como figuran en la constancia de RUC. El sistema no asume impuestos ni vencimientos sin él.'}
+                </ChecklistItem>
+              )}
             </ol>
           )}
         </Sheet>

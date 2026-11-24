@@ -39,6 +39,13 @@ export default defineConfig({
       dependencies: ['contabilidad'],
       use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 860 }, acceptDownloads: true },
     },
+    {
+      // La tributación parte del RUC de la empresa y del plan validado de las anteriores.
+      name: 'tributacion',
+      testMatch: 'tributacion.spec.ts',
+      dependencies: ['contabilidad-3b'],
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 860 }, acceptDownloads: true },
+    },
   ],
   webServer: [
     {

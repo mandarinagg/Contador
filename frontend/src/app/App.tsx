@@ -122,6 +122,18 @@ const accounting = {
   template: () => import('../modules/accounting/recurring/TemplatePage').then((m) => ({ Component: m.TemplatePage })),
 }
 
+/** Impuestos (fase 4), en fragmentos aparte. El acceso: `tax.read` (todos los roles). */
+const tax = {
+  summary: () => import('../modules/tax/SummaryPage').then((m) => ({ Component: m.TaxSummaryPage })),
+  profile: () => import('../modules/tax/ProfilePage').then((m) => ({ Component: m.ProfilePage })),
+  calendar: () => import('../modules/tax/CalendarPage').then((m) => ({ Component: m.CalendarPage })),
+  vouchers: () => import('../modules/tax/VouchersPage').then((m) => ({ Component: m.VouchersPage })),
+  voucherEntry: () => import('../modules/tax/VoucherEntryPage').then((m) => ({ Component: m.VoucherEntryPage })),
+  vat: () => import('../modules/tax/VatPage').then((m) => ({ Component: m.VatPage })),
+  rules: () => import('../modules/tax/RulesPage').then((m) => ({ Component: m.RulesPage })),
+  settings: () => import('../modules/tax/SettingsPage').then((m) => ({ Component: m.TaxSettingsPage })),
+}
+
 const router = createBrowserRouter([
   { element: <Gate need="setup" />, children: [{ path: '/configuracion-inicial', element: <SetupPage /> }] },
   { element: <Gate need="anonymous" />, children: [{ path: '/login', element: <LoginPage /> }] },
@@ -192,6 +204,25 @@ const router = createBrowserRouter([
                   { path: 'recurrentes/:id', lazy: accounting.template },
                 ],
               },
+            ],
+          },
+          {
+            path: '/impuestos',
+            element: (
+              <RequirePermission permission="tax.read">
+                <Outlet />
+              </RequirePermission>
+            ),
+            children: [
+              { index: true, lazy: tax.summary },
+              { path: 'perfil', lazy: tax.profile },
+              { path: 'calendario', lazy: tax.calendar },
+              { path: 'comprobantes', lazy: tax.vouchers },
+              { path: 'comprobantes/cargar', lazy: tax.voucherEntry },
+              { path: 'comprobantes/:id', lazy: tax.voucherEntry },
+              { path: 'iva', lazy: tax.vat },
+              { path: 'reglas', lazy: tax.rules },
+              { path: 'configuracion', lazy: tax.settings },
             ],
           },
           { path: '*', element: <EmptyState title="Página inexistente">La dirección no corresponde a ninguna sección.</EmptyState> },
