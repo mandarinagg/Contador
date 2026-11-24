@@ -8,7 +8,7 @@
 |---|---|
 | 0 — Discovery y auditoría | ✅ Completa |
 | 1 — Fundación | ✅ Funcional en navegador |
-| 1B — Instalador Windows 11 | 🟡 Backend + PostgreSQL portable verdes en Windows real; lanzador Rust y copias probados en Linux. **En Windows la prueba del lanzador se colgaba** al arrancar PostgreSQL: corrección en `2c85642`, pendiente de confirmar en el CI (ver "Para retomar") |
+| 1B — Instalador Windows 11 | 🟡 CI verde en Windows real (lanzador, copias, instalador instalado, abierto, cerrado y desinstalado). Falta instalarlo en la PC del propietario |
 | 2 — Finanzas empresa/personal | 🟡 Backend y interfaz hechos; probado de punta a punta en navegador (ver tabla). Falta validarlo con extractos reales del propietario |
 | 3 a 8 | ⏳ No iniciadas |
 
@@ -75,16 +75,13 @@ D-001 a D-034 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 8. Revisar los hallazgos R-10 y R-11 de `DISCOVERY.md` (repositorio git en la carpeta personal con `.git-credentials`).
 
 ## Para retomar (traspaso, 2026-11-24)
-**Estado de `main`:** fases 0-1 completas; fase 2 (finanzas) integrada, con backend, interfaz y rendimiento. Todo verde en Linux. No quedan worktrees ni agentes abiertos.
+**Estado de `main`:** fases 0-1 completas; fase 2 (finanzas) integrada, con backend, interfaz y rendimiento. Todo verde en Linux y en Windows. Fase 3 en curso: el backend lo está haciendo un agente en un worktree (`docs/specs/FASE3_CONTABILIDAD.md`).
 
 **Lo primero:**
-1. **CI de Windows:** ver el resultado del job `windows` del último push.
-   - En `4f4be2a` el instalador ya funcionaba en Windows real: primer arranque, cierre forzado (el backend muere con la app), reapertura, cierre normal y desinstalación sin borrar datos.
-   - El paso igual figuraba en rojo: el script terminaba con el código 3 de `pg_ctl status` (servidor detenido, lo esperado). Corregido en el CI.
-   - Causas ya resueltas: el pipe que `postgres` hereda (`stack.rs`, `tests/backup.rs`) y la ruta `\\?\` que `initdb` no entiende (`stack::plain_path`).
-   - Si algo vuelve a fallar, el paso "Lanzador — registros si falló" muestra cada comando ejecutado (`$ ...`) y su resultado (`→`). La prueba del instalador vuelca `%LOCALAPPDATA%\ContadorAI\logs`.
-   - `gh run view --log` a veces sale vacío; usar `gh api repos/mandarinagg/Contador/actions/jobs/<id>/logs`.
-2. Con Windows en verde, el propietario prueba el instalador NSIS (artefacto del CI) en su PC con Windows 11 (P-8: usuario con tildes o ñ).
+1. **CI de Windows: ✅ todo verde desde `7c98639`** (ejecución 45390713831). Pasan el lanzador, las copias, el Administrador de credenciales, el instalador NSIS y su prueba completa en Windows real.
+   - Causas que se resolvieron: el pipe que `postgres` hereda (`stack.rs`, `tests/backup.rs`), la ruta `\\?\` que `initdb` no entiende (`stack::plain_path`) y el código 3 de `pg_ctl status` al final del script.
+   - Si algo vuelve a fallar, el paso "Lanzador — registros si falló" muestra cada comando ejecutado (`$ ...`) y su resultado (`→`). La prueba del instalador vuelca `%LOCALAPPDATA%\ContadorAI\logs`. `gh run view --log` a veces sale vacío; usar `gh api repos/mandarinagg/Contador/actions/jobs/<id>/logs`.
+2. El propietario prueba el instalador NSIS (artefacto `contador-ai-windows-instalador` del CI, vence a los 30 días) en su PC con Windows 11 (P-8: usuario con tildes o ñ).
 
 **Después:**
 - Fase 2: el importador ya se probó con extractos simulados de formato bancario paraguayo (cabecera del banco, débito y crédito, hora en la fecha, `Gs.`, totales al pie, XLSX con fechas numéricas y fórmulas), y se corrigieron 4 casos. Falta probarlo con extractos reales anonimizados del propietario (punto 6 de abajo) y guardar un mapeo por banco.
