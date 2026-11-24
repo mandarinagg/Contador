@@ -8,6 +8,7 @@ import {
   type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
   useEffect,
   useId,
   useRef,
@@ -98,6 +99,10 @@ const controlBase =
 
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return <input {...props} className={cx(controlBase, className)} />
+}
+
+export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className={cx(controlBase, 'h-auto min-h-20 py-2 leading-snug', className)} />
 }
 
 export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
@@ -191,13 +196,18 @@ export function Modal({
   title,
   onClose,
   children,
+  size = 'md',
 }: {
   open: boolean
   title: string
   onClose: () => void
   children: ReactNode
+  /** `lg` para formularios con dos columnas o tablas. */
+  size?: 'md' | 'lg'
 }) {
   const ref = useRef<HTMLDialogElement>(null)
+  // Un id por modal: una pantalla puede tener varios diálogos montados a la vez.
+  const titleId = useId()
   useEffect(() => {
     const dialog = ref.current
     if (!dialog) return
@@ -210,11 +220,14 @@ export function Modal({
       ref={ref}
       onClose={onClose}
       onCancel={onClose}
-      aria-labelledby="modal-title"
-      className="m-auto w-full max-w-lg rounded-md bg-surface p-0 text-ink shadow-(--shadow-float) backdrop:bg-black/35 open:animate-rise"
+      aria-labelledby={titleId}
+      className={cx(
+        'm-auto w-full rounded-md bg-surface p-0 text-ink shadow-(--shadow-float) backdrop:bg-black/35 open:animate-rise',
+        size === 'lg' ? 'max-w-2xl' : 'max-w-lg',
+      )}
     >
       <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-        <h2 id="modal-title" className="text-md font-semibold">
+        <h2 id={titleId} className="text-md font-semibold">
           {title}
         </h2>
         <button

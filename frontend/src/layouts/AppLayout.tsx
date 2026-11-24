@@ -1,8 +1,9 @@
-import { Building2, Home, LogOut, ScrollText, UserRound, Users } from 'lucide-react'
+import { ArrowLeftRight, Building2, FileUp, Home, Landmark, LayoutDashboard, LogOut, ScrollText, Tags, UserRound, Users, Contact } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { NavLink, Outlet } from 'react-router'
+import { NavLink, Outlet, useMatch } from 'react-router'
 import { cx } from '../lib/cx'
 import { ROLE_LABELS } from '../lib/format'
+import { FINANCE_SECTIONS, preferredContext, useContexts } from '../modules/finance/data'
 import { useSession } from '../stores/session'
 
 interface NavItem {
@@ -10,6 +11,36 @@ interface NavItem {
   label: string
   icon: ReactNode
   permission?: string
+  end?: boolean
+}
+
+const FINANCE_ICONS: Record<string, ReactNode> = {
+  '': <LayoutDashboard size={16} />,
+  movimientos: <ArrowLeftRight size={16} />,
+  cuentas: <Landmark size={16} />,
+  importar: <FileUp size={16} />,
+  categorias: <Tags size={16} />,
+  contrapartes: <Contact size={16} />,
+}
+
+/**
+ * Finanzas en el menú. Los enlaces llevan el contexto activo (o el preferido): la empresa
+ * exige finance.read y eso ya lo filtra la API en /finance/contexts; el personal está
+ * siempre disponible para su dueño.
+ */
+function useFinanceNav(): NavItem[] {
+  const { me } = useSession()
+  const contexts = useContexts()
+  const match = useMatch('/finanzas/:cid/*')
+  const fromUrl = match?.params.cid !== 'consolidado' ? contexts.data?.find((c) => c.id === match?.params.cid) : undefined
+  const ctx = fromUrl ?? (me && contexts.data ? preferredContext(me.user.id, contexts.data) : undefined)
+  if (!ctx) return [{ to: '/finanzas', label: 'Finanzas', icon: <LayoutDashboard size={16} /> }]
+  return FINANCE_SECTIONS.map((s) => ({
+    to: s.slug ? `/finanzas/${ctx.id}/${s.slug}` : `/finanzas/${ctx.id}`,
+    label: s.label,
+    icon: FINANCE_ICONS[s.slug],
+    end: s.slug === '',
+  }))
 }
 
 const NAV: { group: string; items: NavItem[] }[] = [
@@ -43,7 +74,9 @@ function BrandMark() {
 
 export function AppLayout() {
   const { me, can, logout } = useSession()
+  const financeNav = useFinanceNav()
   if (!me) return null
+  const nav = [NAV[0], { group: 'Finanzas', items: financeNav }, ...NAV.slice(1)]
 
   return (
     <div className="flex h-full">
@@ -59,7 +92,7 @@ export function AppLayout() {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-2" aria-label="Principal">
-          {NAV.map(({ group, items }) => {
+          {nav.map(({ group, items }) => {
             const visible = items.filter((i) => !i.permission || can(i.permission))
             if (visible.length === 0) return null
             return (
@@ -70,7 +103,7 @@ export function AppLayout() {
                     <li key={item.to}>
                       <NavLink
                         to={item.to}
-                        end={item.to === '/'}
+                        end={item.end ?? item.to === '/'}
                         className={({ isActive }) =>
                           cx(
                             'relative flex items-center gap-2.5 rounded-sm px-2 py-1.5 transition-colors',

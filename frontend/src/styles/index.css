@@ -27,6 +27,13 @@
   --amber: #946200;      /* pendientes de verificar */
   --amber-soft: #fbf0d9;
   --focus: #1f5c4a;
+  /* Contexto financiero personal (BR-FIN-01): tinta azul, distinta del verde de la empresa. */
+  --personal: #43508f;
+  --personal-soft: #e9ebf6;
+  /* Gráficos: entradas y salidas. Validados con el verificador de paletas (CVD ΔE ≥ 8);
+     la salida clara no llega a 3:1 contra la hoja, así que siempre va con tabla y etiqueta. */
+  --chart-in: #12734f;
+  --chart-out: #e58f78;
   color-scheme: light;
 }
 
@@ -48,6 +55,10 @@
   --amber: #e0b155;
   --amber-soft: #33290f;
   --focus: #7fcaae;
+  --personal: #a9b1ec;
+  --personal-soft: #222640;
+  --chart-in: #3aa67e;
+  --chart-out: #c45a42;
   color-scheme: dark;
 }
 
@@ -70,6 +81,10 @@
   --color-debit-soft: var(--debit-red-soft);
   --color-amber: var(--amber);
   --color-amber-soft: var(--amber-soft);
+  --color-personal: var(--personal);
+  --color-personal-soft: var(--personal-soft);
+  --color-chart-in: var(--chart-in);
+  --color-chart-out: var(--chart-out);
 
   /* Escala tipográfica (razón ~1.2) */
   --text-xs: 0.75rem;

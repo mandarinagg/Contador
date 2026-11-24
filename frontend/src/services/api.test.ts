@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, api, session } from './api'
+import { ApiError, api, postForm, qs, session } from './api'
 
 const respond = (status: number, body: unknown) =>
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(body), { status }))
@@ -41,5 +41,22 @@ describe('cliente de la API', () => {
   it('sin servicio responde un error de red legible', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))
     await expect(api('GET', '/x')).rejects.toMatchObject({ code: 'NETWORK', status: 0 })
+  })
+})
+
+describe('subida de archivos y query string', () => {
+  it('FormData viaja sin Content-Type JSON', async () => {
+    const spy = respond(201, { id: 'x' })
+    const form = new FormData()
+    form.set('mapping', '{}')
+    await postForm('/finance/contexts/c/imports', form)
+    const init = spy.mock.calls[0][1] as RequestInit
+    expect(init.body).toBe(form)
+    expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined()
+  })
+
+  it('qs omite vacíos y falsos', () => {
+    expect(qs({ a: 'x y', b: '', c: undefined, d: false, e: true, f: 0 })).toBe('?a=x+y&e=true&f=0')
+    expect(qs({})).toBe('')
   })
 })

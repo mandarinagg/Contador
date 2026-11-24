@@ -4,6 +4,19 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Agregado — Fase 2, interfaz de finanzas (2026-11-24)
+- Menú **Finanzas** (Resumen, Movimientos, Cuentas, Importar extracto, Categorías, Contrapartes) y selector de contexto permanente: pestañas Empresa / Personal ("solo vos") / Consolidado, franja que dice dónde se opera y si es solo lectura, y botón para crear el espacio personal. El contexto va en la URL (`/finanzas/:cid/...`); `localStorage` solo recuerda cuál abrir (`contador.finanzas.contexto.<usuario>`).
+- **Resumen**: período (últimos 12 meses, este año, año anterior o fechas), un bloque por moneda (nunca se suman monedas), saldo en cuentas, entradas, salidas y neto, gráfico propio en SVG de entradas/salidas/neto por mes con vista de tabla y tooltip accesible por teclado, gastos por categoría y saldo por cuenta. **Consolidado** por contexto y moneda, identificando Empresa y Personal (BR-FIN-02).
+- **Cuentas**: alta, edición, archivo; solo los últimos 4 dígitos; moneda y saldo inicial bloqueados con explicación cuando la cuenta tiene movimientos (y el 409 de la API si igual se intenta).
+- **Movimientos**: filtros en la URL (cuenta, categoría, contraparte, fechas, texto, sin revisar, anulados), paginación por cursor, alta manual con sentido entra/sale, edición, marcar revisado, categoría rápida desde la lista, anulación con motivo obligatorio (tachado y atenuado, nunca se borra) y transferencias entre cuentas propias (misma moneda o con importe de salida y de entrada).
+- **Importar extracto** en 4 pasos: archivo (CSV/XLSX) → columnas (lectura local del archivo para proponer el mapeo y previsualizarlo, reuso del mapeo de la última importación de la cuenta) → revisión (válidas, duplicadas contra la base y dentro del archivo, con error; importar u omitir por fila) → confirmar o cancelar. Maneja `IMPORT_NEW_DUPLICATES` e `IMPORT_STALE` explicando qué hacer. Nada se crea hasta confirmar.
+- **Categorías** (gastos/ingresos, un nivel de subcategorías, archivo, conjunto sugerido) y **Contrapartes** (búsqueda, RUC con DV validado en vivo, archivo).
+- `lib/money.ts`: importes siempre como string; formato paraguayo (`₲ 1.234.567`, `US$ 1.234,50`) y entrada que acepta `1.234.567` o `1234567,50` y envía el string normalizado. Positivo entra, negativo sale: color **y** signo.
+- Rol Consulta: lee la empresa sin acciones de escritura (con explicación); cualquier rol opera su propio espacio personal.
+- Tokens nuevos `personal`, `personal-soft`, `chart-in`, `chart-out` (claro y oscuro). Finanzas se carga aparte (división de código por pantalla). Sin dependencias nuevas: el gráfico es SVG propio y el XLSX se lee con `DecompressionStream` nativo.
+- Auditoría: nombres legibles para las acciones de finanzas.
+- Pruebas: 43 unitarias nuevas (53 en total) y `e2e/finanzas.spec.ts` con 8 flujos (18 E2E en total). `e2e/env.ts` acepta `CONTADOR_E2E_API_PORT` y `CONTADOR_E2E_WEB_PORT`.
+
 ### Agregado — Fase 2, backend de finanzas (2026-11-24)
 - Migración `0002` (esquema `finance`, reversible): contextos `business`/`personal`, cuentas, categorías (un nivel), contrapartes con RUC y DV, movimientos, lotes y filas de importación. La migración crea el contexto empresarial de cada organización existente y `POST /system/setup` lo crea junto con la organización.
 - Separación impuesta en la base (D-025): claves foráneas compuestas `(id, context_id)` y `(account_id, context_id, currency)`; además, restricciones de importe distinto de cero, PYG sin decimales, anulación completa con motivo y transferencias sin categoría.
