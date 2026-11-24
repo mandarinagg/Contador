@@ -4,7 +4,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.core.logging import request_id_var
@@ -65,16 +65,28 @@ def security_event(
     )
 
 
+# Auditoría de finanzas personales (D-024): solo la ve su dueño, que es el único que puede
+# operar ese contexto y por lo tanto el único actor de esas entradas.
+PRIVATE_ENTITY_PREFIX = "finance.personal."
+
+
 def list_logs(
     db: Session,
     organization_id: uuid.UUID,
     *,
+    viewer_user_id: uuid.UUID,
     limit: int,
     before_seq: int | None,
     entity_type: str | None,
     action: str | None,
 ) -> list[AuditLog]:
-    query = select(AuditLog).where(AuditLog.organization_id == organization_id)
+    query = select(AuditLog).where(
+        AuditLog.organization_id == organization_id,
+        or_(
+            ~AuditLog.entity_type.startswith(PRIVATE_ENTITY_PREFIX, autoescape=True),
+            AuditLog.actor_user_id == viewer_user_id,
+        ),
+    )
     if before_seq is not None:
         query = query.where(AuditLog.seq < before_seq)
     if entity_type:

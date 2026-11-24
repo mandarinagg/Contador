@@ -13,6 +13,8 @@ dependencies = [
   "alembic==1.20.1",
   "psycopg[binary]==3.3.9",
   "argon2-cffi==25.1.0",
+  "openpyxl==3.1.5",  # lectura de extractos XLSX (fase 2)
+  "python-multipart==0.0.34",  # formularios multipart (subida de extractos)
 ]
 
 [project.optional-dependencies]
@@ -21,6 +23,7 @@ dev = [
   "httpx2==2.16.2",  # cliente de TestClient (starlette depreca httpx)
   "ruff==0.17.6",
   "mypy==2.4.1",
+  "types-openpyxl==3.1.5.20261122",  # tipos de openpyxl para mypy estricto
 ]
 
 # Empaquetado del backend como ejecutable (ver docs/ARCHITECTURE.md § Distribución).
@@ -38,6 +41,7 @@ include = ["app*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra -q"
+markers = ["slow: pruebas de rendimiento con muchos datos (más lentas)"]
 filterwarnings = ["error::sqlalchemy.exc.SAWarning"]
 
 [tool.ruff]
