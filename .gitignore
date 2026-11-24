@@ -47,3 +47,6 @@ Thumbs.db
 # Playwright
 frontend/test-results/
 frontend/playwright-report/
+
+# Claude Code: worktrees de agentes y configuración local
+/.claude/
