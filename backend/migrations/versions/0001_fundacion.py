@@ -13,8 +13,6 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-from app.core.permissions import PERMISSION_DESCRIPTIONS, ROLE_INFO, ROLE_PERMISSIONS
-
 revision: str = "0001"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
@@ -363,6 +361,30 @@ def _create_audit_protection() -> None:
     op.execute(AUDIT_SQL)
 
 
+# Copia congelada del catálogo tal como era al crear esta migración. Una migración no
+# importa el catálogo vivo del código: si lo hiciera, una base nueva no sería igual a una
+# instalada con la versión anterior. Los permisos nuevos los carga su propia migración.
+PERMISSIONS_0001: dict[str, str] = {
+    "organization.read": "Ver los datos de la organización",
+    "organization.manage": "Modificar los datos de la organización",
+    "users.read": "Ver los usuarios de la organización",
+    "users.manage": "Crear usuarios, cambiar roles y desactivarlos",
+    "audit.read": "Consultar la auditoría y los eventos de seguridad",
+}
+ROLES_0001: dict[str, tuple[str, str]] = {
+    "owner": ("Propietario", "Control total, incluida la gestión de propietarios"),
+    "admin": ("Administrador", "Administra usuarios y configuración"),
+    "accountant": ("Contador", "Opera la contabilidad y consulta la auditoría"),
+    "viewer": ("Consulta", "Solo lectura"),
+}
+ROLE_PERMISSIONS_0001: dict[str, tuple[str, ...]] = {
+    "owner": tuple(PERMISSIONS_0001),
+    "admin": tuple(PERMISSIONS_0001),
+    "accountant": ("organization.read", "users.read", "audit.read"),
+    "viewer": ("organization.read",),
+}
+
+
 def _seed_roles_and_permissions() -> None:
     roles = sa.table(
         "roles", sa.column("code"), sa.column("name"), sa.column("description"), schema="core"
@@ -371,17 +393,15 @@ def _seed_roles_and_permissions() -> None:
     links = sa.table(
         "role_permissions", sa.column("role_code"), sa.column("permission_code"), schema="core"
     )
+    op.bulk_insert(perms, [{"code": c, "description": d} for c, d in PERMISSIONS_0001.items()])
     op.bulk_insert(
-        perms, [{"code": p.value, "description": d} for p, d in PERMISSION_DESCRIPTIONS.items()]
-    )
-    op.bulk_insert(
-        roles, [{"code": r.value, "name": n, "description": d} for r, (n, d) in ROLE_INFO.items()]
+        roles, [{"code": c, "name": n, "description": d} for c, (n, d) in ROLES_0001.items()]
     )
     op.bulk_insert(
         links,
         [
-            {"role_code": r.value, "permission_code": p.value}
-            for r, ps in ROLE_PERMISSIONS.items()
+            {"role_code": r, "permission_code": p}
+            for r, ps in ROLE_PERMISSIONS_0001.items()
             for p in sorted(ps)
         ],
     )

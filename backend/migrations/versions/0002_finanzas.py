@@ -493,8 +493,8 @@ def upgrade() -> None:
 
 
 def _seed_permissions() -> None:
-    # ON CONFLICT: la 0001 carga el catálogo vivo, así que en una base nueva estos permisos
-    # ya pueden existir; en una base creada antes de esta fase, se agregan acá.
+    # La 0001 tiene su catálogo congelado: estos permisos nacen acá. ON CONFLICT se conserva
+    # como resguardo para bases de desarrollo creadas antes de congelar la 0001.
     bind = op.get_bind()
     for code, description in FINANCE_PERMISSIONS.items():
         bind.execute(

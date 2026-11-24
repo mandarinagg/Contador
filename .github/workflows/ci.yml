@@ -73,7 +73,7 @@ jobs:
           .venv/bin/alembic check
           .venv/bin/alembic downgrade base
           .venv/bin/alembic upgrade head
-          .venv/bin/pytest
+          .venv/bin/pytest -m "not slow"
 
       - name: Frontend — dependencias
         working-directory: frontend
@@ -85,6 +85,33 @@ jobs:
           npm run lint
           npm test
           npm run build
+
+  performance:
+    # Pruebas de rendimiento (100.000 movimientos). Aparte: un tiempo fuera de límite se ve
+    # en rojo, pero no frena la generación del instalador de Windows.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: contador
+          POSTGRES_PASSWORD: contador_dev
+          POSTGRES_DB: contador
+        ports: ["55433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U contador -d contador"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Rendimiento
+        working-directory: backend
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -e ".[dev]"
+          .venv/bin/pytest -m slow -s
 
   e2e:
     # Navegador real (Chromium) contra la API y el build del frontend, con una base vacía propia.

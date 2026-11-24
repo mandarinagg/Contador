@@ -38,7 +38,8 @@ const BACKUP_RECHECK: Duration = Duration::from_secs(30 * 60);
 
 enum StackSlot {
     Starting,
-    Running(Stack),
+    // En una caja: en Windows `Stack` incluye el job object y agranda mucho el enum.
+    Running(Box<Stack>),
     Closing,
 }
 
@@ -102,7 +103,7 @@ fn start_in_background(handle: tauri::AppHandle, config: StackConfig) {
                     drop(slot);
                     stack.stop();
                 } else {
-                    *slot = StackSlot::Running(stack);
+                    *slot = StackSlot::Running(Box::new(stack));
                     drop(slot);
                     start_backups(handle.clone(), backup);
                 }
