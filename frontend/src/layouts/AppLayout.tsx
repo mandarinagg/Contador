@@ -1,9 +1,10 @@
-import { ArrowLeftRight, Boxes, Building2, CalendarRange, Contact, FileUp, Home, Landmark, LayoutDashboard, ListTree, LogOut, Network, NotebookPen, Repeat, Scale, ScrollText, Tags, UserRound, Users } from 'lucide-react'
+import { ArrowLeftRight, BadgePercent, BookCheck, Boxes, Building2, CalendarDays, CalendarRange, Contact, FileBadge2, FileUp, Gauge, Home, Landmark, LayoutDashboard, ListTree, LogOut, Network, NotebookPen, ReceiptText, Repeat, Scale, ScrollText, Settings2, Tags, UserRound, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { NavLink, Outlet, useMatch } from 'react-router'
 import { cx } from '../lib/cx'
 import { ROLE_LABELS } from '../lib/format'
 import { FINANCE_SECTIONS, preferredContext, useContexts } from '../modules/finance/data'
+import { useTaxAlerts } from '../modules/tax/data'
 import { useSession } from '../stores/session'
 
 interface NavItem {
@@ -12,6 +13,8 @@ interface NavItem {
   icon: ReactNode
   permission?: string
   end?: boolean
+  /** Marca con una cantidad (avisos de impuestos). */
+  count?: number
 }
 
 const FINANCE_ICONS: Record<string, ReactNode> = {
@@ -71,6 +74,21 @@ const ACCOUNTING_NAV: NavItem[] = [
   { to: '/contabilidad/reportes', label: 'Libros y balances', icon: <Scale size={16} />, permission: 'accounting.read' },
 ]
 
+/** Impuestos (fase 4): todos los roles lo leen (`tax.read`). La marca del Resumen cuenta los avisos (D-092). */
+function useTaxNav(): NavItem[] {
+  const { can } = useSession()
+  const alerts = useTaxAlerts(can('tax.read'))
+  return [
+    { to: '/impuestos', label: 'Resumen fiscal', icon: <Gauge size={16} />, permission: 'tax.read', end: true, count: alerts.data?.count },
+    { to: '/impuestos/calendario', label: 'Calendario', icon: <CalendarDays size={16} />, permission: 'tax.read' },
+    { to: '/impuestos/comprobantes', label: 'Comprobantes', icon: <ReceiptText size={16} />, permission: 'tax.read' },
+    { to: '/impuestos/iva', label: 'IVA del mes', icon: <BadgePercent size={16} />, permission: 'tax.read' },
+    { to: '/impuestos/perfil', label: 'Perfil fiscal', icon: <FileBadge2 size={16} />, permission: 'tax.read' },
+    { to: '/impuestos/reglas', label: 'Reglas y feriados', icon: <BookCheck size={16} />, permission: 'tax.read' },
+    { to: '/impuestos/configuracion', label: 'Configuración', icon: <Settings2 size={16} />, permission: 'tax.read' },
+  ]
+}
+
 function BrandMark() {
   // Cinco pétalos: la flor del lapacho, reducida a una marca geométrica.
   return (
@@ -86,10 +104,19 @@ function BrandMark() {
 export function AppLayout() {
   const { me, can, logout } = useSession()
   const financeNav = useFinanceNav()
-  // Los libros contables necesitan más ancho que el resto (columnas de debe, haber y saldo).
-  const wide = useMatch('/contabilidad/*')
+  const taxNav = useTaxNav()
+  // Los libros contables y los registros de impuestos necesitan más ancho que el resto.
+  const wideAccounting = useMatch('/contabilidad/*')
+  const wideTax = useMatch('/impuestos/*')
+  const wide = wideAccounting ?? wideTax
   if (!me) return null
-  const nav = [NAV[0], { group: 'Finanzas', items: financeNav }, { group: 'Contabilidad', items: ACCOUNTING_NAV }, ...NAV.slice(1)]
+  const nav = [
+    NAV[0],
+    { group: 'Finanzas', items: financeNav },
+    { group: 'Contabilidad', items: ACCOUNTING_NAV },
+    { group: 'Impuestos', items: taxNav },
+    ...NAV.slice(1),
+  ]
 
   return (
     <div className="flex h-full">
@@ -128,6 +155,14 @@ export function AppLayout() {
                       >
                         {item.icon}
                         {item.label}
+                        {item.count ? (
+                          <span data-testid="tax-alert-count" className="ml-auto rounded-sm bg-amber-soft px-1.5 text-xs font-semibold text-amber tabular-nums">
+                            <span aria-hidden>{item.count}</span>
+                            <span className="sr-only">
+                              , {item.count} {item.count === 1 ? 'aviso' : 'avisos'}
+                            </span>
+                          </span>
+                        ) : null}
                       </NavLink>
                     </li>
                   ))}

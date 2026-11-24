@@ -4,6 +4,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Agregado — Fase 4, interfaz de tributación (2026-11-24)
+- Menú **Impuestos** con siete entradas; la de Resumen fiscal lleva la cantidad de avisos. Todo lo calculado lleva la marca «sin verificar» mientras dependa de reglas pendientes (D-082), con la regla, la norma y la fuente a un clic.
+- **Resumen fiscal**: avisos con su acción, próximos vencimientos y estado del perfil. Inicio muestra los mismos avisos y el paso «Perfil fiscal» de la puesta en marcha.
+- **Perfil fiscal**: asistente por pasos que sigue la constancia de RUC (vigencia, IRE, cierre, IVA, obligaciones con su fecha de alta), con controles de coherencia, historial de versiones y verificación del contador con matrícula y constancia.
+- **Calendario**: vencimientos por año con su estado, el motivo si se corrieron (`shift_explanation`), el aviso por `remind_by`, la excepción aplicada, y presentar, pagar, no aplica y reabrir. Se sincroniza al abrir (solo quien puede escribir).
+- **Comprobantes**: registro del mes con filtros en la URL y totales; carga en tanda con el teclado (IVA incluido calculado al escribir, DV del RUC y del CDC, número completado, contrapartes de finanzas); edición, anulación con motivo, asiento propuesto; Excel del libro y vista previa y descarga del archivo de Marangatu.
+- **IVA del mes**: débito y crédito por tasa con las notas de crédito, saldo anterior, resultado, aviso de prorrateo, control contra el mayor, borrador del Formulario 120 con las dudas abiertas en cada casilla, Excel y «Copiar a la obligación».
+- **Reglas y feriados**: reglas con filtro (estado, las que usa la app), carga de candidatas, verificar y deprecar; feriados por año (candidatos, alta con fuente obligatoria, edición, baja, verificación); excepciones de vencimiento (alta y activar o desactivar).
+- **Configuración**: cuentas del IVA, proveedores y clientes (o la del plan por defecto) y días de aviso.
+- E2E `tributacion.spec.ts` (9 flujos): avisos sin perfil, reglas y feriados candidatos, perfil con el asistente, calendario, carga de compra y venta, IVA del mes, configuración, verificación del contador y límites del rol de consulta. Vitest suma las pruebas de la lógica de tributación (191 en total).
+
 ### Agregado — Fase 4, backend del núcleo tributario (2026-11-24)
 - Migración `0005_tributacion` (escrita a mano, esquema `tax`): reglas versionadas, feriados, excepciones de calendario, perfil fiscal versionado, obligaciones, comprobantes y configuración, con triggers que hacen de última defensa y permisos `tax.read`, `tax.manage` y `tax.verify` (el Administrador no verifica). La bajada se niega a perder comprobantes u obligaciones presentadas. Especificación `docs/specs/FASE4_TRIBUTACION.md`; investigación integrada en D-096 a D-099; decisiones de implementación D-100 a D-116.
 - **Reglas como datos**: las 39 candidatas de `docs/research/tax_rules_candidatas.yaml` empaquetadas (copia verificada idéntica), carga idempotente, parámetros validados por código, sin vigencias superpuestas; verificar (nombre y matrícula) y deprecar con `tax.verify`. Todo lo que se calcula dice qué regla usó y si está «sin verificar» (D-082).

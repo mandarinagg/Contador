@@ -69,6 +69,7 @@ export function useCategories(cid: string) {
 
 export function useCounterparties(cid: string) {
   return useQuery({
+    enabled: Boolean(cid),
     queryKey: [...financeKeys.counterparties(cid), 'all'],
     queryFn: () => fetchAll<Counterparty>(`/finance/contexts/${cid}/counterparties`, { include_archived: true }),
   })
