@@ -25,6 +25,13 @@ export default defineConfig({
       dependencies: ['chromium'],
       use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 860 } },
     },
+    {
+      // La contabilidad parte de las cuentas de la empresa que deja finanzas.spec.ts.
+      name: 'contabilidad',
+      testMatch: 'contabilidad.spec.ts',
+      dependencies: ['finanzas'],
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 860 } },
+    },
   ],
   webServer: [
     {

@@ -11,20 +11,26 @@ import { errorMessage } from './forms'
 import { financeKeys, useCategories, useFinance } from './data'
 import { byName } from './labels'
 import type { Category, CategoryKind } from './types'
+import { type LedgerMapping, useLedgerMapping } from '../accounting/entryRefs'
+import { LedgerAccountField, LedgerAccountTag } from '../accounting/financeBridge'
 
 
 function CategoryForm({
   category,
   all,
   initialKind,
+  mapping,
   onDone,
 }: {
   category?: Category
   all: Category[]
   initialKind: CategoryKind
+  mapping: LedgerMapping
   onDone: () => void
 }) {
   const { cid } = useFinance()
+  const [ledgerId, setLedgerId] = useState(category?.ledger_account_id ?? '')
+  const ledgerChanged = mapping.canEdit && ledgerId !== (category?.ledger_account_id ?? '')
   const qc = useQueryClient()
   const toast = useToast()
   const [name, setName] = useState(category?.name ?? '')
@@ -35,10 +41,13 @@ function CategoryForm({
   const parents = all.filter((c) => c.kind === kind && c.parent_id === null && !c.archived_at && c.id !== category?.id).sort(byName)
 
   const save = useMutation({
-    mutationFn: () =>
-      category
-        ? patch<Category>(`/finance/contexts/${cid}/categories/${category.id}`, { name, parent_id: parentId || null })
-        : post<Category>(`/finance/contexts/${cid}/categories`, { name, kind, parent_id: parentId || null }),
+    mutationFn: async () => {
+      const ledger = ledgerChanged ? { ledger_account_id: ledgerId || null } : {}
+      if (category) return patch<Category>(`/finance/contexts/${cid}/categories/${category.id}`, { name, parent_id: parentId || null, ...ledger })
+      const created = await post<Category>(`/finance/contexts/${cid}/categories`, { name, kind, parent_id: parentId || null })
+      // La cuenta contable solo se asigna al editar (la API no la recibe al crear).
+      return ledgerChanged ? patch<Category>(`/finance/contexts/${cid}/categories/${created.id}`, ledger) : created
+    },
     onSuccess: (c) => {
       qc.invalidateQueries({ queryKey: financeKeys.categories(cid) })
       toast('ok', category ? `Categoría «${c.name}» guardada.` : `Categoría «${c.name}» creada.`)
@@ -91,6 +100,17 @@ function CategoryForm({
           </Select>
         )}
       </Field>
+      <LedgerAccountField
+        mapping={mapping}
+        kinds={[kind]}
+        value={ledgerId}
+        onChange={setLedgerId}
+        hint={
+          parentId
+            ? 'Opcional en una subcategoría: si queda vacía, usa la cuenta contable de su categoría.'
+            : `Una cuenta de ${kind === 'income' ? 'ingreso' : 'gasto'}: a ella va el movimiento al proponer el asiento.`
+        }
+      />
       <div className="flex justify-end gap-2 border-t border-line pt-4">
         <Button type="button" variant="ghost" onClick={onDone}>
           Cancelar
@@ -111,7 +131,9 @@ function KindSection({
   onEdit,
   onArchive,
   busy,
+  mapping,
 }: {
+  mapping: LedgerMapping
   kind: CategoryKind
   all: Category[]
   showArchived: boolean
@@ -131,6 +153,18 @@ function KindSection({
         {c.archived_at && (
           <span className="ml-2">
             <Badge>Archivada</Badge>
+          </span>
+        )}
+        {mapping.show && (
+          <span className="block font-normal">
+            <LedgerAccountTag
+              mapping={mapping}
+              id={c.ledger_account_id}
+              inherited={(() => {
+                const p = c.parent_id ? all.find((x) => x.id === c.parent_id) : undefined
+                return p?.ledger_account_id ? { id: p.ledger_account_id, from: p.name } : null
+              })()}
+            />
           </span>
         )}
       </span>
@@ -171,6 +205,7 @@ function KindSection({
 
 export function CategoriesPage() {
   const { cid, context, canWrite, readOnlyReason } = useFinance()
+  const mapping = useLedgerMapping(context.kind === 'business')
   const qc = useQueryClient()
   const toast = useToast()
   const categories = useCategories(cid)
@@ -256,6 +291,7 @@ export function CategoriesPage() {
                 onEdit={(c) => setEditing({ category: c, kind: c.kind })}
                 onArchive={(c) => archive.mutate(c)}
                 busy={archive.isPending}
+                mapping={mapping}
               />
             ))}
           </div>
@@ -273,6 +309,7 @@ export function CategoriesPage() {
             category={editing.category}
             initialKind={editing.kind}
             all={all}
+            mapping={mapping}
             onDone={() => setEditing(null)}
           />
         )}
