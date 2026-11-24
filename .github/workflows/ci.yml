@@ -233,12 +233,23 @@ jobs:
           cargo clippy --all-targets -- -D warnings
 
       - name: Lanzador — prueba con binarios reales y Administrador de credenciales
-        timeout-minutes: 15
+        timeout-minutes: 10
         working-directory: desktop/src-tauri
         run: |
           $env:CONTADOR_TEST_PGSQL_BIN = Resolve-Path ..\..\build\pgsql\bin
           $env:CONTADOR_TEST_BACKEND_EXE = Resolve-Path ..\..\backend\dist\contador-backend\contador-backend.exe
-          cargo test -- --ignored --test-threads=1
+          cargo test -- --ignored --test-threads=1 --nocapture
+
+      - name: Lanzador — registros si falló (cada comando anota "$ ..." al empezar y "→" al terminar)
+        if: failure()
+        run: |
+          Get-ChildItem $env:TEMP -Directory -Filter "contador-*" | ForEach-Object {
+            Get-ChildItem (Join-Path $_.FullName "logs") -File -ErrorAction SilentlyContinue | ForEach-Object {
+              "===== $($_.FullName)"; Get-Content $_.FullName -Tail 40
+            }
+          }
+          Get-Process postgres, pg_ctl, initdb, contador-backend, cmd -ErrorAction SilentlyContinue |
+            Format-Table Id, ProcessName, StartTime -AutoSize
 
       - name: Instalador NSIS
         run: |
