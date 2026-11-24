@@ -13,6 +13,7 @@ Hay una primera investigación con fuentes oficiales leídas. **Todo está en `p
 | [`research/tax_rules_candidatas.yaml`](research/tax_rules_candidatas.yaml) | 25 reglas candidatas con el formato de `tax_rule_versions`. Todas con `validation_status: pending` y `reviewed_by: null`. |
 | [`research/PLAN_DE_CUENTAS_PY.md`](research/PLAN_DE_CUENTAS_PY.md) | No hay un plan de cuentas oficial obligatorio. Explica el modelo de estados financieros de la RG 49/2014. |
 | [`research/plan_de_cuentas_propuesto.yaml`](research/plan_de_cuentas_propuesto.yaml) | Plan propuesto de 159 cuentas, basado en los códigos de la RG 49/2014. Es una propuesta para validar. |
+| [`research/DEPRECIACION_PY.md`](research/DEPRECIACION_PY.md) y [`research/categorias_activo_fijo_candidatas.yaml`](research/categorias_activo_fijo_candidatas.yaml) | Depreciación del activo fijo para el IRE: vidas útiles y valor residual (Decreto 3182, art. 31, texto del Decreto 6105/2021), método, inicio, venta y baja, revalúo, cuadro de depreciación de la RG 77/2020 y diferencias del IRE SIMPLE. 34 categorías propuestas, todas `pending`; 17 dudas para el contador (D-DEP-1 a D-DEP-17). |
 
 ### Resumen del estado
 

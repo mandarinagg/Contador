@@ -1,0 +1,589 @@
+# CATEGORÍAS DE ACTIVO FIJO CANDIDATAS — PROPUESTA, NO VALIDADA
+#
+# Estado: borrador para que el contador lo valide. Todas las filas están en validation_status: pending.
+# Nada de esto es asesoramiento tributario. Ninguna fila está verificada.
+#
+# Fuente principal: Decreto N° 3182/2019 (reglamento del IRE), Anexo, art. 31, en la redacción dada por el
+# Decreto N° 6105/2021 (14-10-2021). Complementan: Ley N° 6380/2019, arts. 10, 11 y 15; Decreto 3182, arts. 23,
+# 24, 30, 32 y 33; RG DNIT N° 77/2020 (cuadro de depreciación).
+#   Decreto 6105/2021: https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf
+#   Decreto 3182/2019: https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+3182-19.pdf/ee6adbdb-f9c2-7a3f-877d-96a0bbbc0a3d?t=1681424260226.pdf
+#   consultado: 2026-11-24
+# Detalle, contradicciones y dudas: docs/research/DEPRECIACION_PY.md
+#
+# Campos:
+#   codigo                        slug de la categoría
+#   nombre
+#   vida_util_anios               años de vida útil fiscal (null = no encontrada o no aplica)
+#   valor_residual_pct            porcentaje de valor residual fiscal sobre el costo (null = la norma no lo fija)
+#   metodo                        lineal | no_depreciable. 'lineal' es una inferencia (DEPRECIACION_PY.md §3.1, D-DEP-1)
+#   cuenta_activo                 código del plan_de_cuentas_propuesto.yaml; null si no hay una cuenta adecuada (ver nota)
+#   cuenta_depreciacion_acumulada código del plan propuesto; null si no aplica
+#   cuenta_gasto                  código del plan propuesto (15.01 depreciaciones / 15.02 amortizaciones)
+#   nota                          aclaraciones, dudas y límites del mapeo
+#   fuente_url, referencia_legal, cita (textual, corta), consultado
+#   confianza                     oficial leída | oficial vista solo por título | secundaria
+#   validation_status             pending hasta que lo valide el contador
+#
+# Notas generales:
+# - El plan propuesto tiene UNA sola cuenta de depreciación acumulada para todo el activo fijo (1.02.04.99).
+#   Si se quiere saldo por categoría, hay que agregar subcuentas debajo de 1.02.04.99 (el modelo RG 49/2014 permite
+#   agregar cuentas). Es una decisión de diseño, no de la norma.
+# - Los activos biológicos (ganado y plantaciones) del art. 31 no se incluyen: esta EAS no los tiene.
+# - Cada bien se rige por las normas vigentes al momento de su adquisición (Decreto 3182, art. 30). Las filas
+#   reflejan la redacción vigente desde el 14-10-2021. La única diferencia que encontré con el texto de 2019 es la
+#   fila 'envases_retornables' y el último párrafo (ver DEPRECIACION_PY.md §6).
+# - La Administración puede autorizar, a solicitud del contribuyente, otra vida útil u otro sistema de depreciación
+#   (Decreto 3182, art. 31, último párrafo). No se modela aquí.
+
+meta:
+  status: propuesta
+  validated_by: null
+  generated_at: "2026-11-24"
+  base: "Decreto N° 3182/2019, Anexo, art. 31 (texto del Decreto N° 6105/2021)"
+
+categorias:
+  - codigo: "muebles_y_equipos_en_general"
+    nombre: "Muebles y equipos en general (excluidos los de los enunciados siguientes)"
+    vida_util_anios: 5
+    valor_residual_pct: 10
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.03"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Clasificar un bien como equipo general (5 años), informática (2 años) o útil/enser (2 años) es criterio del contador (D-DEP-14)."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "i) Muebles y equipos en general, excluidos los comprendidos en el enunciado siguiente: 5 años. Valor Residual: 10%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "muebles_y_enseres_en_viviendas_del_personal"
+    nombre: "Muebles y enseres en las viviendas para el personal"
+    vida_util_anios: 2
+    valor_residual_pct: 10
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.03"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Poco probable en una EAS de servicios; se incluye porque está en la norma."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "ii) Muebles y enseres en las viviendas para el personal: 2 años. Valor Residual: 10%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "utiles_de_trabajo_rural_para_el_personal"
+    nombre: "Útiles de trabajo rural para el personal"
+    vida_util_anios: 2
+    valor_residual_pct: 10
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.03"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Actividad rural; probablemente no aplica a esta EAS."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "iii) Útiles de trabajo rural para el personal: 2 años. Valor Residual: 10%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "utiles_y_enseres_en_general"
+    nombre: "Útiles y enseres en general"
+    vida_util_anios: 2
+    valor_residual_pct: 10
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.03"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Ver D-DEP-3 (bienes de bajo valor) y D-DEP-14 (clasificación)."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "iv) Útiles y enseres en general: 2 años. Valor Residual: 10%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "envases_retornables"
+    nombre: "Envases retornables"
+    vida_util_anios: 3
+    valor_residual_pct: 10
+    metodo: "lineal"
+    cuenta_activo: null
+    cuenta_depreciacion_acumulada: null
+    cuenta_gasto: "15.01"
+    nota: "Categoría agregada por el Decreto 6105/2021 (no estaba en el texto original de 2019). El plan propuesto no tiene una cuenta adecuada; si hiciera falta, agregar una subcuenta bajo 1.02.04. Probablemente no aplica a esta EAS."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "v) Envases retornables: 3 años. Valor Residual: 10%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "maquinarias_e_implementos"
+    nombre: "Maquinarias e implementos"
+    vida_util_anios: 10
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: null
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "El modelo RG 49/2014 tiene 1.02.04.04 MAQUINARIAS, pero el plan propuesto la omitió. Sugerencia: agregarla con el mismo código del modelo y usarla aquí."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "i) Maquinarias e implementos: 10 años. Valor Residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "herramientas_y_equipos"
+    nombre: "Herramientas y equipos"
+    vida_util_anios: 5
+    valor_residual_pct: 10
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.06"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "El plan propuesto separa Herramientas (1.02.04.06) y Equipos (1.02.04.05, agrupadora). Un equipo que no sea de informática no tiene cuenta imputable propia."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "ii) Herramientas y equipos: 5 años. Valor Residual: 10%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "equipos_de_informatica"
+    nombre: "Equipos de informática"
+    vida_util_anios: 2
+    valor_residual_pct: 10
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.05.01"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "En el Decreto 3182/2019 original la cifra queda parcialmente tapada por una firma en el escaneo (se lee 2 años). El Decreto 6105/2021 la republica legible: 2 años. El software no está aquí (ver software_licencias)."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "iii) Equipos de informática: 2 años. Valor Residual: 10%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "vehiculos_automotores"
+    nombre: "Vehículos automotores (excluidos los de los enunciados siguientes)"
+    vida_util_anios: 5
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Duda sobre qué es vehículo utilitario (10 años) frente a automotor común (5 años): D-DEP-13."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "i) Vehículos automotores, excluidos los comprendidos en los enunciados siguientes: 5 años. Valor Residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "motocicletas_y_similares"
+    nombre: "Motocicletas, motonetas, cuatriciclos, triciclos y bicicletas"
+    vida_util_anios: 2
+    valor_residual_pct: 10
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: null
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "ii) Motocicletas, motonetas, cuatriciclos, triciclos y bicicletas: 2 años. Valor Residual: 10%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "transporte_publico_y_vehiculos_utilitarios"
+    nombre: "Transporte público de pasajeros y vehículos utilitarios"
+    vida_util_anios: 10
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "La norma no define utilitarios (D-DEP-13)."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "iii) Transporte público de pasajeros y vehículos utilitarios: 10 años. Valor Residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "transporte_terrestre_restantes"
+    nombre: "Transporte terrestre: restantes bienes"
+    vida_util_anios: 5
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: null
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "iv) Restantes bienes: 5 años. Valor Residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "aeronaves"
+    nombre: "Aviones y demás aeronaves"
+    vida_util_anios: 20
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Improbable en esta EAS."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "i) Aviones y demás aeronaves: 20 años. Valor Residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "material_de_vuelo"
+    nombre: "Material de vuelo"
+    vida_util_anios: 2
+    valor_residual_pct: 10
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Improbable en esta EAS."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "ii) Material de vuelo: 2 años. Valor Residual: 10%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "embarcaciones_comerciales"
+    nombre: "Embarcaciones motorizadas para explotación comercial (vapores, remolcadores, barcazas)"
+    vida_util_anios: 20
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Improbable en esta EAS."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "i) Embarcaciones motorizadas para explotación comercial, tales como vapores, remolcadores incluidas las barcazas: 20 años. Valor Residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "embarcaciones_motorizadas_en_general"
+    nombre: "Embarcaciones motorizadas en general (lanchas y similares)"
+    vida_util_anios: 10
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Improbable en esta EAS."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "ii) Embarcaciones motorizadas en general, tales como lanchas, y similares: 10 años. Valor Residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "canoas_botes_y_otras_embarcaciones"
+    nombre: "Canoas, botes y demás embarcaciones"
+    vida_util_anios: 5
+    valor_residual_pct: 10
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Improbable en esta EAS."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "iii) Canoas, botes y demás embarcaciones no señaladas en los incisos anteriores: 5 años. Valor Residual: 10%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "material_rodante_ferroviario"
+    nombre: "Locomotoras, vagones y material rodante"
+    vida_util_anios: 20
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Improbable en esta EAS."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "i) Locomotoras, vagones, autovías, zorras y materiales rodantes de cualquier clase: Vida útil 20 años. Valor residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "vias_ferroviarias_y_demas_bienes"
+    nombre: "Construcción de vías y demás bienes ferroviarios"
+    vida_util_anios: 10
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Improbable en esta EAS."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "ii) Construcción de vías y demás bienes: Vida útil 10 años. Valor Residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "construcciones_y_mejoras_de_inmuebles"
+    nombre: "Construcciones y mejoras de inmuebles urbanos y rurales (sin terreno)"
+    vida_util_anios: 30
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.01"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "El plan propuesto tiene una sola cuenta Inmuebles (1.02.04.01) para terreno y construcción. El terreno no se deprecia, así que la aplicación debe separarlos (por subcuenta o por campo). Si el precio no los distingue, el Decreto 3182, art. 24, usa la valuación fiscal del impuesto inmobiliario."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "i) Construcciones y mejoras de inmuebles urbanos y rurales, excluido el terreno y los comprendidos en los enunciados siguientes: Vida útil 30 años. Valor Residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "terrenos"
+    nombre: "Terrenos (no depreciables)"
+    vida_util_anios: null
+    valor_residual_pct: null
+    metodo: "no_depreciable"
+    cuenta_activo: "1.02.04.01"
+    cuenta_depreciacion_acumulada: null
+    cuenta_gasto: null
+    nota: "No encontré una frase que diga expresamente que el terreno no se deprecia; se infiere de que el art. 31 lo excluye de la tabla. Ver D-DEP-12."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "Construcciones y mejoras de inmuebles urbanos y rurales, excluido el terreno … Vida útil 30 años."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "silos_almacenes_y_galpones"
+    nombre: "Silos, almacenes y galpones"
+    vida_util_anios: 20
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.01"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Un depósito o galpón propio de la EAS caería aquí y no en la fila de 30 años."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "ii) Silos, almacenes y galpones: Vida útil 20 años. Valor residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "tanques_de_agua_bebederos_y_similares"
+    nombre: "Tanques de agua, bebederos y similares"
+    vida_util_anios: 5
+    valor_residual_pct: 10
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.01"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Actividad rural; probablemente no aplica."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "iii) Tanques de agua, bebederos y similares: Vida útil 5 años. Valor residual: 10%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "canales_de_regadio_tajamares_y_pozos"
+    nombre: "Canales de regadío, tajamares y pozos"
+    vida_util_anios: 15
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.01"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Actividad rural; probablemente no aplica."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "iv) Canales de regadío, tajamares y pozo: Vida útil 15 años. Valor residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "alambrados_tranqueras_y_corrales"
+    nombre: "Alambrados, tranqueras y corrales"
+    vida_util_anios: 10
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.01"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Actividad rural; probablemente no aplica."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "v) Alambrados, tranqueras y corrales: Vida útil 10 años. Valor residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "construcciones_en_propiedad_de_terceros"
+    nombre: "Construcciones en propiedad de terceros"
+    vida_util_anios: 20
+    valor_residual_pct: 0
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.08"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Si el contrato fija un plazo menor, ese plazo es la vida útil. Cuenta del modelo RG 49/2014: Mejoras en predio ajeno."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "vi) Construcciones en propiedad de terceros: Vida útil 20 años, salvo que el contrato establezca un plazo menor. Valor Residual: 0%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "mejoras_en_propiedad_de_terceros"
+    nombre: "Mejoras en propiedad de terceros (por ejemplo, refacción de un local alquilado)"
+    vida_util_anios: 10
+    valor_residual_pct: 0
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.08"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Si el contrato de alquiler fija un plazo menor, ese plazo es la vida útil. Caso relevante para una EAS que alquila su oficina."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "vii) Mejoras en propiedad de terceros: Vida útil 10 años, salvo que el contrato establezca un plazo menor. Valor Residual: 0%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "instalaciones_de_electrificacion"
+    nombre: "Instalaciones de electrificación"
+    vida_util_anios: 10
+    valor_residual_pct: 10
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.01"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Sin cuenta específica en el plan propuesto; se propone Inmuebles por cercanía. Validar."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "viii) Instalaciones de electrificación: Vida útil 10 años. Valor residual: 10%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "caminos_internos"
+    nombre: "Caminos internos"
+    vida_util_anios: 15
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.01"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Actividad rural; probablemente no aplica."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "ix) Caminos internos: Vida útil 15 años. Valor residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "instalaciones_electricas_y_prevencion_de_incendios"
+    nombre: "Instalaciones eléctricas, sistemas de prevención de incendios, mamparas y otros incorporados a construcciones y mejoras"
+    vida_util_anios: 10
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: "1.02.04.01"
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Sin cuenta específica en el plan propuesto. Si están en un local alquilado, ver más bien mejoras_en_propiedad_de_terceros."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "x) Instalaciones eléctricas, sistemas de prevención de incendios, mamparas y otros, incorporados como parte de construcciones y mejoras de inmuebles: Vida útil 10 años. Valor residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "otros_bienes_de_construcciones_no_contemplados"
+    nombre: "Restantes bienes no contemplados en los incisos anteriores (grupo Construcciones)"
+    vida_util_anios: 5
+    valor_residual_pct: 20
+    metodo: "lineal"
+    cuenta_activo: null
+    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_gasto: "15.01"
+    nota: "Categoría residual. El plan propuesto no tiene una cuenta de otros bienes de PPE. Es dudoso si aplica a todo el activo fijo no listado o solo al grupo Construcciones (D-DEP-15)."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
+    cita: "xi) Los restantes bienes no contemplados en los incisos precedentes. Vida útil 5 años. Valor residual: 20%."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "licencias_marcas_y_patentes"
+    nombre: "Bienes intangibles pagados: marcas, patentes, licencias y otros"
+    vida_util_anios: 5
+    valor_residual_pct: null
+    metodo: "lineal"
+    cuenta_activo: "1.02.07.01"
+    cuenta_depreciacion_acumulada: "1.02.07.99"
+    cuenta_gasto: "15.02"
+    nota: "La norma no da valor residual para intangibles. Ley 6380, art. 15 num. 16: la amortización es deducible siempre que al momento de la adquisición hayan estado gravados por alguno de los Impuestos a las Rentas por parte del enajenante. Decreto 3182, art. 33: solo se computan en el activo si son una inversión real y fueron comprados."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 num. 2 (Decreto N° 6105/2021) y art. 33; Ley N° 6380/2019, arts. 10 y 15 num. 16"
+    cita: "Los bienes intangibles efectivamente pagados, tales como marcas, patentes, licencias y otros, se amortizarán en cinco (5) años."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
+  - codigo: "software_licencias"
+    nombre: "Software adquirido (licencias perpetuas o de larga duración)"
+    vida_util_anios: 5
+    valor_residual_pct: null
+    metodo: "lineal"
+    cuenta_activo: "1.02.07.03"
+    cuenta_depreciacion_acumulada: "1.02.07.99"
+    cuenta_gasto: "15.02"
+    nota: "El software NO se nombra en el reglamento. Se asimila a licencias y otros por analogía; esa asimilación es una suposición del investigador, no texto de la norma. La suscripción mensual o anual (SaaS) no es un activo: va a gasto (plan 11.19). Ver D-DEP-4."
+    fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
+    referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 num. 2 (Decreto N° 6105/2021); Ley N° 6380/2019, art. 15 num. 16"
+    cita: "Los bienes intangibles efectivamente pagados, tales como marcas, patentes, licencias y otros, se amortizarán en cinco (5) años."
+    consultado: "2026-11-24"
+    confianza: "oficial leída (la categoría); la asimilación del software no tiene fuente"
+    validation_status: pending
+
+  - codigo: "gastos_de_constitucion_y_organizacion"
+    nombre: "Gastos de constitución y organización (incluye preoperativos)"
+    vida_util_anios: 5
+    valor_residual_pct: null
+    metodo: "lineal (opcional, hasta 5 años)"
+    cuenta_activo: "1.02.06.01"
+    cuenta_depreciacion_acumulada: "1.02.06.99"
+    cuenta_gasto: "15.02"
+    nota: "Es una opción: hasta 5 años, o gasto del ejercicio. vida_util_anios: 5 es el máximo. Subcuenta 1.02.06.02 para gastos de organización. Responde por el lado fiscal la pregunta 6 de PLAN_DE_CUENTAS_PY.md §4; falta la visión contable."
+    fuente_url: "https://www.dnit.gov.py/web/portal-institucional/w/ley-n-6380-19"
+    referencia_legal: "Ley N° 6380/2019, art. 15 num. 9; Decreto N° 3182/2019, Anexo, art. 33"
+    cita: "Los gastos de constitución y organización, incluidos los denominados gastos preoperativos … podrán ser amortizados en un período de hasta cinco años a opción del contribuyente."
+    consultado: "2026-11-24"
+    confianza: "oficial leída"
+    validation_status: pending
+
