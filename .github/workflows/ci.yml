@@ -317,6 +317,23 @@ jobs:
           $global:LASTEXITCODE = 0
           "Cierre normal OK: backend y PostgreSQL detenidos"
 
+          # 4b. Cierre durante el arranque: la ventana se cierra antes de que los servicios estén
+          # listos. La app tiene que esperar al hilo de arranque y detener todo igual.
+          $p = Start-Process $app.FullName -PassThru
+          for ($i = 0; $i -lt 150 -and $p.MainWindowHandle -eq 0; $i++) { Start-Sleep -Milliseconds 200; $p.Refresh() }
+          if ($p.MainWindowHandle -eq 0) { throw "La ventana no apareció" }
+          $p.CloseMainWindow() | Out-Null
+          if (-not $p.WaitForExit(240000)) { throw "La app no se cerró (cierre durante el arranque)" }
+          Start-Sleep 2
+          if (Port-Open) { throw "El backend siguió vivo después de cerrar la app durante el arranque" }
+          & "$dir\pgsql\bin\pg_ctl.exe" status -D "$data\pgdata"
+          if ($LASTEXITCODE -ne 3) { throw "PostgreSQL siguió en marcha después de cerrar la app durante el arranque" }
+          $global:LASTEXITCODE = 0
+          $hit = Get-ChildItem $env:LOCALAPPDATA -Recurse -Filter *.log -ErrorAction SilentlyContinue |
+            Select-String -SimpleMatch "durante el arranque" -List | Select-Object -First 1
+          if ($hit) { "Se cerró durante el arranque (registro: $($hit.Path))" } else { "Aviso: el cierre llegó con los servicios ya listos" }
+          "Cierre durante el arranque OK: backend y PostgreSQL detenidos"
+
           # 5. Desinstalar no borra la contabilidad.
           Start-Process "$dir\uninstall.exe" -ArgumentList "/S" -Wait
           Start-Sleep 3

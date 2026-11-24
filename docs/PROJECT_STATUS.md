@@ -79,6 +79,7 @@ D-001 a D-034 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 
 **Lo primero:**
 1. **CI de Windows: ✅ todo verde desde `7c98639`** (ejecución 45390713831). Pasan el lanzador, las copias, el Administrador de credenciales, el instalador NSIS y su prueba completa en Windows real.
+   - Con la migración 0003 (`btree_gist`), el primer arranque en Windows funciona. Apareció una carrera: cerrar la app durante el arranque dejaba PostgreSQL en marcha. Se corrigió en `lib.rs` (la salida espera al hilo de arranque) y se agregó el paso 4b a la prueba del instalador.
    - Causas que se resolvieron: el pipe que `postgres` hereda (`stack.rs`, `tests/backup.rs`), la ruta `\\?\` que `initdb` no entiende (`stack::plain_path`) y el código 3 de `pg_ctl status` al final del script.
    - Si algo vuelve a fallar, el paso "Lanzador — registros si falló" muestra cada comando ejecutado (`$ ...`) y su resultado (`→`). La prueba del instalador vuelca `%LOCALAPPDATA%\ContadorAI\logs`. `gh run view --log` a veces sale vacío; usar `gh api repos/mandarinagg/Contador/actions/jobs/<id>/logs`.
 2. El propietario prueba el instalador NSIS (artefacto `contador-ai-windows-instalador` del CI, vence a los 30 días) en su PC con Windows 11 (P-8: usuario con tildes o ñ).

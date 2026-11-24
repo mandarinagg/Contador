@@ -43,7 +43,9 @@ enum StackSlot {
     Closing,
 }
 
-struct StackState(Mutex<StackSlot>);
+/// Estado de los servicios y el hilo que los arranca. El hilo se guarda para poder esperarlo
+/// al salir: si la ventana se cierra durante el arranque, es ese hilo el que detiene todo.
+struct StackState(Mutex<StackSlot>, Mutex<Option<std::thread::JoinHandle<()>>>);
 
 pub fn run() {
     let app = tauri::Builder::default()
@@ -61,10 +63,16 @@ pub fn run() {
                 .level(log::LevelFilter::Info)
                 .build(),
         )
-        .manage(StackState(Mutex::new(StackSlot::Starting)))
+        .manage(StackState(Mutex::new(StackSlot::Starting), Mutex::new(None)))
         .setup(|app| {
             match stack_config(app.handle()) {
-                Ok(Some(config)) => start_in_background(app.handle().clone(), config),
+                Ok(Some(config)) => {
+                    let starter = start_in_background(app.handle().clone(), config);
+                    *app.state::<StackState>()
+                        .1
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(starter);
+                }
                 Ok(None) => log::info!("Modo desarrollo: los servicios los levanta scripts/dev.sh"),
                 Err(message) => fail(app.handle(), &message),
             }
@@ -77,15 +85,36 @@ pub fn run() {
         if let RunEvent::Exit = event {
             let state = handle.state::<StackState>();
             let previous = std::mem::replace(&mut *lock(&state), StackSlot::Closing);
-            if let StackSlot::Running(stack) = previous {
-                log::info!("Deteniendo servicios locales");
-                stack.stop();
+            match previous {
+                StackSlot::Running(stack) => {
+                    log::info!("Deteniendo servicios locales");
+                    stack.stop();
+                }
+                StackSlot::Starting => {
+                    // Todavía arrancando: al terminar, el hilo de arranque ve `Closing` y detiene
+                    // los servicios. Hay que esperarlo, porque al volver de este evento el proceso
+                    // termina y mataría el hilo antes de detener PostgreSQL. No se traba: el
+                    // arranque tiene su propio límite de tiempo y `fail` muestra el error en otro
+                    // hilo.
+                    let starter = state
+                        .1
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .take();
+                    if let Some(starter) = starter {
+                        log::info!(
+                            "La ventana se cerró durante el arranque: esperando para detener los servicios"
+                        );
+                        let _ = starter.join();
+                    }
+                }
+                StackSlot::Closing => {}
             }
         }
     });
 }
 
-fn start_in_background(handle: tauri::AppHandle, config: StackConfig) {
+fn start_in_background(handle: tauri::AppHandle, config: StackConfig) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         log::info!("Iniciando servicios locales en {}", config.data_dir.display());
         let store = match secret_store(&config) {
@@ -113,7 +142,7 @@ fn start_in_background(handle: tauri::AppHandle, config: StackConfig) {
                 fail(&handle, &e.to_string());
             }
         }
-    });
+    })
 }
 
 /// Copia de seguridad diaria en un hilo propio: la app ya está abierta y no espera a la copia.
