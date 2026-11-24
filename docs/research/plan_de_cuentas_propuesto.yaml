@@ -1,0 +1,1175 @@
+# PLAN DE CUENTAS PROPUESTO — PROPUESTA, NO VALIDADA
+#
+# Estado: borrador para que el contador lo valide. NO es un plan oficial.
+# No encontré un plan de cuentas oficial obligatorio para empresas privadas en Paraguay.
+# Base: códigos y nombres del modelo de estados financieros de la RG N° 49/2014 (DNIT),
+# Anexos 1 (Balance General) y 2 (Estado de Resultados). Su art. 3° obliga a usar esos
+# códigos en los estados financieros y permite agregar cuentas o subcuentas.
+#   https://www.dnit.gov.py/documents/20123/209894/Resoluci%C3%B3n+General+N%C2%B0+49_14+Anexos.xls/1be53adb-b8a2-37d3-2561-7d2b93810387?t=1684192313142
+#   consultado: 2026-11-24
+#
+# Campos:
+#   codigo      código jerárquico (separado por puntos)
+#   nombre
+#   tipo        activo | pasivo | patrimonio | ingreso | gasto
+#   naturaleza  deudora | acreedora (saldo normal)
+#   imputable   true = recibe asientos; false = cuenta agrupadora
+#   padre       código de la cuenta superior (null en la raíz)
+#   origen      rg49_2014 = código y nombre del modelo oficial; propuesta = agregada aquí
+#   nota        opcional
+#
+# Notas:
+# - Los costos (grupo 5) se marcan tipo "gasto" porque el esquema solo admite cinco tipos.
+# - Del modelo RG 49/2014 se omitieron cuentas de actividades que esta EAS no parece tener
+#   (agro, ganadería, forestal, exportación, zona franca, maquila, turismo). Si las tuviera,
+#   se agregan con el mismo código del modelo.
+# - Los renglones de subtotal del Estado de Resultados (6, 9, 12, 16, 18 y 20) no son
+#   cuentas y no se incluyen.
+
+meta:
+  status: propuesta
+  validated_by: null
+  generated_at: "2026-11-24"
+  base: "RG N° 49/2014, Anexos 1 y 2"
+
+cuentas:
+  - codigo: "1"
+    nombre: "ACTIVO"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: null
+    origen: rg49_2014
+  - codigo: "1.01"
+    nombre: "ACTIVO CORRIENTE"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1"
+    origen: rg49_2014
+  - codigo: "1.01.01"
+    nombre: "DISPONIBILIDADES"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1.01"
+    origen: rg49_2014
+  - codigo: "1.01.01.01"
+    nombre: "RECAUDACIONES A DEPOSITAR"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.01"
+    origen: rg49_2014
+  - codigo: "1.01.01.02"
+    nombre: "CAJA"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.01"
+    origen: rg49_2014
+  - codigo: "1.01.01.03"
+    nombre: "FONDOS FIJOS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.01"
+    origen: rg49_2014
+  - codigo: "1.01.01.04"
+    nombre: "BANCOS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1.01.01"
+    origen: rg49_2014
+  - codigo: "1.01.01.04.01"
+    nombre: "BANCO - CUENTA CORRIENTE GUARANÍES"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.01.04"
+    origen: propuesta
+    nota: "Abrir una subcuenta por cada cuenta bancaria real."
+  - codigo: "1.01.01.04.02"
+    nombre: "BANCO - CAJA DE AHORRO GUARANÍES"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.01.04"
+    origen: propuesta
+  - codigo: "1.01.01.04.03"
+    nombre: "BANCO - CUENTA EN DÓLARES"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.01.04"
+    origen: propuesta
+    nota: "Moneda extranjera: requiere diferencia de cambio."
+  - codigo: "1.01.02"
+    nombre: "INVERSIONES TEMPORARIAS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1.01"
+    origen: rg49_2014
+  - codigo: "1.01.02.01"
+    nombre: "INVERSIONES FINANCIERAS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.02"
+    origen: rg49_2014
+  - codigo: "1.01.03"
+    nombre: "CRÉDITOS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1.01"
+    origen: rg49_2014
+  - codigo: "1.01.03.01"
+    nombre: "DEUDORES POR VENTAS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.03"
+    origen: rg49_2014
+  - codigo: "1.01.03.04"
+    nombre: "CUENTAS A COBRAR A SOCIOS O A ENTIDADES VINCULADAS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.03"
+    origen: rg49_2014
+    nota: "Préstamos al accionista: el art. 40 de la Ley 6380 los presume distribución de utilidades (IDU). Validar con el contador."
+  - codigo: "1.01.03.05"
+    nombre: "CRÉDITOS POR IMPUESTOS CORRIENTES"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1.01.03"
+    origen: rg49_2014
+  - codigo: "1.01.03.05.01"
+    nombre: "ANTICIPOS Y RETENCIONES DE IMPUESTO A LA RENTA"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.03.05"
+    origen: rg49_2014
+  - codigo: "1.01.03.05.02"
+    nombre: "RETENCIONES DE IVA"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.03.05"
+    origen: rg49_2014
+  - codigo: "1.01.03.05.03"
+    nombre: "IVA - CRÉDITO FISCAL"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1.01.03.05"
+    origen: rg49_2014
+  - codigo: "1.01.03.05.03.01"
+    nombre: "IVA CRÉDITO FISCAL 10%"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.03.05.03"
+    origen: propuesta
+  - codigo: "1.01.03.05.03.02"
+    nombre: "IVA CRÉDITO FISCAL 5%"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.03.05.03"
+    origen: propuesta
+  - codigo: "1.01.03.05.05"
+    nombre: "SALDO A FAVOR DE IVA (EJERCICIOS ANTERIORES)"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.03.05"
+    origen: propuesta
+    nota: "Remanente de crédito fiscal de períodos anteriores."
+  - codigo: "1.01.03.06"
+    nombre: "ANTICIPO A PROVEEDORES"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1.01.03"
+    origen: rg49_2014
+  - codigo: "1.01.03.06.01"
+    nombre: "ANTICIPOS A PROVEEDORES LOCALES"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.03.06"
+    origen: rg49_2014
+  - codigo: "1.01.03.06.02"
+    nombre: "ANTICIPOS A PROVEEDORES DEL EXTERIOR"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.03.06"
+    origen: rg49_2014
+  - codigo: "1.01.03.99"
+    nombre: "(-) PREVISIÓN PARA CRÉDITOS DE DUDOSO COBRO"
+    tipo: activo
+    naturaleza: acreedora
+    imputable: true
+    padre: "1.01.03"
+    origen: rg49_2014
+    nota: "Cuenta regularizadora del activo."
+  - codigo: "1.01.04"
+    nombre: "INVENTARIOS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1.01"
+    origen: rg49_2014
+  - codigo: "1.01.04.01"
+    nombre: "MERCADERÍAS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1.01.04"
+    origen: rg49_2014
+  - codigo: "1.01.04.01.01"
+    nombre: "MERCADERÍAS GRAVADAS POR EL IVA AL 10%"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.04.01"
+    origen: rg49_2014
+  - codigo: "1.01.04.01.02"
+    nombre: "MERCADERÍAS GRAVADAS POR EL IVA AL 5%"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.04.01"
+    origen: rg49_2014
+  - codigo: "1.01.04.01.03"
+    nombre: "MERCADERÍAS EXENTAS DEL IVA"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.04.01"
+    origen: rg49_2014
+  - codigo: "1.01.05"
+    nombre: "GASTOS PAGADOS POR ADELANTADO"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1.01"
+    origen: rg49_2014
+  - codigo: "1.01.05.01"
+    nombre: "ALQUILERES PAGADOS POR ADELANTADO"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.05"
+    origen: rg49_2014
+  - codigo: "1.01.05.02"
+    nombre: "SEGUROS A DEVENGAR"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01.05"
+    origen: rg49_2014
+  - codigo: "1.01.06"
+    nombre: "OTROS ACTIVOS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.01"
+    origen: rg49_2014
+  - codigo: "1.02"
+    nombre: "ACTIVO NO CORRIENTE"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1"
+    origen: rg49_2014
+  - codigo: "1.02.04"
+    nombre: "PROPIEDAD, PLANTA Y EQUIPO"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1.02"
+    origen: rg49_2014
+  - codigo: "1.02.04.01"
+    nombre: "INMUEBLES"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.04"
+    origen: rg49_2014
+  - codigo: "1.02.04.02"
+    nombre: "RODADOS /TRANSPORTES"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.04"
+    origen: rg49_2014
+  - codigo: "1.02.04.03"
+    nombre: "MUEBLES, ÚTILES Y ENSERES"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.04"
+    origen: rg49_2014
+  - codigo: "1.02.04.05"
+    nombre: "EQUIPOS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1.02.04"
+    origen: rg49_2014
+  - codigo: "1.02.04.05.01"
+    nombre: "EQUIPOS DE INFORMÁTICA"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.04.05"
+    origen: propuesta
+  - codigo: "1.02.04.06"
+    nombre: "HERRAMIENTAS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.04"
+    origen: rg49_2014
+  - codigo: "1.02.04.08"
+    nombre: "MEJORAS EN PREDIO AJENO"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.04"
+    origen: rg49_2014
+  - codigo: "1.02.04.99"
+    nombre: "(-) DEPRECIACIÓN ACUMULADA"
+    tipo: activo
+    naturaleza: acreedora
+    imputable: true
+    padre: "1.02.04"
+    origen: rg49_2014
+    nota: "Cuenta regularizadora del activo. Tasas fiscales de depreciación: no investigadas."
+  - codigo: "1.02.06"
+    nombre: "CARGOS DIFERIDOS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1.02"
+    origen: rg49_2014
+  - codigo: "1.02.06.01"
+    nombre: "GASTOS DE CONSTITUCIÓN"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.06"
+    origen: rg49_2014
+  - codigo: "1.02.06.02"
+    nombre: "GASTOS DE ORGANIZACIÓN"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.06"
+    origen: rg49_2014
+  - codigo: "1.02.06.99"
+    nombre: "(-) AMORTIZACIÓN ACUMULADA"
+    tipo: activo
+    naturaleza: acreedora
+    imputable: true
+    padre: "1.02.06"
+    origen: rg49_2014
+    nota: "Cuenta regularizadora del activo."
+  - codigo: "1.02.07"
+    nombre: "ACTIVOS INTANGIBLES"
+    tipo: activo
+    naturaleza: deudora
+    imputable: false
+    padre: "1.02"
+    origen: rg49_2014
+  - codigo: "1.02.07.01"
+    nombre: "LICENCIAS, MARCAS Y PATENTES"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.07"
+    origen: rg49_2014
+  - codigo: "1.02.07.03"
+    nombre: "SOFTWARE"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.07"
+    origen: propuesta
+  - codigo: "1.02.07.99"
+    nombre: "(-) AMORTIZACIÓN ACUMULADA"
+    tipo: activo
+    naturaleza: acreedora
+    imputable: true
+    padre: "1.02.07"
+    origen: rg49_2014
+    nota: "Cuenta regularizadora del activo."
+  - codigo: "2"
+    nombre: "PASIVO"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: false
+    padre: null
+    origen: rg49_2014
+  - codigo: "2.01"
+    nombre: "PASIVO CORRIENTE"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: false
+    padre: "2"
+    origen: rg49_2014
+  - codigo: "2.01.01"
+    nombre: "ACREEDORES COMERCIALES"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: false
+    padre: "2.01"
+    origen: rg49_2014
+  - codigo: "2.01.01.01"
+    nombre: "PROVEEDORES LOCALES"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.01"
+    origen: rg49_2014
+  - codigo: "2.01.01.02"
+    nombre: "PROVEEDORES DEL EXTERIOR"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.01"
+    origen: rg49_2014
+  - codigo: "2.01.01.04"
+    nombre: "OTROS ACREEDORES"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.01"
+    origen: rg49_2014
+  - codigo: "2.01.02"
+    nombre: "DEUDAS FINANCIERAS"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: false
+    padre: "2.01"
+    origen: rg49_2014
+  - codigo: "2.01.02.01"
+    nombre: "PRÉSTAMOS DE BANCOS Y OTRAS ENTIDADES FINANCIERAS"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.02"
+    origen: rg49_2014
+  - codigo: "2.01.02.02"
+    nombre: "PRÉSTAMOS DEL DUEÑO, SOCIOS O ENTIDADES VINCULADAS"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.02"
+    origen: rg49_2014
+    nota: "Aportes del accionista que no son capital. Documentar con contrato."
+  - codigo: "2.01.02.05"
+    nombre: "INTERESES A PAGAR"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.02"
+    origen: rg49_2014
+  - codigo: "2.01.03"
+    nombre: "OTRAS CUENTAS POR PAGAR"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: false
+    padre: "2.01"
+    origen: rg49_2014
+  - codigo: "2.01.03.01"
+    nombre: "DEUDAS FISCALES CORRIENTES"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: false
+    padre: "2.01.03"
+    origen: rg49_2014
+  - codigo: "2.01.03.01.01"
+    nombre: "IMPUESTO A LA RENTA A PAGAR"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.03.01"
+    origen: rg49_2014
+  - codigo: "2.01.03.01.02"
+    nombre: "IVA A PAGAR"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: false
+    padre: "2.01.03.01"
+    origen: rg49_2014
+  - codigo: "2.01.03.01.02.01"
+    nombre: "IVA DÉBITO FISCAL 10%"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.03.01.02"
+    origen: propuesta
+  - codigo: "2.01.03.01.02.02"
+    nombre: "IVA DÉBITO FISCAL 5%"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.03.01.02"
+    origen: propuesta
+  - codigo: "2.01.03.01.03"
+    nombre: "RETENCIONES DE IMPUESTOS A INGRESAR"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: false
+    padre: "2.01.03.01"
+    origen: rg49_2014
+  - codigo: "2.01.03.01.03.01"
+    nombre: "RETENCIÓN IDU A INGRESAR"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.03.01.03"
+    origen: propuesta
+    nota: "Obligación 726. Solo al distribuir utilidades."
+  - codigo: "2.01.03.01.03.02"
+    nombre: "RETENCIONES DE IVA Y RENTA A INGRESAR"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.03.01.03"
+    origen: propuesta
+    nota: "Solo si la DNIT designa a la EAS agente de retención."
+  - codigo: "2.01.03.02"
+    nombre: "OBLIGACIONES LABORALES Y CARGAS SOCIALES"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: false
+    padre: "2.01.03"
+    origen: rg49_2014
+  - codigo: "2.01.03.02.01"
+    nombre: "SUELDOS Y JORNALES A PAGAR"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.03.02"
+    origen: propuesta
+    nota: "Solo con empleados."
+  - codigo: "2.01.03.02.02"
+    nombre: "APORTES IPS A PAGAR"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.03.02"
+    origen: propuesta
+    nota: "Obrero 9% + patronal 16,5% (tabla IPS 2026, pendiente de verificación)."
+  - codigo: "2.01.03.02.03"
+    nombre: "AGUINALDO A PAGAR"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.03.02"
+    origen: propuesta
+    nota: "Base legal no investigada."
+  - codigo: "2.01.03.03"
+    nombre: "DIVIDENDOS A PAGAR"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.03"
+    origen: rg49_2014
+  - codigo: "2.01.04"
+    nombre: "PROVISIONES"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: false
+    padre: "2.01"
+    origen: rg49_2014
+  - codigo: "2.01.04.03"
+    nombre: "PROVISIÓN PARA BENEFICIOS A EMPLEADOS"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.04"
+    origen: rg49_2014
+  - codigo: "2.01.05"
+    nombre: "INGRESOS DIFERIDOS"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: false
+    padre: "2.01"
+    origen: rg49_2014
+  - codigo: "2.01.05.01"
+    nombre: "ANTICIPOS DE CLIENTES"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.01.05"
+    origen: rg49_2014
+  - codigo: "2.02"
+    nombre: "PASIVO NO CORRIENTE"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: false
+    padre: "2"
+    origen: rg49_2014
+  - codigo: "2.02.02"
+    nombre: "DEUDAS FINANCIERAS A LARGO PLAZO"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: false
+    padre: "2.02"
+    origen: rg49_2014
+  - codigo: "2.02.02.01"
+    nombre: "PRÉSTAMOS DE BANCOS Y OTRAS ENTIDADES FINANCIERAS"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.02.02"
+    origen: rg49_2014
+  - codigo: "2.02.02.02"
+    nombre: "PRÉSTAMOS DEL DUEÑO, SOCIOS O ENTIDADES VINCULADAS"
+    tipo: pasivo
+    naturaleza: acreedora
+    imputable: true
+    padre: "2.02.02"
+    origen: rg49_2014
+  - codigo: "3"
+    nombre: "PATRIMONIO NETO"
+    tipo: patrimonio
+    naturaleza: acreedora
+    imputable: false
+    padre: null
+    origen: rg49_2014
+  - codigo: "3.01"
+    nombre: "CAPITAL"
+    tipo: patrimonio
+    naturaleza: acreedora
+    imputable: false
+    padre: "3"
+    origen: rg49_2014
+  - codigo: "3.01.01"
+    nombre: "CAPITAL INTEGRADO"
+    tipo: patrimonio
+    naturaleza: acreedora
+    imputable: false
+    padre: "3.01"
+    origen: rg49_2014
+  - codigo: "3.01.01.01"
+    nombre: "CAPITAL SUSCRIPTO"
+    tipo: patrimonio
+    naturaleza: acreedora
+    imputable: true
+    padre: "3.01.01"
+    origen: rg49_2014
+  - codigo: "3.01.01.02"
+    nombre: "(-) CAPITAL A INTEGRAR"
+    tipo: patrimonio
+    naturaleza: deudora
+    imputable: true
+    padre: "3.01.01"
+    origen: rg49_2014
+    nota: "Cuenta regularizadora del patrimonio. El FAQ MIC menciona integración de aportes en especie dentro de 60 días hábiles."
+  - codigo: "3.02"
+    nombre: "RESERVAS"
+    tipo: patrimonio
+    naturaleza: acreedora
+    imputable: false
+    padre: "3"
+    origen: rg49_2014
+  - codigo: "3.02.01"
+    nombre: "RESERVA LEGAL"
+    tipo: patrimonio
+    naturaleza: acreedora
+    imputable: true
+    padre: "3.02"
+    origen: rg49_2014
+    nota: "Porcentaje y obligatoriedad para la EAS: no investigados (Código Civil supletorio, Ley 6480 art. 42)."
+  - codigo: "3.02.03"
+    nombre: "OTRAS RESERVAS"
+    tipo: patrimonio
+    naturaleza: acreedora
+    imputable: true
+    padre: "3.02"
+    origen: rg49_2014
+  - codigo: "3.03"
+    nombre: "RESULTADOS"
+    tipo: patrimonio
+    naturaleza: acreedora
+    imputable: false
+    padre: "3"
+    origen: rg49_2014
+  - codigo: "3.03.01"
+    nombre: "RESULTADOS ACUMULADOS"
+    tipo: patrimonio
+    naturaleza: acreedora
+    imputable: true
+    padre: "3.03"
+    origen: rg49_2014
+    nota: "Puede tener saldo deudor (pérdidas)."
+  - codigo: "3.03.02"
+    nombre: "RESULTADO DEL EJERCICIO"
+    tipo: patrimonio
+    naturaleza: acreedora
+    imputable: true
+    padre: "3.03"
+    origen: rg49_2014
+    nota: "Puede tener saldo deudor (pérdida). Se usa en el cierre."
+  - codigo: "4"
+    nombre: "INGRESOS OPERATIVOS"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: false
+    padre: null
+    origen: rg49_2014
+  - codigo: "4.01"
+    nombre: "VENTAS DE MERCADERÍAS"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: false
+    padre: "4"
+    origen: rg49_2014
+  - codigo: "4.01.01"
+    nombre: "VENTAS DE MERCADERÍAS GRAVADAS POR EL IVA"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: false
+    padre: "4.01"
+    origen: rg49_2014
+  - codigo: "4.01.01.01"
+    nombre: "VENTAS GRAVADAS IVA 10%"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: true
+    padre: "4.01.01"
+    origen: propuesta
+  - codigo: "4.01.01.02"
+    nombre: "VENTAS GRAVADAS IVA 5%"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: true
+    padre: "4.01.01"
+    origen: propuesta
+  - codigo: "4.01.02"
+    nombre: "VENTAS DE MERCADERÍAS EXENTAS DEL IVA"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: true
+    padre: "4.01"
+    origen: rg49_2014
+  - codigo: "4.09"
+    nombre: "VENTAS DE SERVICIOS GRAVADOS"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: true
+    padre: "4"
+    origen: rg49_2014
+  - codigo: "4.11"
+    nombre: "OTRAS VENTAS EXENTAS DEL IVA"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: true
+    padre: "4"
+    origen: rg49_2014
+  - codigo: "4.98"
+    nombre: "(-) DESCUENTOS CONCEDIDOS"
+    tipo: ingreso
+    naturaleza: deudora
+    imputable: true
+    padre: "4"
+    origen: rg49_2014
+    nota: "Cuenta regularizadora del ingreso."
+  - codigo: "4.99"
+    nombre: "(-) DEVOLUCIONES"
+    tipo: ingreso
+    naturaleza: deudora
+    imputable: true
+    padre: "4"
+    origen: rg49_2014
+    nota: "Cuenta regularizadora del ingreso."
+  - codigo: "5"
+    nombre: "COSTOS OPERATIVOS"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: false
+    padre: null
+    origen: rg49_2014
+  - codigo: "5.01"
+    nombre: "COSTO DE MERCADERÍAS"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: false
+    padre: "5"
+    origen: rg49_2014
+  - codigo: "5.01.01"
+    nombre: "COSTO DE MERCADERÍAS GRAVADAS POR EL IVA"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "5.01"
+    origen: rg49_2014
+  - codigo: "5.01.02"
+    nombre: "COSTO DE MERCADERÍAS EXENTAS DEL IVA"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "5.01"
+    origen: rg49_2014
+  - codigo: "5.09"
+    nombre: "COSTO DE SERVICIOS GRAVADOS"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "5"
+    origen: rg49_2014
+  - codigo: "5.11"
+    nombre: "COSTO DE VENTAS EXENTAS DEL IVA"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "5"
+    origen: rg49_2014
+  - codigo: "8"
+    nombre: "OTROS INGRESOS"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: false
+    padre: null
+    origen: rg49_2014
+  - codigo: "8.01"
+    nombre: "INTERESES GANADOS"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: true
+    padre: "8"
+    origen: rg49_2014
+  - codigo: "8.03"
+    nombre: "DESCUENTOS OBTENIDOS"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: true
+    padre: "8"
+    origen: rg49_2014
+  - codigo: "8.05"
+    nombre: "RESULTADO POR DIFERENCIA DE CAMBIO"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: true
+    padre: "8"
+    origen: rg49_2014
+    nota: "Ganancia por diferencia de cambio. La pérdida va en 13.04."
+  - codigo: "10"
+    nombre: "GASTOS DE VENTAS O COMERCIALIZACIÓN"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: false
+    padre: null
+    origen: rg49_2014
+  - codigo: "10.01"
+    nombre: "SUELDOS Y OTRAS REMUNERACIONES AL PERSONAL"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: false
+    padre: "10"
+    origen: rg49_2014
+  - codigo: "10.01.01"
+    nombre: "SUELDOS Y JORNALES"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "10.01"
+    origen: rg49_2014
+  - codigo: "10.01.02"
+    nombre: "APORTE PATRONAL"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "10.01"
+    origen: rg49_2014
+  - codigo: "10.01.03"
+    nombre: "OTROS BENEFICIOS AL PERSONAL"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "10.01"
+    origen: rg49_2014
+  - codigo: "10.02"
+    nombre: "COMISIONES PAGADAS SOBRE VENTAS"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "10"
+    origen: rg49_2014
+  - codigo: "10.04"
+    nombre: "PUBLICIDAD Y PROPAGANDA"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "10"
+    origen: rg49_2014
+  - codigo: "10.05"
+    nombre: "FLETES PAGADOS"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "10"
+    origen: rg49_2014
+  - codigo: "10.99"
+    nombre: "OTROS GASTOS DE VENTAS"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "10"
+    origen: rg49_2014
+  - codigo: "11"
+    nombre: "GASTOS DE ADMINISTRACIÓN"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: false
+    padre: null
+    origen: rg49_2014
+  - codigo: "11.01"
+    nombre: "SUELDOS Y OTRAS REMUNERACIONES AL PERSONAL"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: false
+    padre: "11"
+    origen: rg49_2014
+  - codigo: "11.01.01"
+    nombre: "SUELDOS Y JORNALES"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11.01"
+    origen: rg49_2014
+  - codigo: "11.01.02"
+    nombre: "APORTE PATRONAL"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11.01"
+    origen: rg49_2014
+  - codigo: "11.01.03"
+    nombre: "OTROS BENEFICIOS AL PERSONAL"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11.01"
+    origen: rg49_2014
+  - codigo: "11.02"
+    nombre: "REMUNERACIÓN PERSONAL SUPERIOR"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11"
+    origen: rg49_2014
+    nota: "Pagos al accionista o administrador: revisar IRP y deducibilidad con el contador."
+  - codigo: "11.04"
+    nombre: "HONORARIOS PROFESIONALES"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11"
+    origen: rg49_2014
+  - codigo: "11.05"
+    nombre: "ALQUILERES"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11"
+    origen: rg49_2014
+  - codigo: "11.06"
+    nombre: "AGUA, LUZ, TELÉFONO E INTERNET"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11"
+    origen: rg49_2014
+  - codigo: "11.07"
+    nombre: "MOVILIDAD"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11"
+    origen: rg49_2014
+  - codigo: "11.08"
+    nombre: "COMBUSTIBLES Y LUBRICANTES"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11"
+    origen: rg49_2014
+  - codigo: "11.09"
+    nombre: "REPARACIONES Y MANTENIMIENTOS"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11"
+    origen: rg49_2014
+  - codigo: "11.10"
+    nombre: "SEGUROS PAGADOS"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11"
+    origen: rg49_2014
+  - codigo: "11.11"
+    nombre: "ÚTILES DE OFICINA"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11"
+    origen: rg49_2014
+  - codigo: "11.12"
+    nombre: "GASTOS PAGADOS EN EL EXTERIOR"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11"
+    origen: rg49_2014
+  - codigo: "11.16"
+    nombre: "COMISIONES Y GASTOS BANCARIOS OPERACIONALES"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11"
+    origen: rg49_2014
+  - codigo: "11.17"
+    nombre: "IMPUESTOS, PATENTES, TASAS Y OTRAS CONTRIBUCIONES"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11"
+    origen: rg49_2014
+  - codigo: "11.18"
+    nombre: "MULTAS Y SANCIONES"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11"
+    origen: rg49_2014
+    nota: "Deducibilidad fiscal: a validar."
+  - codigo: "11.19"
+    nombre: "SUSCRIPCIONES DE SOFTWARE Y SERVICIOS DIGITALES"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "11"
+    origen: propuesta
+    nota: "Si el proveedor es del exterior, revisar IVA/retenciones con el contador."
+  - codigo: "13"
+    nombre: "GASTOS BANCARIOS Y FINANCIEROS"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: false
+    padre: null
+    origen: rg49_2014
+  - codigo: "13.01"
+    nombre: "INTERESES PAGADOS A ENTIDADES BANCARIAS Y FINANCIERAS"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "13"
+    origen: rg49_2014
+  - codigo: "13.02"
+    nombre: "OTROS INTERESES PAGADOS"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "13"
+    origen: rg49_2014
+  - codigo: "13.03"
+    nombre: "COMISIONES Y GASTOS BANCARIOS SOBRE OPERACIONES CREDITICIAS"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "13"
+    origen: rg49_2014
+  - codigo: "13.04"
+    nombre: "RESULTADO POR DIFERENCIA DE CAMBIO"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "13"
+    origen: rg49_2014
+    nota: "Pérdida por diferencia de cambio."
+  - codigo: "14"
+    nombre: "PREVISIONES"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: false
+    padre: null
+    origen: rg49_2014
+  - codigo: "14.01"
+    nombre: "DESAFECTACIÓN DE PREVISIONES"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: true
+    padre: "14"
+    origen: rg49_2014
+    nota: "En la RG 49/2014 suma al resultado."
+  - codigo: "14.02"
+    nombre: "(-) CONSTITUCIÓN DE PREVISIONES"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "14"
+    origen: rg49_2014
+  - codigo: "15"
+    nombre: "DEPRECIACIONES Y AMORTIZACIONES DE ACTIVOS"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: false
+    padre: null
+    origen: rg49_2014
+  - codigo: "15.01"
+    nombre: "DEPRECIACIONES DEL EJERCICIO"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "15"
+    origen: rg49_2014
+  - codigo: "15.02"
+    nombre: "AMORTIZACIONES DEL EJERCICIO"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: "15"
+    origen: rg49_2014
+  - codigo: "17"
+    nombre: "OTROS RESULTADOS NO OPERATIVOS"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: false
+    padre: null
+    origen: rg49_2014
+  - codigo: "17.01"
+    nombre: "UTILIDAD/PÉRDIDA EN VENTA DE ACTIVOS FIJOS"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: true
+    padre: "17"
+    origen: rg49_2014
+    nota: "Puede tener saldo de cualquier signo."
+  - codigo: "17.03"
+    nombre: "CUENTAS INCOBRABLES RECUPERADAS"
+    tipo: ingreso
+    naturaleza: acreedora
+    imputable: true
+    padre: "17"
+    origen: rg49_2014
+  - codigo: "19"
+    nombre: "IMPUESTO A LA RENTA"
+    tipo: gasto
+    naturaleza: deudora
+    imputable: true
+    padre: null
+    origen: rg49_2014

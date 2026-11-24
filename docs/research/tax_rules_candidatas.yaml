@@ -1,0 +1,539 @@
+# Reglas tributarias CANDIDATAS para la tabla tax_rule_versions.
+#
+# ESTADO: TODAS EN `pending`. NINGUNA ESTÁ VERIFICADA.
+# - Las armó un asistente de IA a partir de fuentes oficiales leídas el 2026-11-24.
+# - Solo un contador matriculado puede pasarlas a `verified` (BR-TAX-01), completando `reviewed_by`.
+# - Mientras estén en `pending`, la aplicación NO debe generar obligaciones ni cálculos con ellas.
+# - Detalle, citas y dudas: docs/research/TRIBUTACION_PY.md
+#
+# Campos (ver docs/DATABASE_SCHEMA.md):
+#   code, description, parameters, valid_from, valid_to, published_at, source_url,
+#   legal_reference, consulted_at, validation_status, reviewed_by, confidence, notes
+#
+# confidence:
+#   oficial_leida | oficial_citada_por_terceros | secundaria | no_encontrada
+#
+# Fechas ISO. Un `null` significa que no se conoce o no aplica; no lo completes de memoria.
+
+meta:
+  generated_at: "2026-11-24"
+  generated_by: "asistente IA (investigación); requiere revisión profesional"
+  company_profile_assumed: "EAS, persona jurídica, cierre de ejercicio 31 de diciembre (a confirmar)"
+
+rules:
+
+  # ---------------------------------------------------------------- CALENDARIO
+  - code: CAL-PERPETUO-DJ
+    description: >
+      Día de vencimiento mensual de las declaraciones juradas determinativas
+      (IVA, IRE, IRP, ISC) y de los anticipos, según el último dígito del RUC sin DV.
+      Si cae en día inhábil, pasa al siguiente día hábil.
+    parameters:
+      key: ultimo_digito_ruc_sin_dv
+      day_by_digit: {"0": 7, "1": 9, "2": 11, "3": 13, "4": 15, "5": 17, "6": 19, "7": 21, "8": 23, "9": 25}
+      non_business_day_shift: next_business_day
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2020-02-05"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-38-20"
+    legal_reference: "RG N° 38/2020, art. 3°"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      valid_from es una inferencia: la RG es del 05-02-2020 y la Ley 6380 rige desde el 01-01-2020.
+      Hay traslados excepcionales (por ejemplo RG DNIT 55/2026 y 60/2026) que deben cargarse como
+      excepciones fechadas, no como cambios a esta regla.
+
+  - code: CAL-PERPETUO-DJI
+    description: >
+      Día de vencimiento de las declaraciones juradas informativas: registro de comprobantes,
+      estados financieros, DJI del IDU y dictamen de auditoría. Depende del último dígito del RUC sin DV.
+    parameters:
+      key: ultimo_digito_ruc_sin_dv
+      day_by_digit: {"0": 8, "1": 10, "2": 12, "3": 14, "4": 16, "5": 18, "6": 20, "7": 22, "8": 24, "9": 26}
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2020-02-05"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-38-20"
+    legal_reference: "RG N° 38/2020, art. 6°"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: "valid_from inferido, igual que CAL-PERPETUO-DJ."
+
+  - code: CAL-EXCEPCION-2026-11
+    description: >
+      Traslado excepcional de los vencimientos de declaraciones juradas determinativas y pagos
+      de noviembre de 2026, por la resolución de Ueno Bank S.A. No incluye DJI, retenciones,
+      anticipos ni cuotas de facilidades de pago.
+    parameters:
+      month: "2026-11"
+      new_date_by_digit: {"0": "2026-11-16", "1": "2026-11-16", "2": "2026-11-17", "3": "2026-11-17", "4": "2026-11-19", "5": "2026-11-19", "6": "2026-11-23", "7": "2026-11-24", "8": "2026-11-25", "9": "2026-11-26"}
+      excludes: [DJI, retenciones, anticipos, facilidades_de_pago]
+    valid_from: "2026-11-01"
+    valid_to: "2026-11-30"
+    published_at: "2026-11-09"
+    source_url: "https://www.dnit.gov.py/documents/20123/2664257/RG+60+-+2026_firmado.pdf/cadc1f8b-47cd-7ec3-491a-42a0feb6265d?t=1794273017967"
+    legal_reference: "RG DNIT N° 60/2026, arts. 1° y 2°"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: "Ejemplo de excepción fechada. Sirve para probar que el modelo de datos soporta traslados."
+
+  # ---------------------------------------------------------------- IVA
+  - code: IVA-GENERAL-TASAS
+    description: >
+      Tasas del IVA: 10% general; 5% para los casos taxativos del art. 90
+      (alquiler de vivienda, inmuebles, canasta familiar, productos agrícolas/pecuarios, medicamentos).
+    parameters:
+      general_rate: 0.10
+      reduced_rate: 0.05
+      reduced_rate_cases_ref: "Ley 6380 art. 90 incisos a) a f)"
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2019-09-25"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/d-ley-n-6380-19"
+    legal_reference: "Ley N° 6380/2019, art. 90; vigencia: Decreto N° 2787/2019, art. 1°, num. 6"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      El Poder Ejecutivo puede fijar tasas diferenciales entre 5% y 10% para ciertos incisos.
+      No revisé decretos que lo hayan hecho. Tampoco revisé exoneraciones del art. 100
+      (Ley 7067/2023 lo modifica; leí solo el título).
+
+  - code: IVA-GENERAL-LIQUIDACION
+    description: >
+      IVA General (obligación 211, Formulario 120 v4): liquidación y DJ mensual
+      (IVA débito − IVA crédito). Vence en el mes siguiente al período, día según CAL-PERPETUO-DJ.
+      La DJ es obligatoria aunque no haya operaciones gravadas.
+    parameters:
+      obligation_code: 211
+      form: "120 v4"
+      periodicity: monthly
+      due: {month_offset: 1, day_rule: CAL-PERPETUO-DJ}
+      file_even_if_zero: true
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2020-02-05"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-38-20"
+    legal_reference: "Ley N° 6380/2019, arts. 86 y 96; RG N° 38/2020, art. 2°; RG N° 33/2020 (Form. 120)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: "Otras fuentes: página DNIT IVA y cartilla IVA del 06-08-2024."
+
+  # ---------------------------------------------------------------- REGISTRO DE COMPROBANTES
+  - code: REG-COMPROB-MENSUAL
+    description: >
+      Registro mensual de comprobantes de compras y ventas en Marangatu (obligación 955), asociado
+      a 211-IVA General. Se confirma hasta el día de vencimiento DJI del mes subsiguiente al período.
+      Se confirma aunque no haya movimientos. Tiene carácter de declaración jurada.
+    parameters:
+      obligation_code: 955
+      linked_obligation: 211
+      periodicity: monthly
+      due: {month_offset: 2, day_rule: CAL-PERPETUO-DJI}
+      confirm_even_if_zero: true
+    valid_from: "2022-01-01"
+    valid_to: null
+    published_at: "2024-05-31"
+    source_url: "https://www.dnit.gov.py/documents/20123/796215/Res.+General+DNIT+N%C2%B0+12_2024.pdf/06555b22-920e-f0ac-74d9-f5b6aa50329f?t=1717201434815"
+    legal_reference: "RG N° 90/2021, arts. 3°, 7°, 13, 15 y 16; art. 7° según RG DNIT N° 12/2024"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      Base: https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-90-21 (11-05-2021).
+      Desde el 01-11-2024 la confirmación tardía tiene multa por contravención (RG DNIT 17/2024).
+      No encontré el monto de la multa.
+
+  # ---------------------------------------------------------------- IRE
+  - code: IRE-TASA
+    description: "Tasa del IRE sobre la renta neta (Régimen General y SIMPLE)."
+    parameters:
+      rate: 0.10
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2019-09-25"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/d-ley-n-6380-19"
+    legal_reference: "Ley N° 6380/2019, arts. 21 y 26; vigencia: Decreto N° 2787/2019, art. 1°, num. 1"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: null
+
+  - code: IRE-GENERAL-DJ
+    description: >
+      IRE Régimen General (obligación 700, Formulario 500): DJ y pago anual. Vence en el 4.º mes
+      después del cierre, día según CAL-PERPETUO-DJ. La DJ se presenta aunque no haya renta gravada.
+    parameters:
+      obligation_code: 700
+      form: "500"
+      periodicity: annual
+      due: {months_after_fiscal_close: 4, day_rule: CAL-PERPETUO-DJ}
+      file_even_if_zero: true
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2020-02-05"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-38-20"
+    legal_reference: "RG N° 38/2020, art. 2°; Decreto N° 3182/2019, arts. 74 y 75; RG N° 61/2020 (Form. 500)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: "Pendiente: confirmar el régimen inscripto en la constancia de RUC (dudas D-1 y D-2)."
+
+  - code: IRE-SIMPLE-DJ
+    description: >
+      IRE SIMPLE (obligación 701, Formulario 501): DJ anual en el 3.er mes después del cierre.
+      Renta neta = menor entre base real y 30% de la facturación bruta. Tasa 10%. Sin arrastre de
+      pérdidas. Requiere ingresos del ejercicio anterior hasta G. 2.000.000.000. No aplica a
+      importadores ni exportadores.
+    parameters:
+      obligation_code: 701
+      form: "501"
+      periodicity: annual
+      due: {months_after_fiscal_close: 3, day_rule: CAL-PERPETUO-DJ}
+      max_prior_year_income_pyg: 2000000000
+      presumed_net_income_pct_of_gross: 0.30
+      rate: 0.10
+      loss_carryforward: false
+      excluded_if: [importador, exportador]
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2019-09-25"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/d-ley-n-6380-19"
+    legal_reference: "Ley N° 6380/2019, arts. 26, 28 y 140; Decreto N° 3182/2019, art. 76; RG N° 38/2020, art. 2°; RG N° 61/2020"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      DUDA CENTRAL (D-1): el FAQ del MIC dice que la EAS puede optar por el SIMPLE, pero el
+      Decreto 3182 art. 77 y la cartilla DNIT no nombran a la EAS. Además (art. 140) el tope
+      de G. 2.000 millones puede haberse reducido desde el sexto ejercicio; no lo verifiqué.
+
+  - code: IRE-ANTICIPOS
+    description: >
+      Anticipos del IRE General (obligación 735) y del SIMPLE (obligación 736): 4 cuotas del 25%
+      del promedio del impuesto de los últimos 3 ejercicios; con menos de 3 ejercicios, el anterior.
+      No se pagan si el promedio no supera G. 10.000.000. Se pagan en los meses 1, 3, 5 y 7
+      siguientes al vencimiento de la DJ (con cierre en diciembre: General may/jul/sep/nov;
+      SIMPLE abr/jun/ago/oct).
+    parameters:
+      obligation_codes: {ire_general: 735, ire_simple: 736}
+      installments: 4
+      installment_pct: 0.25
+      base: average_tax_last_3_years
+      base_if_less_than_3_years: previous_year_tax
+      exempt_if_base_not_over_pyg: 10000000
+      months_after_dj_due: [1, 3, 5, 7]
+      day_rule: CAL-PERPETUO-DJ
+    valid_from: "2023-01-01"
+    valid_to: null
+    published_at: "2022-12-09"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-123-22"
+    legal_reference: "Ley N° 6380/2019, art. 24; Decreto N° 2787/2019, art. 2°; Decreto N° 3182/2019, art. 83 (texto Decreto N° 7402/2022); RG N° 123/2022; RG N° 38/2020, art. 4°"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      CONTRADICCIÓN (D-4): las cartillas DNIT de 2024 describen la regla anterior (25% del
+      impuesto del año anterior). La lectura del escaneo del Decreto 7402 dice «no supere» y la
+      RG 123/22 dice «supere». En el primer ejercicio de una EAS nueva no habría anticipos
+      (inferencia a validar).
+
+  # ---------------------------------------------------------------- ESTADOS FINANCIEROS
+  - code: EEFF-PRESENTACION
+    description: >
+      Presentación anual de los estados financieros ante la DNIT (obligación 948) para el
+      IRE General. Modelo RG 49/2014 (Anexos 1 a 5) y cuadro de depreciación. Vence en el
+      4.º mes después del cierre, día según CAL-PERPETUO-DJI. Las notas deben detallar
+      utilidades, reservas, distribución y capitalización (desde los cierres al 31-12-2025).
+    parameters:
+      obligation_code: 948
+      periodicity: annual
+      due: {months_after_fiscal_close: 4, day_rule: CAL-PERPETUO-DJI}
+      model: "RG 49/2014 Anexos 1-5"
+      applies_to: [IRE_GENERAL]
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2020-12-31"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-77-20"
+    legal_reference: "RG N° 38/2020, art. 8°; RG N° 77/2020 (mod. RG N° 102/2021); RG N° 49/2014; RG DNIT N° 49/2026"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      La DNIT suele prorrogar este vencimiento (RG DNIT 29/2025 para 2024; RG DNIT 50/2026 para
+      2025, a junio). Duda D-10: ¿el SIMPLE presenta estados financieros?
+
+  - code: AEI-UMBRAL
+    description: >
+      Auditoría Externa Impositiva (obligación 947): obligatoria si la facturación anual supera
+      el umbral. El dictamen vence en el 8.º mes según el calendario DJI.
+    parameters:
+      obligation_code: 947
+      threshold_annual_billing_pyg: 9201143662
+    valid_from: null
+    valid_to: null
+    published_at: "2020-05-22"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-53-20"
+    legal_reference: "Ley N° 2421/2004, art. 33; RG N° 30/2019; RG N° 53/2020; RG N° 38/2020, art. 9°"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: "El monto es el de 2020. No verifiqué actualizaciones posteriores. Para una EAS nueva probablemente no aplica."
+
+  # ---------------------------------------------------------------- IDU
+  - code: IDU-TASAS
+    description: "Tasa del IDU sobre dividendos o utilidades distribuidas: 8% a residente, 15% a no residente."
+    parameters:
+      rate_resident: 0.08
+      rate_non_resident: 0.15
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2019-09-25"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/d-ley-n-6380-19"
+    legal_reference: "Ley N° 6380/2019, art. 43; vigencia: Decreto N° 2787/2019, art. 1°, num. 3"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: null
+
+  - code: IDU-RETENCION
+    description: >
+      La EAS retiene el IDU al distribuir utilidades (obligación 726, Formulario 526 generado
+      por el sistema). Retiene al pagar o al último día del mes en que nace la obligación, lo que
+      ocurra primero. Las utilidades se consideran distribuidas según la asamblea o, sin obligación
+      de asamblea y sin plazo estatutario, en el 4.º mes posterior al cierre.
+    parameters:
+      obligation_code: 726
+      form: "526"
+      periodicity: monthly_when_applicable
+      proforma_confirm_by_day: null
+      payment_by_day: null
+      deemed_distribution_month_after_close: 4
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2019-09-25"
+    source_url: "https://www.dnit.gov.py/documents/20123/302950/IDU+Cartilla+Informativa+03.09.24.pdf/25eeb741-b627-f2f0-f798-a9188a1a0f26?t=1725388488324.pdf"
+    legal_reference: "Ley N° 6380/2019, arts. 41 a 44; Decreto N° 3110/2019 (citado); RG N° 31/2019 (citada)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_citada_por_terceros
+    notes: >
+      Los días de confirmación y pago quedan en null a propósito. La RG 38/2020, art. 5°, dice
+      días 6 y 7, y la cartilla IDU 2024 dice 12 y 13 (D-5). Duda D-3: cuándo se entienden
+      distribuidas las utilidades en una EAS unipersonal.
+
+  - code: IDU-DJI
+    description: "DJI del IDU (obligación 954), en el 6.º mes después del cierre, según el calendario DJI."
+    parameters:
+      obligation_code: 954
+      periodicity: annual
+      due: {months_after_fiscal_close: 6, day_rule: CAL-PERPETUO-DJI}
+    valid_from: null
+    valid_to: null
+    published_at: null
+    source_url: "https://www.dnit.gov.py/documents/20123/302950/IDU+Cartilla+Informativa+03.09.24.pdf/25eeb741-b627-f2f0-f798-a9188a1a0f26?t=1725388488324.pdf"
+    legal_reference: "RG N° 70/2020, arts. 2°, 4° y 5° (citada en la cartilla IDU)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_citada_por_terceros
+    notes: "No leí la RG 70/2020."
+
+  # ---------------------------------------------------------------- SIFEN
+  - code: SIFEN-PJ-NUEVA
+    description: >
+      Las personas jurídicas inscriptas como nuevas en el RUC desde el 01-04-2025 solo pueden
+      emitir documentos tributarios electrónicos (e-Kuatia o e-Kuatia'i), salvo el Comprobante
+      de Retención Virtual. No reciben timbrado preimpreso.
+    parameters:
+      applies_if_ruc_registration_on_or_after: "2025-04-01"
+      allowed_systems: [e-Kuatia, e-Kuatiai]
+    valid_from: "2025-04-01"
+    valid_to: null
+    published_at: "2024-12-30"
+    source_url: "https://www.dnit.gov.py/documents/20123/394707/Res.+General+DNIT+N%C2%B0+21_2024.pdf/ce60e169-e201-27e5-826a-9644eaa81cff?t=1736354628635"
+    legal_reference: "RG DNIT N° 21/2024, art. 9° (modifica el art. 5° de la RG N° 105/2021)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: "Falta la fecha de inscripción de la empresa en el RUC."
+
+  - code: SIFEN-PROVEEDOR-ESTADO
+    description: >
+      Quien firme un contrato de contratación pública desde el 02-01-2026 debe adherirse a SIFEN
+      desde el día siguiente a la firma.
+    parameters:
+      trigger: firma_contrato_publico
+      from_day_after_signature: true
+    valid_from: "2026-01-02"
+    valid_to: null
+    published_at: "2025-12-24"
+    source_url: "https://www.dnit.gov.py/documents/20123/1374136/Resoluci%C3%B3n+General+DNIT+N%C2%B0+41-25.pdf/c017ec3b-3a5c-19a7-478a-2ba96bf06edf?t=1767111734830"
+    legal_reference: "RG DNIT N° 41/2025; Ley N° 7021/2022"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: null
+
+  - code: SIFEN-GRUPOS-19-24
+    description: "Inicio de la obligación SIFEN de los contribuyentes designados en los grupos 19 a 24."
+    parameters:
+      start_by_group: {"19": "2026-06-01", "20": "2026-09-01", "21": "2026-12-01", "22": "2027-03-02", "23": "2027-06-01", "24": "2027-09-01"}
+      max_extension_months: 3
+      earliest_obligation_prevails: true
+    valid_from: "2026-06-01"
+    valid_to: null
+    published_at: "2026-05-05"
+    source_url: "https://www.dnit.gov.py/documents/20123/2664257/RESOLUCION+GENERAL+DNIT+52__designaci%C3%B3n+facturadores+electr%C3%B3nicos_firmado.pdf/6a69d00a-4b20-e381-77a5-67c49c831359?t=1778088577261"
+    legal_reference: "RG DNIT N° 52/2026; Decreto N° 872/2023"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: "Solo aplica si el RUC figura en un anexo. No revisé los anexos."
+
+  # ---------------------------------------------------------------- LIBROS / SOCIETARIO
+  - code: LIBROS-EAS
+    description: >
+      Libros obligatorios de la EAS: actas del órgano de gobierno, registro de acciones, actas del
+      órgano de administración, diario e inventario. Según el FAQ del MIC deben estar rubricados.
+      Atrasar el diario, inventario, mayor o compras/ventas más de 90 días corridos es infracción tributaria.
+    parameters:
+      books: [actas_organo_gobierno, registro_acciones, actas_organo_administracion, diario, inventario, mayor]
+      max_delay_days: 90
+      rubrica_required: true
+    valid_from: "2020-01-13"
+    valid_to: null
+    published_at: "2020-01-13"
+    source_url: "https://eas.mic.gov.py/files/LEY-EAS-6480-2020-1-.pdf"
+    legal_reference: "Ley N° 6480/2020, art. 31; Decreto N° 3182/2019, art. 64; Res. DGPEJBF N° 02/2022, art. 8° (citada en el FAQ MIC)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      El «mayor» sale del Decreto 3182, no de la Ley 6480. La rúbrica la cita el FAQ, pero no leí
+      la Res. 02/2022 (PDF escaneado). Duda D-7: libros digitales. valid_from inferido de la
+      publicación de la Ley 6480.
+
+  - code: EAS-APROBACION-CUENTAS
+    description: "En la EAS unipersonal, el accionista único aprueba las cuentas sociales y lo deja en acta."
+    parameters:
+      deadline: null
+    valid_from: "2020-01-13"
+    valid_to: null
+    published_at: "2020-01-13"
+    source_url: "https://eas.mic.gov.py/files/LEY-EAS-6480-2020-1-.pdf"
+    legal_reference: "Ley N° 6480/2020, arts. 39 y 42; Decreto N° 3998/2020, art. 22"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: "Sin plazo en la ley EAS (D-8)."
+
+  # ---------------------------------------------------------------- LABORAL
+  - code: SALARIO-MINIMO
+    description: "Salario mínimo legal para actividades diversas no especificadas, y jornal mínimo."
+    parameters:
+      monthly_pyg: 3044000
+      daily_pyg: 117077
+    valid_from: "2026-07-01"
+    valid_to: null
+    published_at: null
+    source_url: "https://www.mtess.gov.py/wp-content/uploads/2026/06/DECRETO-N%C2%B0-6225-SALARIO-MINIMO-2026.pdf"
+    legal_reference: "Decreto N° 6225/2026, art. 2°"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: "Fecha del decreto ilegible en el escaneo. Sustituye al Decreto 4122/2025."
+
+  - code: IPS-APORTES
+    description: "Aporte obrero-patronal al IPS, régimen general: 9% del trabajador y 16,5% del empleador (25,5% total)."
+    parameters:
+      employee_rate: 0.09
+      employer_rate: 0.165
+      total_rate: 0.255
+      minimum_base_pyg: 3044000
+      due_day: null
+    valid_from: null
+    valid_to: null
+    published_at: null
+    source_url: "https://portal.ips.gov.py/sistemas/ipsportal/contenido.php?c=372"
+    legal_reference: "Tabla N° 1 IPS (Res. MTESS N° 670/2026). Base legal de los porcentajes no identificada."
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      Imagen de la tabla: https://portal.ips.gov.py/sistemas/ipsportal/archivos/archivos/1786135176.jpg.
+      No encontré el vencimiento mensual del pago. Solo aplica con empleados.
+
+  - code: MTESS-PLANILLAS
+    description: >
+      Presentación anual de planillas laborales del año anterior en el MTESS (empleados y obreros,
+      sueldos y jornales, resumen general). El plazo lo fija una resolución anual.
+    parameters:
+      periodicity: annual
+      deadline: null
+      fine_jornales_range: [10, 20]
+    valid_from: null
+    valid_to: null
+    published_at: null
+    source_url: "https://www.mtess.gov.py/?page_id=24595"
+    legal_reference: "Res. MTESS N° 835/2016 (base); plazo 2025: Res. MTESS N° 69/2025"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: "Solo aplica con empleados. No busqué la resolución de plazos 2026."
+
+  # ---------------------------------------------------------------- SIN FUENTE
+  - code: PATENTE-MUNICIPAL
+    description: "Patente comercial y tasas municipales."
+    parameters: {}
+    valid_from: null
+    valid_to: null
+    published_at: null
+    source_url: null
+    legal_reference: null
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: no_encontrada
+    notes: "No investigado. Depende del municipio."
+
+  - code: BENEFICIARIOS-FINALES
+    description: "Actualización del registro de beneficiarios finales de la EAS."
+    parameters: {}
+    valid_from: null
+    valid_to: null
+    published_at: null
+    source_url: "https://eas.mic.gov.py/files/TR%C3%81MITES-POSTERIORES-DE-EAS-A-TRAVES-DE-LA-PLATAFORMA%20-4-.pdf"
+    legal_reference: "Ley N° 6446/2019 (no leída)"
+    consulted_at: "2026-11-24"
+    validation_status: pending
+    reviewed_by: null
+    confidence: no_encontrada
+    notes: "La guía del MIC menciona el trámite. No encontré la periodicidad ni el plazo en una norma leída."

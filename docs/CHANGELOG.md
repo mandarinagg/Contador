@@ -4,6 +4,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Agregado — Investigación tributaria (2026-11-24)
+- `docs/research/TRIBUTACION_PY.md`: investigación con fuentes oficiales sobre:
+  - EAS (Ley 6480 y Decreto 3998)
+  - IVA, IRE (General, SIMPLE y RESIMPLE), IDU, IRP y anticipos
+  - calendario por terminación de RUC
+  - registro de comprobantes (RG 90/2021)
+  - estados financieros y SIFEN
+  - IPS y MTESS.
+  Incluye contradicciones y dudas para el contador, y lo no verificado.
+- `docs/research/tax_rules_candidatas.yaml`: 25 reglas candidatas en formato `tax_rule_versions`, todas `pending`.
+- `docs/research/PLAN_DE_CUENTAS_PY.md` y `docs/research/plan_de_cuentas_propuesto.yaml`:
+  - no hay un plan de cuentas oficial obligatorio
+  - se propone un plan de 159 cuentas sobre los códigos de la RG 49/2014, a validar.
+- `docs/TAX_COMPLIANCE_PARAGUAY.md`: enlaza la investigación y resume su estado. Nada se marca como verificado.
+
 ### Agregado — Fase 0 (2026-11-23)
 - `docs/PROMPT_MAESTRO.md`: prompt del propietario convertido a Markdown como documento rector.
 - `docs/DISCOVERY.md`: diagnóstico del entorno, repositorios y riesgos.
