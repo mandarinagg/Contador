@@ -73,7 +73,11 @@ impl ScratchCluster {
             String::from_utf8_lossy(&initdb.stderr)
         );
         let cluster = Self { dir };
-        let start = Command::new(pg_tool("pg_ctl"))
+        // Salida a un archivo, no a un pipe: en Windows `postgres` hereda los handles de
+        // `pg_ctl` y `Command::output` esperaría para siempre (mismo motivo que en stack.rs).
+        let out_path = cluster.dir.join("pg_ctl.out");
+        let out = fs::File::create(&out_path).unwrap();
+        let status = Command::new(pg_tool("pg_ctl"))
             .arg("start")
             .arg("-D")
             .arg(cluster.dir.join("data"))
@@ -83,12 +87,15 @@ impl ScratchCluster {
             .arg(format!(
                 "-p {port} -c listen_addresses=127.0.0.1 -c unix_socket_directories="
             ))
-            .output()
+            .stdin(Stdio::null())
+            .stdout(out.try_clone().unwrap())
+            .stderr(out)
+            .status()
             .unwrap();
         assert!(
-            start.status.success(),
+            status.success(),
             "{}",
-            String::from_utf8_lossy(&start.stderr)
+            fs::read_to_string(&out_path).unwrap_or_default()
         );
         cluster
     }
