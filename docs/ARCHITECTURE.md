@@ -90,6 +90,10 @@ Definido en `frontend/src/styles/index.css` (tokens) y `frontend/src/components/
 | `lapacho` | `#C2477A` | `#E07AA5` | Marca. **Solo** el logo y el indicador de navegación activa |
 | `debit` | `#B3412E` | `#E57A66` | Negativos, errores, acciones destructivas |
 | `amber` | `#946200` | `#E0B155` | Pendiente de verificación |
+| `personal` / `personal-soft` | `#43508F` / `#E9EBF6` | `#A9B1EC` / `#222640` | Contexto financiero personal (pestaña, franja "solo vos") |
+| `chart-in` / `chart-out` | `#12734F` / `#E58F78` | `#3AA67E` / `#C45A42` | Gráficos de finanzas: entradas / salidas (validados para daltonismo; el gráfico trae vista de tabla) |
+
+- **Finanzas:** los importes son siempre strings (`lib/money.ts` formatea y lee el formato paraguayo sin pasar por `number`); solo la geometría de los gráficos usa números. Los gráficos son SVG propio con los tokens de arriba (sin librería de gráficos). El contexto financiero va en la URL (`/finanzas/:cid/...`); las pantallas de finanzas se cargan aparte (`lazy` de React Router).
 
 - **Tipografía:** IBM Plex Sans Variable (local, sin red), cifras tabulares en toda la app. Escala: 12 / 13 / 14 (base) / 16 / 20 / 28 px.
 - **Firma visual:** la doble raya contable (`.ledger-rule`) bajo títulos de página y, en fase 2+, bajo totales — la convención real de los libros contables.

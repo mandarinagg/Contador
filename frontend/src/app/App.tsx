@@ -84,11 +84,30 @@ function RequirePermission({ permission, children }: { permission: string; child
   return children
 }
 
+/**
+ * Finanzas se carga aparte (división de código): no pesa en el arranque de quien no la usa.
+ * Cada pantalla es su propio fragmento; el marco y las utilidades comunes se comparten.
+ */
+const financeLayout = () => import('../modules/finance/FinanceLayout')
+const finance = {
+  index: () => financeLayout().then((m) => ({ Component: m.FinanceIndex })),
+  layout: () => financeLayout().then((m) => ({ Component: m.FinanceLayout })),
+  consolidated: () => import('../modules/finance/ConsolidatedPage').then((m) => ({ Component: m.ConsolidatedPage })),
+  summary: () => import('../modules/finance/SummaryPage').then((m) => ({ Component: m.SummaryPage })),
+  transactions: () => import('../modules/finance/TransactionsPage').then((m) => ({ Component: m.TransactionsPage })),
+  accounts: () => import('../modules/finance/AccountsPage').then((m) => ({ Component: m.AccountsPage })),
+  imports: () => import('../modules/finance/ImportPage').then((m) => ({ Component: m.ImportPage })),
+  categories: () => import('../modules/finance/CategoriesPage').then((m) => ({ Component: m.CategoriesPage })),
+  counterparties: () => import('../modules/finance/CounterpartiesPage').then((m) => ({ Component: m.CounterpartiesPage })),
+}
+
 const router = createBrowserRouter([
   { element: <Gate need="setup" />, children: [{ path: '/configuracion-inicial', element: <SetupPage /> }] },
   { element: <Gate need="anonymous" />, children: [{ path: '/login', element: <LoginPage /> }] },
   {
     element: <Gate need="session" />,
+    // Mientras llega el fragmento de una pantalla cargada aparte (al abrir la app directo en ella).
+    hydrateFallbackElement: <FullPage><Skeleton className="h-4 w-40" /></FullPage>,
     children: [
       {
         element: <AppLayout />,
@@ -98,6 +117,22 @@ const router = createBrowserRouter([
           { path: '/usuarios', element: <RequirePermission permission="users.read"><UsersPage /></RequirePermission> },
           { path: '/auditoria', element: <RequirePermission permission="audit.read"><AuditPage /></RequirePermission> },
           { path: '/cuenta', element: <AccountPage /> },
+          // Finanzas: el contexto va en la URL. El acceso lo decide la API (empresa con
+          // finance.read; el personal solo para su dueño, cualquiera sea el rol).
+          { path: '/finanzas', lazy: finance.index },
+          { path: '/finanzas/consolidado', lazy: finance.consolidated },
+          {
+            path: '/finanzas/:cid',
+            lazy: finance.layout,
+            children: [
+              { index: true, lazy: finance.summary },
+              { path: 'movimientos', lazy: finance.transactions },
+              { path: 'cuentas', lazy: finance.accounts },
+              { path: 'importar', lazy: finance.imports },
+              { path: 'categorias', lazy: finance.categories },
+              { path: 'contrapartes', lazy: finance.counterparties },
+            ],
+          },
           { path: '*', element: <EmptyState title="Página inexistente">La dirección no corresponde a ninguna sección.</EmptyState> },
         ],
       },

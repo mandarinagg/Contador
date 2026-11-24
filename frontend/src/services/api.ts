@@ -54,7 +54,9 @@ type Method = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
 
 export async function api<T>(method: Method, path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = {}
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const isForm = body instanceof FormData
+  // FormData (subida de archivos): el navegador pone el Content-Type con su separador.
+  if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
   const token = session.token
   if (token) headers.Authorization = `Bearer ${token}`
 
@@ -63,7 +65,7 @@ export async function api<T>(method: Method, path: string, body?: unknown): Prom
     res = await fetch(`${BASE_URL}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
     })
   } catch {
     throw new ApiError(0, 'NETWORK', 'No se pudo conectar con el servicio local de CONTADOR AI.')
@@ -91,3 +93,15 @@ export async function api<T>(method: Method, path: string, body?: unknown): Prom
 export const get = <T>(path: string) => api<T>('GET', path)
 export const post = <T>(path: string, body?: unknown) => api<T>('POST', path, body ?? {})
 export const patch = <T>(path: string, body: unknown) => api<T>('PATCH', path, body)
+export const postForm = <T>(path: string, form: FormData) => api<T>('POST', path, form)
+
+/** Arma un query string omitiendo los valores vacíos: `qs({a: 1, b: ''})` → `?a=1`. */
+export function qs(params: Record<string, string | number | boolean | null | undefined>): string {
+  const search = new URLSearchParams()
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null || v === '' || v === false) continue
+    search.set(k, String(v))
+  }
+  const text = search.toString()
+  return text ? `?${text}` : ''
+}

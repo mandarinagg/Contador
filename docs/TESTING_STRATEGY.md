@@ -60,9 +60,20 @@ Variables opcionales: `CONTADOR_E2E_DB_NAME` (base, por defecto `contador_e2e`),
 - Se localiza por rol y etiqueta accesible (`getByRole`, `getByLabel`), nunca por CSS; si algo no se puede localizar así, es un problema de accesibilidad de la interfaz.
 - `e2e/fixtures.ts` hace fallar cualquier prueba con `console.error` o `pageerror`. Un error de consola esperado (el 401 de un ingreso fallido, el corte de red simulado) se declara de forma explícita en la prueba con `test.use({ expectedConsoleErrors: /.../ })`.
 
+- `e2e/finanzas.spec.ts` corre después de `flujos.spec.ts` (proyecto `finanzas` con `dependencies: ['chromium']` en `playwright.config.ts`) y parte de su empresa y usuarios; si se corre solo con la base vacía, los crea por la API.
+- Puertos configurables con `CONTADOR_E2E_API_PORT` y `CONTADOR_E2E_WEB_PORT` (por defecto 8794 / 5174), para correr varias copias a la vez.
+
 **Flujos cubiertos:** configuración inicial (empresa + propietario) -> inicio; cierre de sesión y nuevo ingreso; ingreso con contraseña incorrecta sin revelar si el email existe; RUC con DV erróneo y correcto (`44444401` -> `7`); alta de usuarios con rol Contador y Consulta; permisos de cada rol al ingresar; auditoría con cadena íntegra; tema claro/oscuro; servicio local caído ("Iniciando Contador AI…").
 
-## Estado actual (2026-11-23)
+**Finanzas** (`finanzas.spec.ts`): alta de cuentas en PYG y USD con saldo inicial en formato paraguayo; contexto en la URL tras recargar; alta manual de salida y entrada; anulación que exige motivo, queda tachada y deja de sumar; transferencia (dos movimientos enlazados, sin categoría); importación de un CSV con títulos del banco, un duplicado contra la base y una fila con fecha inválida (nada se crea hasta confirmar; se omite una fila; los importados quedan sin revisar); `IMPORT_NEW_DUPLICATES` cuando aparece un movimiento igual entre el análisis y la confirmación; resumen con un bloque por moneda sin mezclar ₲ y US$ y consolidado; privacidad del contexto personal (el Contador recibe "no existe" en la interfaz y 404 en la API; Consulta lee la empresa sin botones de escritura y opera su propio espacio).
+
+**Unitarias de finanzas** (Vitest): formato y lectura de importes (`lib/money.test.ts`), DV del RUC, cliente HTTP con `FormData` y `qs`, lectura de CSV y mapeo de columnas (`importMapping.test.ts`), lectura mínima de XLSX con un ZIP armado en la prueba (`xlsxPreview.test.ts`) y conteo/filtros de filas importadas (`importRows.test.ts`).
+
+## Estado actual (2026-11-24, interfaz de finanzas)
+- Frontend: **53 pruebas** Vitest pasan; `tsc -b` sin errores; oxlint con las mismas 2 advertencias de antes.
+- E2E: **18 pruebas** (10 de `flujos.spec.ts` + 8 de `finanzas.spec.ts`), ~30 s por corrida.
+
+## Estado anterior (2026-11-23)
 - Backend: **28 pruebas** pasan; ruff y mypy (`strict`) sin errores; `alembic check` sin diferencias; migración reversible.
 - Frontend: **10 pruebas** pasan; `tsc -b` sin errores; oxlint con 2 advertencias de recarga en caliente (hooks junto a sus providers), sin errores.
 - E2E: **10 pruebas** de Playwright en `frontend/e2e/` (ver arriba), Chromium con base aislada, sin errores de consola; corren en el job `e2e` del CI.

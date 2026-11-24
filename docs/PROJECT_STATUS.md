@@ -8,8 +8,9 @@
 |---|---|
 | 0 — Discovery y auditoría | ✅ Completa |
 | 1 — Fundación | ✅ Funcional en navegador |
-| 1B — Instalador Windows 11 | 🟡 CI verde en Windows real (backend + PostgreSQL portable); lanzador Rust probado en Linux; instalador NSIS en el CI |
-| 2 a 8 | ⏳ No iniciadas |
+| 1B — Instalador Windows 11 | 🟡 Backend + PostgreSQL portable verdes en Windows real; lanzador Rust y copias probados en Linux. **En Windows la prueba del lanzador se colgaba** al arrancar PostgreSQL: corrección en `2c85642`, pendiente de confirmar en el CI (ver "Para retomar") |
+| 2 — Finanzas empresa/personal | 🟡 Backend y interfaz hechos; probado de punta a punta en navegador (ver tabla). Falta validarlo con extractos reales del propietario |
+| 3 a 8 | ⏳ No iniciadas |
 
 **Destino definido por el propietario:** una PC con Windows 11, uso en una sola máquina (D-016). Desarrollo en esta PC Linux; instaladores generados en GitHub Actions.
 
@@ -25,8 +26,18 @@
 | Auditoría inmutable + verificación | ✅ | ✅ | ✅ | n/a | ✅ | ✅ + E2E | ✅ |
 | Eventos de seguridad | ✅ | ✅ | ✅ | n/a | ✅ | ✅ + E2E | ✅ |
 | Tema claro / oscuro / sistema | ✅ | n/a | preferencia local | n/a | n/a | E2E | ✅ |
+| Finanzas: selector de contexto y espacio personal privado | ✅ | ✅ | ✅ | ✅ | ✅ (404 a otros usuarios, también por API) | ✅ + E2E | ✅ |
+| Finanzas: cuentas (alta, saldo, moneda) | ✅ | ✅ | ✅ | ✅ | ✅ (Consulta solo lee) | ✅ + E2E | ✅ |
+| Finanzas: movimientos manuales y anulación con motivo | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ + E2E | ✅ |
+| Finanzas: transferencia entre cuentas propias (misma moneda) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ + E2E | ✅ |
+| Finanzas: importar extracto CSV (duplicados, errores, decisión por fila, duplicados nuevos al confirmar) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ + E2E | ✅ |
+| Finanzas: resumen por moneda y consolidado por contexto | ✅ | ✅ | n/a | n/a | ✅ | ✅ + E2E | ✅ |
+| Finanzas: categorías, contrapartes, edición, categoría rápida, transferencia entre monedas, XLSX, `IMPORT_STALE` | ✅ | ✅ | ✅ | ✅ | ✅ | unitarias + prueba manual (sin E2E) | ✅ |
 
 ## Pruebas ejecutadas (2026-11-24)
+- Interfaz de finanzas: Vitest 53/53; `tsc -b` y build OK (409 kB JS inicial; finanzas en fragmentos aparte); oxlint sin advertencias nuevas; E2E 18/18 (10 de `flujos.spec.ts` + 8 de `finanzas.spec.ts`), dos corridas seguidas en verde (50 y 58 s). La prueba de privacidad (tres usuarios) va con `test.slow()`: con la PC cargada superaba los 30 s por defecto.
+- Backend: 84/84 pytest (incluidas las `slow`); resumen anual con 100.000 movimientos en ~48 ms con la máquina libre y 153-289 ms cargada (límite 300; D-033). Importaciones simultáneas sin duplicados (D-034).
+- Lanzador en Linux (PostgreSQL 18 de Ubuntu + backend empaquetado): `first_run_restart_and_recovery` y `daily_backup_retention_and_restore` OK; `cargo fmt` y `clippy -D warnings` sin errores.
 - CI (push `66b729c`): secretos ✅, Linux ✅, Windows real ✅ (backend empaquetado + PostgreSQL 18.7 portable: migración, configuración inicial, ingreso, auditoría).
 - Lanzador con PostgreSQL 18.6 de Ubuntu + backend empaquetado: primer arranque, reinicio con datos persistidos e ingreso, rechazo sin contraseña sin tocar datos, rechazo de carpeta ajena sin borrarla.
 - App de escritorio en modo release en Linux: crea la base, levanta todo en 4 s; contraseña con permisos 600.
@@ -51,7 +62,7 @@
 | P-6 | La política de contraseñas del frontend cuenta como "símbolo" las letras con tilde | El backend es quien decide (Unicode); solo cambia el aviso previo |
 
 ## Decisiones tomadas en esta sesión
-D-001 a D-022 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requiere tu confirmación.**
+D-001 a D-034 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requiere tu confirmación.**
 
 ## Información requerida del propietario
 1. **Confirmar D-007**: reutilizar el núcleo SIFEN como servicio Node (recomendado) en lugar de portarlo a Python.
@@ -63,5 +74,19 @@ D-001 a D-022 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 7. **Probar el instalador** en la PC con Windows 11 y avisar el resultado (y si el nombre de usuario de Windows tiene tildes o ñ).
 8. Revisar los hallazgos R-10 y R-11 de `DISCOVERY.md` (repositorio git en la carpeta personal con `.git-credentials`).
 
+## Para retomar (traspaso, 2026-11-24)
+**Estado de `main`:** fases 0-1 completas; fase 2 (finanzas) integrada, con backend, interfaz y rendimiento. Todo verde en Linux. No quedan worktrees ni agentes abiertos.
+
+**Lo primero:**
+1. **CI de Windows:** ver el resultado del job `windows` del último push. El lanzador se colgaba al arrancar PostgreSQL porque `Command::output` esperaba un pipe que `postgres` hereda y nunca cierra. Ya se corrigió en `stack.rs` (`97be887`) y en `tests/backup.rs` (`2c85642`). Si vuelve a fallar, el paso "Lanzador — registros si falló" muestra cada comando ejecutado (`$ ...`) y su resultado (`→`): buscar el último `$` sin `→`.
+2. Con Windows en verde, el propietario prueba el instalador NSIS (artefacto del CI) en su PC con Windows 11 (P-8: usuario con tildes o ñ).
+
+**Después:**
+- Fase 2: validar con extractos reales anonimizados del propietario (punto 6 de abajo) y preparar adaptadores por banco.
+- Fase 3: el plan de cuentas y las reglas tributarias de `docs/research/` siguen `pending` hasta que los valide el contador.
+- Sigue abierto, decisión del propietario: tabla de totales mensuales para el resumen. No se hizo: se revisa solo si en la PC real se nota lento.
+
+**Entorno local:** Postgres de desarrollo en el proyecto docker `contador` (127.0.0.1:55433). Para probar el lanzador sin `sudo` se usan los binarios de PostgreSQL 18 de Ubuntu (`apt download` + `dpkg-deb -x`, con `LD_LIBRARY_PATH`) y las variables `CONTADOR_TEST_PGSQL_BIN` y `CONTADOR_TEST_BACKEND_EXE`. E2E en paralelo con otra corrida: `CONTADOR_E2E_DB_NAME`, `CONTADOR_E2E_API_PORT` y `CONTADOR_E2E_WEB_PORT`.
+
 ## Próximo objetivo recomendado
-Fase 1B: primer push → CI verde en Windows → lanzador Rust → instalador NSIS instalado en la PC con Windows 11. Después, fase 2.
+Cerrar la fase 1B (CI de Windows en verde e instalador probado en la PC real) y validar la fase 2 con datos reales.

@@ -14,3 +14,13 @@ export function rucCheckDigit(digits: string): number {
   const rest = total % 11
   return rest > 1 ? 11 - rest : 0
 }
+
+/** Estado del RUC mientras se escribe: vacío (es opcional), mal formado o con DV correcto/incorrecto. */
+export function rucStatus(ruc: string, dv: string): { ok: boolean; message?: string } {
+  if (!ruc && !dv) return { ok: true }
+  if (!/^\d{1,8}$/.test(ruc)) return { ok: false, message: 'El RUC son hasta 8 dígitos, sin puntos ni guion.' }
+  const expected = String(rucCheckDigit(ruc))
+  if (dv === '') return { ok: false, message: `Falta el dígito verificador (para ese RUC es ${expected}).` }
+  if (dv !== expected) return { ok: false, message: `Para ese RUC el dígito verificador es ${expected}.` }
+  return { ok: true }
+}

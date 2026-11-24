@@ -15,7 +15,17 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 860 } } }],
+  // Orden explícito: los flujos de finanzas parten de la empresa y los usuarios que crea flujos.spec.ts
+  // (por orden alfabético, finanzas.spec.ts correría primero).
+  projects: [
+    { name: 'chromium', testMatch: 'flujos.spec.ts', use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 860 } } },
+    {
+      name: 'finanzas',
+      testMatch: 'finanzas.spec.ts',
+      dependencies: ['chromium'],
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 860 } },
+    },
+  ],
   webServer: [
     {
       // Base vacía + migraciones + API (uvicorn) con el venv del backend.

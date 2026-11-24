@@ -3,7 +3,7 @@ import { ShieldCheck } from 'lucide-react'
 import { useState } from 'react'
 import { Badge, Button, EmptyState, PageHeader, Sheet, Skeleton } from '../../components/ui'
 import { cx } from '../../lib/cx'
-import { AUDIT_ACTION_LABELS, FIELD_LABELS, formatDateTime, formatFieldValue, plural, SECURITY_EVENT_LABELS } from '../../lib/format'
+import { auditActionLabel, FIELD_LABELS, formatDateTime, formatFieldValue, plural, SECURITY_EVENT_LABELS } from '../../lib/format'
 import { get } from '../../services/api'
 import type { AuditLog, ChainVerification, Member, SecurityEvent } from '../../types/api'
 
@@ -48,7 +48,7 @@ function ChangesTab({ names }: { names: Map<string, string> }) {
             <span className="text-sm text-ink-2">{formatDateTime(log.occurred_at)}</span>
             <div className="min-w-0">
               <p>
-                <span className="font-medium">{AUDIT_ACTION_LABELS[log.action] ?? log.action}</span>
+                <span className="font-medium">{auditActionLabel(log.action)}</span>
                 <span className="text-ink-2"> por {log.actor_user_id ? (names.get(log.actor_user_id) ?? 'usuario eliminado') : 'el sistema'}</span>
               </p>
               <Diff before={log.before} after={log.after} />

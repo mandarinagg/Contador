@@ -40,6 +40,35 @@ export const SECURITY_EVENT_LABELS: Record<string, string> = {
   password_changed: 'Contraseña cambiada',
 }
 
+const FINANCE_ENTITIES: Record<string, [string, 'm' | 'f']> = {
+  context: ['Contexto financiero', 'm'],
+  account: ['Cuenta', 'f'],
+  category: ['Categoría', 'f'],
+  counterparty: ['Contraparte', 'f'],
+  transaction: ['Movimiento', 'm'],
+  import: ['Importación', 'f'],
+}
+const FINANCE_VERBS: Record<string, [string, string]> = {
+  created: ['creado', 'creada'],
+  updated: ['modificado', 'modificada'],
+  archived: ['archivado', 'archivada'],
+  unarchived: ['desarchivado', 'desarchivada'],
+  voided: ['anulado', 'anulada'],
+  previewed: ['analizado', 'analizada'],
+  committed: ['confirmado', 'confirmada'],
+  cancelled: ['cancelado', 'cancelada'],
+}
+
+/** Etiqueta de una acción de auditoría, incluidas las de finanzas (`finance[.personal].<entidad>.<verbo>`). */
+export function auditActionLabel(action: string): string {
+  if (AUDIT_ACTION_LABELS[action]) return AUDIT_ACTION_LABELS[action]
+  const m = /^finance\.(personal\.)?([a-z]+)\.([a-z]+)$/.exec(action)
+  const entity = m && FINANCE_ENTITIES[m[2]]
+  const verb = m && FINANCE_VERBS[m[3]]
+  if (!m || !entity || !verb) return action
+  return `${entity[0]} ${verb[entity[1] === 'm' ? 0 : 1]}${m[1] ? ' (finanzas personales)' : ''}`
+}
+
 /** Nombres legibles de los campos que aparecen en la auditoría. */
 export const FIELD_LABELS: Record<string, string> = {
   legal_name: 'Razón social',
@@ -52,6 +81,31 @@ export const FIELD_LABELS: Record<string, string> = {
   full_name: 'Nombre',
   is_active: 'Activo',
   role: 'Rol',
+  name: 'Nombre',
+  kind: 'Tipo',
+  institution: 'Entidad',
+  currency: 'Moneda',
+  number_last4: 'Últimos 4 dígitos',
+  opening_balance: 'Saldo inicial',
+  opening_date: 'Fecha del saldo inicial',
+  archived_at: 'Archivado',
+  parent_id: 'Categoría padre',
+  notes: 'Notas',
+  account_id: 'Cuenta',
+  booked_on: 'Fecha',
+  amount: 'Importe',
+  description: 'Descripción',
+  reference: 'Referencia',
+  category_id: 'Categoría',
+  counterparty_id: 'Contraparte',
+  reviewed_at: 'Revisado',
+  voided_at: 'Anulado',
+  void_reason: 'Motivo de anulación',
+  filename: 'Archivo',
+  rows_total: 'Filas',
+  rows_imported: 'Importadas',
+  rows_error: 'Con error',
+  rows_duplicate: 'Duplicadas',
 }
 
 export function formatFieldValue(field: string, value: unknown): string {
