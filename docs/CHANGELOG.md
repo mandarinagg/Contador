@@ -4,6 +4,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Cambiado — Rendimiento del resumen financiero y concurrencia de importaciones (2026-11-24)
+- `GET /finance/contexts/{cid}/summary` y el consolidado leen los movimientos **una sola vez** (una consulta agrupada con una suma por (cuenta, mes, categoría, signo)) en lugar de tres, y calculan el mes con `date_trunc` en vez de `to_char` por fila. Mismos resultados (prueba de equivalencia nueva); ≈ 40 % menos CPU: con 100.000 movimientos el resumen pasó de ~82 a ~47 ms con la máquina libre y de 222-414 a 153-289 ms con la máquina cargada (D-033).
+- Sin índices nuevos ni migración `0003`: los candidatos (índices parciales cubrientes) no dieron mejora medible; planes y mediciones en `docs/DATABASE_SCHEMA.md`.
+- `tests/test_finance_performance.py`: 2 corridas de calentamiento y mediana de 9; imprime mediana, mínimo y máximo y si se cumple el objetivo de margen de 120 ms; el límite se puede endurecer con `CONTADOR_PERF_LIMIT_MS`.
+- Pruebas nuevas: `test_finance_summary_reference.py` (resumen y consolidado contra un cálculo de referencia en Python sobre ~600 movimientos variados) y `test_finance_import_concurrency.py` (confirmaciones simultáneas con conexiones reales sobre una base propia: mismo lote → uno crea y el otro recibe 409 sin duplicar; dos lotes con filas iguales → el segundo recibe `IMPORT_NEW_DUPLICATES`). No se encontró ninguna carrera en `imports.commit` (D-034).
+
 ### Agregado — Fase 2, backend de finanzas (2026-11-24)
 - Migración `0002` (esquema `finance`, reversible): contextos `business`/`personal`, cuentas, categorías (un nivel), contrapartes con RUC y DV, movimientos, lotes y filas de importación. La migración crea el contexto empresarial de cada organización existente y `POST /system/setup` lo crea junto con la organización.
 - Separación impuesta en la base (D-025): claves foráneas compuestas `(id, context_id)` y `(account_id, context_id, currency)`; además, restricciones de importe distinto de cero, PYG sin decimales, anulación completa con motivo y transferencias sin categoría.

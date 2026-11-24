@@ -18,6 +18,8 @@
 - Toda regla de `BUSINESS_RULES.md` marcada "Implementada" cita su prueba.
 - Las reglas contables y tributarias críticas (fases 3-4) llevan pruebas de propiedades (ej. "todo asiento contabilizado suma cero") además de casos fijos.
 - Un bug corregido entra con la prueba que lo reproduce.
+- Lo que depende de varias conexiones a la vez (candados, carreras) no se puede probar dentro de la transacción revertida: esas pruebas usan una base propia confirmada (`<base de pruebas>_conc`, que el fixture crea y borra), hilos y una sesión por pedido (`tests/test_finance_import_concurrency.py`, D-034).
+- Las consultas de resumen se prueban contra un cálculo de referencia simple en Python (`tests/test_finance_summary_reference.py`); el rendimiento (`@pytest.mark.slow`) imprime medianas con `pytest -s`.
 
 ## Cómo correrlas
 
