@@ -79,9 +79,10 @@ D-001 a D-034 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 
 **Lo primero:**
 1. **CI de Windows:** ver el resultado del job `windows` del último push.
-   - Lanzador y copias ya pasaban en Windows real desde `2c85642`. El cuelgue venía de que `Command::output` esperaba un pipe que `postgres` hereda; se corrigió en `stack.rs` y `tests/backup.rs`.
-   - Faltaba la prueba del instalador: `initdb` fallaba con la ruta `\\?\` que Tauri da a la app instalada. Se corrigió con `stack::plain_path`.
-   - Si algo vuelve a fallar, el paso "Lanzador — registros si falló" muestra cada comando ejecutado (`$ ...`) y su resultado (`→`). En la prueba del instalador, el script vuelca `%LOCALAPPDATA%\\ContadorAI\\logs`.
+   - En `4f4be2a` el instalador ya funcionaba en Windows real: primer arranque, cierre forzado (el backend muere con la app), reapertura, cierre normal y desinstalación sin borrar datos.
+   - El paso igual figuraba en rojo: el script terminaba con el código 3 de `pg_ctl status` (servidor detenido, lo esperado). Corregido en el CI.
+   - Causas ya resueltas: el pipe que `postgres` hereda (`stack.rs`, `tests/backup.rs`) y la ruta `\\?\` que `initdb` no entiende (`stack::plain_path`).
+   - Si algo vuelve a fallar, el paso "Lanzador — registros si falló" muestra cada comando ejecutado (`$ ...`) y su resultado (`→`). La prueba del instalador vuelca `%LOCALAPPDATA%\ContadorAI\logs`.
    - `gh run view --log` a veces sale vacío; usar `gh api repos/mandarinagg/Contador/actions/jobs/<id>/logs`.
 2. Con Windows en verde, el propietario prueba el instalador NSIS (artefacto del CI) en su PC con Windows 11 (P-8: usuario con tildes o ñ).
 

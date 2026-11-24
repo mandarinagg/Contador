@@ -312,6 +312,9 @@ jobs:
           if (Port-Open) { throw "El backend siguió vivo después de cerrar la app" }
           & "$dir\pgsql\bin\pg_ctl.exe" status -D "$data\pgdata"
           if ($LASTEXITCODE -ne 3) { throw "PostgreSQL siguió en marcha después de cerrar la app" }
+          # pg_ctl status devuelve 3 cuando el servidor está detenido (lo esperado): que ese
+          # código no quede como resultado del paso, que GitHub toma de $LASTEXITCODE.
+          $global:LASTEXITCODE = 0
           "Cierre normal OK: backend y PostgreSQL detenidos"
 
           # 5. Desinstalar no borra la contabilidad.
@@ -319,3 +322,4 @@ jobs:
           Start-Sleep 3
           if (-not (Test-Path "$data\pgdata\PG_VERSION")) { throw "La desinstalación borró los datos" }
           "Desinstalación OK: los datos siguen en $data"
+          exit 0
