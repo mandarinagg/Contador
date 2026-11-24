@@ -203,10 +203,22 @@ fn initialize_cluster(config: &StackConfig, secrets: &dyn SecretStore) -> Result
             .map_err(|e| StackError::new(format!("No se pudo limpiar {}: {e}", staging.display())))?;
     }
 
-    let password = random_password()?;
-    secrets
-        .set(&password)
-        .map_err(|e| StackError::new(format!("No se pudo guardar la contraseña de la base: {e}")))?;
+    // Si ya hay una contraseña guardada se reutiliza: puede pertenecer a una base anterior
+    // que se movió a un costado (p. ej. durante una restauración manual). Pisarla dejaría
+    // esa base sin forma de abrirse.
+    let existing = secrets
+        .get()
+        .map_err(|e| StackError::new(format!("No se pudo leer la contraseña de la base: {e}")))?;
+    let password = match existing {
+        Some(password) => password,
+        None => {
+            let password = random_password()?;
+            secrets
+                .set(&password)
+                .map_err(|e| StackError::new(format!("No se pudo guardar la contraseña de la base: {e}")))?;
+            password
+        }
+    };
 
     let init_log = config.logs_dir().join("initdb.log");
     let pwfile = config.data_dir.join(".pgpass.init");

@@ -27,7 +27,7 @@ Notas:
 3. **Las copias no están cifradas todavía** (pendiente, ver `docs/SECURITY.md`). Cualquiera que tenga un archivo `.dump` puede leer la contabilidad. Guardalas solo en lugares de confianza.
 4. **Nunca se restaura encima de la base en uso.** Este procedimiento carga la copia en una base **nueva** y recién después la pone en lugar de la anterior; la anterior **no se borra**, queda guardada con otro nombre.
 5. Usá una versión de Contador AI **igual o más nueva** que la que hizo la copia. La app actualiza sola la estructura de la base al abrirse, pero no puede abrir una base de una versión más nueva que ella.
-6. Si movés o renombrás `pgdata` para que la app arme una base vacía, la app genera una contraseña **nueva** y reemplaza la guardada en Windows: la `pgdata` vieja deja de poder abrirse con la contraseña actual. Antes de hacer eso asegurate de tener la copia `.dump` y de haber copiado toda la carpeta `ContadorAI` a otro lugar.
+6. Si movés o renombrás `pgdata` para que la app arme una base vacía, la app **reutiliza la contraseña guardada** en Windows: la `pgdata` vieja se sigue pudiendo abrir con ella. Aun así, antes de mover nada asegurate de tener la copia `.dump` y de haber copiado toda la carpeta `ContadorAI` a otro lugar.
 
 ## Antes de empezar
 

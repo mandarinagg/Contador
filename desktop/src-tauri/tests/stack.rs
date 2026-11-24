@@ -113,6 +113,18 @@ fn first_run_restart_and_recovery() {
     assert!(err.message.contains("no es una base de datos completa"), "{err}");
     assert!(foreign.join("pgdata").join("archivo-del-usuario.txt").is_file());
 
+    // 5. Base movida a un costado: la nueva reutiliza la contraseña guardada, así la
+    //    anterior se sigue pudiendo abrir.
+    std::fs::rename(cfg.pgdata(), dir.join("pgdata.anterior")).unwrap();
+    let stack = Stack::start(&cfg, &secrets).expect("arranque con base nueva");
+    assert!(needs_setup(), "la base nueva empieza vacía");
+    assert_eq!(
+        secrets.get().unwrap().as_deref(),
+        Some(password.as_str()),
+        "no se pisa la contraseña"
+    );
+    stack.stop();
+
     std::fs::remove_dir_all(&foreign).unwrap();
     std::fs::remove_dir_all(&dir).unwrap();
 }
