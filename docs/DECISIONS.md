@@ -156,3 +156,6 @@ Formato: contexto → decisión → alternativas → consecuencias. Estado: **Ac
 - **D-062:** saldos iniciales en el balance de comprobación, sin asientos de apertura.
 - **D-063:** XLSX desde el backend y PDF por impresión de la interfaz.
 
+## D-064 a D-067 — Depreciación: inicio por bien, fiscal y contable en paralelo, valores por ejercicio y cuadro RG 77/2020
+**Aceptadas · 2026-11-24**, a partir de `docs/research/DEPRECIACION_PY.md` §8. Detalle en `docs/specs/FASE3B_CONTABILIDAD.md` §6. Todo queda pendiente de validar por el contador (D-DEP-1 a D-DEP-17).
+
