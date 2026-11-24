@@ -34,22 +34,22 @@ Cada regla tiene un identificador estable, su estado y dónde se hace cumplir. *
 | BR-AUD-03 | Una alteración de la auditoría es detectable | Implementada | Cadena de hashes, `test_hash_chain_detects_tampering` |
 | BR-AUD-04 | Ingresos, fallos, bloqueos, cierres de sesión y cambios de contraseña se registran como eventos de seguridad | Implementada | `audit.security_events` |
 
-## Contabilidad (fase 3 — especificadas en `docs/specs/FASE3_CONTABILIDAD.md`)
+## Contabilidad (fase 3, núcleo — `docs/specs/FASE3_CONTABILIDAD.md`)
 
-| ID | Regla |
-|---|---|
-| BR-ACC-01 | Un asiento solo se contabiliza si Σ debe = Σ haber en guaraníes (moneda funcional, D-036) y tiene al menos dos líneas |
-| BR-ACC-02 | Un asiento contabilizado no se modifica ni se borra; se corrige con un asiento de reversión |
-| BR-ACC-03 | No se contabiliza en un período cerrado |
-| BR-ACC-04 | Todo asiento registra usuario responsable y documento respaldatorio cuando exista |
-| BR-ACC-05 | Ningún cálculo monetario usa punto flotante |
-| BR-ACC-06 | Un movimiento importado nunca genera un asiento definitivo sin confirmación humana |
-| BR-ACC-07 | La contabilidad es de la empresa: un movimiento personal nunca origina un asiento (D-035) |
-| BR-ACC-08 | Los asientos contabilizados llevan número correlativo por ejercicio, sin huecos (D-040) |
-| BR-ACC-09 | Solo las cuentas imputables reciben líneas; una cuenta usada no cambia de código ni de naturaleza (D-037) |
-| BR-ACC-10 | El plan de cuentas propuesto no se presenta como validado hasta que un contador lo marca, con nombre y matrícula (D-038) |
-| BR-ACC-11 | Un movimiento de finanzas con asiento contabilizado no se anula sin revertir antes el asiento (D-041) |
-| BR-ACC-12 | El cierre del ejercicio exige todos sus períodos cerrados y deja en cero las cuentas de resultado con un asiento de refundición (D-039) |
+| ID | Regla | Estado | Dónde |
+|---|---|---|---|
+| BR-ACC-01 | Un asiento solo se contabiliza si Σ debe = Σ haber en guaraníes (moneda funcional, D-036) y tiene al menos dos líneas | Implementada | Trigger `journal_entries_guard` (`trg_journal_entries_unbalanced`, `_min_lines`), `entries._check_postable`, `test_posting_unbalanced_single_line_or_in_closed_period_fails`, `test_draft_can_be_unbalanced_and_is_edited_only_while_draft`, `test_posting_errors_are_readable` |
+| BR-ACC-02 | Un asiento contabilizado no se modifica ni se borra; se corrige con un asiento de reversión | Implementada | Triggers `journal_entries_guard` (`_posted_immutable`, `_final`, `_no_delete`, `_reversal_missing`, `_reversal_mismatch`) y `journal_lines_guard` (`_entry_not_draft`), `TRUNCATE` prohibido, `test_update_and_delete_of_posted_entry_fail`, `test_lines_of_posted_entry_cannot_change`, `test_reversal_lines_must_mirror_the_original`, `test_reversal_inverts_lines_and_nets_ledger_to_zero` |
+| BR-ACC-03 | No se contabiliza en un período cerrado | Implementada | `trg_journal_entries_period_closed`, `_year_closed`, `trg_periods_year_closed`, `test_posting_unbalanced_single_line_or_in_closed_period_fails`, `test_reversal_in_closed_period_asks_for_another_date`, `test_closing_the_fiscal_year` |
+| BR-ACC-04 | Todo asiento registra usuario responsable y documento respaldatorio cuando exista | Implementada | `created_by`, `posted_by`/`posted_at` (`ck_journal_entries_posted_complete`), `document_reference`, auditoría `accounting.journal_entry.*`, `test_draft_can_be_unbalanced_and_is_edited_only_while_draft`, `test_proposed_draft_has_bank_against_category_with_the_right_sign` |
+| BR-ACC-05 | Ningún cálculo monetario usa punto flotante | Implementada | `Decimal` en todo el módulo, `NUMERIC(18,2)` y `ck_journal_lines_pyg_integer`, importes y cotizaciones como string en JSON, `test_line_validation`, `test_foreign_currency_needs_a_rate_and_never_rounds_silently` |
+| BR-ACC-06 | Un movimiento importado nunca genera un asiento definitivo sin confirmación humana | Implementada | `finance_link.propose_from_transaction` crea solo borradores; `trg_journal_entries_insert_draft`, `test_proposed_draft_has_bank_against_category_with_the_right_sign` |
+| BR-ACC-07 | La contabilidad es de la empresa: un movimiento personal nunca origina un asiento (D-035) | Implementada | `ck_journal_entries_source_business_only`, FK `(source_context_id, source_context_kind) → finance.contexts (id, kind)`, FK `(source_transaction_id, source_context_id) → finance.transactions (id, context_id)` (D-044), `test_entry_from_personal_context_is_rejected_by_database`, `test_personal_transaction_is_not_found_for_accounting`, `test_ledger_accounts_are_assigned_only_in_business_and_with_the_right_kind`, `test_transactions_show_their_journal_entry_only_in_business` |
+| BR-ACC-08 | Los asientos contabilizados llevan número correlativo por ejercicio, sin huecos (D-040) | Implementada | Trigger: número desde `fiscal_years.last_entry_number` (D-049), `trg_journal_entries_number_assigned`, `trg_fiscal_years_numbering`, `test_numbering_is_correlative_without_gaps_despite_discards`, `test_concurrent_posts_do_not_repeat_or_skip_numbers`, `test_same_draft_posted_twice_at_once_gets_one_number`, `test_free_race_stress` |
+| BR-ACC-09 | Solo las cuentas imputables reciben líneas; una cuenta usada no cambia de código ni de naturaleza (D-037) | Implementada | `trg_journal_lines_account_not_postable`, `trg_journal_entries_account_not_postable`, `trg_ledger_accounts_in_use`, `chart.update_account`, `test_line_with_grouping_or_archived_account_fails`, `test_used_ledger_account_keeps_code_and_nature`, `test_used_account_does_not_change_code_or_nature`, `test_archive_rules` |
+| BR-ACC-10 | El plan de cuentas propuesto no se presenta como validado hasta que un contador lo marca, con nombre y matrícula (D-038) | Implementada | `accounting.settings` (`ck_settings_chart_validation_complete`), `chart_status` en todos los reportes, D-046, `test_validation_requires_accountant_and_any_structural_change_resets_it`, `test_load_proposed_creates_159_accounts_with_hierarchy_and_kinds` |
+| BR-ACC-11 | Un movimiento de finanzas con asiento contabilizado no se anula sin revertir antes el asiento (D-041) | Implementada | `links.ensure_no_posted_entry` (también para importe, fecha y cuenta, D-048), `trg_journal_entries_source_voided`, `test_transaction_with_posted_entry_cannot_be_voided_or_changed`, `test_draft_of_a_voided_transaction_cannot_be_posted` |
+| BR-ACC-12 | El cierre del ejercicio exige todos sus períodos cerrados y deja en cero las cuentas de resultado con un asiento de refundición (D-039) | Implementada | `closing.close_fiscal_year`, `trg_journal_entries_closing_invalid`, `trg_fiscal_years_closed_final` (D-050), `test_closing_the_fiscal_year`, `test_closing_with_loss_and_drafts`, `test_closing_entry_only_with_all_periods_closed`, `test_closing_entry_matches_reference` |
 
 ## Finanzas (fase 2)
 

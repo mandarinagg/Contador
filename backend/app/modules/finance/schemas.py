@@ -99,6 +99,9 @@ class AccountUpdate(_Strict):
     institution: Institution | None = None
     number_last4: Last4 | None = None
     archived: bool | None = None
+    # Cuenta contable del banco o la caja (D-041): solo en el contexto empresarial y con
+    # `accounting.manage`; activo o pasivo, imputable. `null` la quita.
+    ledger_account_id: uuid.UUID | None = None
     # Solo si la cuenta todavía no tiene movimientos (si no, 409).
     currency: Currency | None = None
     opening_balance: AmountIn | None = None
@@ -116,6 +119,7 @@ class AccountOut(BaseModel):
     opening_balance: str
     opening_date: date
     balance: str
+    ledger_account_id: uuid.UUID | None
     archived_at: datetime | None
     created_at: datetime
 
@@ -133,6 +137,9 @@ class CategoryUpdate(_Strict):
     name: CategoryName | None = None
     parent_id: uuid.UUID | None = None
     archived: bool | None = None
+    # Cuenta contable de resultado (D-041), con las mismas condiciones que en las cuentas;
+    # de ingreso o de gasto según la categoría.
+    ledger_account_id: uuid.UUID | None = None
 
 
 class CategoryOut(BaseModel):
@@ -143,6 +150,7 @@ class CategoryOut(BaseModel):
     name: str
     kind: str
     parent_id: uuid.UUID | None
+    ledger_account_id: uuid.UUID | None
     archived_at: datetime | None
     created_at: datetime
 
@@ -219,6 +227,15 @@ class VoidRequest(_Strict):
     reason: VoidReason
 
 
+class JournalEntryRefOut(BaseModel):
+    """Asiento contable de un movimiento empresarial: el vivo o, si no hay, el último
+    revertido (D-041)."""
+
+    id: uuid.UUID
+    number: int | None
+    status: str
+
+
 class TransactionOut(BaseModel):
     id: uuid.UUID
     context_id: uuid.UUID
@@ -239,6 +256,8 @@ class TransactionOut(BaseModel):
     void_reason: str | None
     created_by: uuid.UUID
     created_at: datetime
+    # Solo en el contexto empresarial; en el personal siempre es null (D-035).
+    journal_entry: JournalEntryRefOut | None = None
 
 
 class TransferCreate(_Strict):

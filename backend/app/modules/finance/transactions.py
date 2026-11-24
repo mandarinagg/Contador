@@ -16,6 +16,7 @@ from sqlalchemy import or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError, Conflict, NotFound
+from app.modules.accounting import links
 from app.modules.finance import service as fs
 from app.modules.finance.models import FinancialContext, Transaction
 from app.modules.finance.normalize import dedupe_key
@@ -194,6 +195,8 @@ def update_transaction(
                 "TRANSACTION_NOT_EDITABLE",
                 "Es parte de una transferencia: anulala y cargala de nuevo.",
             )
+        # El asiento contabilizado quedaría distinto del movimiento (D-048).
+        links.ensure_no_posted_entry(db, [tx.id], "modificar")
         account = fs.usable_account(db, ctx, core["account_id"]) if "account_id" in core else None
         currency = account.currency if account is not None else tx.currency
         amount = core.get("amount", tx.amount)
@@ -250,6 +253,8 @@ def void_transaction(
                 .with_for_update()
             )
         )
+    # BR-ACC-11: con un asiento contabilizado, primero se revierte el asiento (D-041).
+    links.ensure_no_posted_entry(db, [t.id for t in targets], "anular")
     when = fs.now()
     for target in targets:
         before, after = fs.apply_changes(
