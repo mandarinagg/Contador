@@ -246,7 +246,7 @@ erDiagram
 | `ix_transactions_account_dedupe` | `(account_id, dedupe_key)` **no único**: el duplicado se señala, no se prohíbe |
 
 ### Rendimiento del resumen (índices evaluados, D-033)
-Requisito: con 100.000 movimientos, `GET /transactions` (primera página) y `GET /summary` de 12 meses responden en < 300 ms (objetivo de margen: resumen < 120 ms con la máquina libre). **No hay migración `0003`: no se agregaron índices**, porque ninguno dio una mejora medible. Lo que cambió es la consulta (`app/modules/finance/summary.py`): una pasada en lugar de tres.
+Requisito: con 100.000 movimientos, `GET /transactions` (primera página) y `GET /summary` de 12 meses responden en < 300 ms (objetivo de margen: resumen < 120 ms con la máquina libre). **La fase 2 no agregó índices** (ninguna migración de índices), porque ninguno dio una mejora medible. Lo que cambió es la consulta (`app/modules/finance/summary.py`): una pasada en lugar de tres.
 
 | Consulta (base con `VACUUM ANALYZE`, máquina libre) | Plan | Tiempo de base |
 |---|---|---|
@@ -276,37 +276,192 @@ El listado casi no depende de la base: lo que crece con la carga es el trabajo d
 ### Datos iniciales (migración `0002`)
 Permisos `finance.read` (owner, admin, accountant, viewer) y `finance.manage` (owner, admin, accountant), y el contexto `business` ("Empresa") de cada organización existente. Los permisos se insertan con `ON CONFLICT DO NOTHING` porque la `0001` carga el catálogo vivo de `app/core/permissions.py` (en una base nueva ya los trae).
 
-## Modelo objetivo (fases 3 a 7)
+## Implementado (migración `0003` — contabilidad, núcleo)
 
-Se implementa por fases; cada tabla nace con su migración, su prueba y su pantalla. Lo que sigue es el diseño de referencia y **se revisará** en cada fase.
+Esquema `accounting`. Especificación: `docs/specs/FASE3_CONTABILIDAD.md` (D-035 a D-043; decisiones de implementación D-044 a D-055). Todas las tablas llevan `id uuid` (`uuidv7()`), `organization_id`, `created_at` y `updated_at`. Las tablas referenciadas tienen `UNIQUE (id, organization_id)` y se referencian con claves foráneas compuestas `(x_id, organization_id)`: un asiento no puede usar una cuenta, un ejercicio o un asiento de otra organización. La 0003 requiere la extensión `btree_gist` (D-054).
 
 ```mermaid
 erDiagram
-    organizations ||--o{ financial_contexts : ""
-    persons ||--o{ financial_contexts : "personal"
-    financial_contexts ||--o{ financial_accounts : ""
-    financial_accounts ||--o{ bank_transactions : ""
-    bank_transactions }o--o| transaction_categories : ""
-    bank_transactions }o--o| journal_entries : "conciliado con"
-    organizations ||--o{ chart_of_accounts : ""
-    organizations ||--o{ fiscal_periods : ""
-    fiscal_periods ||--o{ journal_entries : ""
-    journal_entries ||--|{ journal_lines : "partida doble"
-    chart_of_accounts ||--o{ journal_lines : ""
-    journal_entries }o--o| journal_entries : "revierte a"
+    core_organizations ||--o| accounting_settings : "1:1"
+    core_organizations ||--o{ accounting_ledger_accounts : ""
+    accounting_ledger_accounts ||--o{ accounting_ledger_accounts : "padre (código prefijo)"
+    accounting_settings }o--o| accounting_ledger_accounts : "retained_earnings_account_id"
+    core_organizations ||--o{ accounting_fiscal_years : "sin solapamiento"
+    accounting_fiscal_years ||--|{ accounting_periods : "meses calendario"
+    accounting_fiscal_years ||--o{ accounting_journal_entries : "numeración propia"
+    accounting_fiscal_years |o--o| accounting_journal_entries : "closing_entry_id"
+    accounting_journal_entries ||--|{ accounting_journal_lines : "partida doble"
+    accounting_ledger_accounts ||--o{ accounting_journal_lines : "solo imputables"
+    accounting_journal_entries |o--o| accounting_journal_entries : "reverses_entry_id (único)"
+    finance_transactions |o--o{ accounting_journal_entries : "(source_transaction_id, source_context_id)"
+    finance_contexts |o--o{ accounting_journal_entries : "(source_context_id, source_context_kind='business')"
+    accounting_ledger_accounts |o--o{ finance_accounts : "ledger_account_id"
+    accounting_ledger_accounts |o--o{ finance_categories : "ledger_account_id"
+
+    accounting_settings {
+        uuid id PK
+        uuid organization_id "UNIQUE"
+        varchar chart_status "none|pending|validated"
+        varchar chart_validated_by_name
+        varchar chart_validated_reference "matrícula"
+        timestamptz chart_validated_at
+        uuid retained_earnings_account_id "FK compuesta"
+    }
+    accounting_ledger_accounts {
+        uuid id PK
+        varchar code "1.01.01.04; único por organización"
+        varchar name
+        varchar kind "asset|liability|equity|income|expense"
+        varchar normal_side "debit|credit"
+        bool is_postable "imputable"
+        uuid parent_id "FK compuesta"
+        varchar origin "rg49_2014|proposed|user"
+        varchar note
+        timestamptz archived_at
+    }
+    accounting_fiscal_years {
+        uuid id PK
+        date start_date
+        date end_date "a lo sumo 1 año"
+        varchar status "open|closed"
+        timestamptz closed_at
+        uuid closed_by
+        uuid closing_entry_id
+        int last_entry_number "lo sube el trigger"
+    }
+    accounting_periods {
+        uuid id PK
+        uuid fiscal_year_id "FK compuesta"
+        date start_date
+        date end_date
+        varchar status "open|closed"
+        timestamptz closed_at
+        uuid closed_by
+        varchar reopen_reason
+    }
+    accounting_journal_entries {
+        uuid id PK
+        uuid fiscal_year_id "FK compuesta"
+        date entry_date "dentro del ejercicio"
+        int number "NULL en draft/discarded"
+        varchar status "draft|posted|reversed|discarded"
+        varchar kind "manual|finance|reversal|closing"
+        varchar description
+        varchar document_reference
+        uuid reverses_entry_id
+        uuid source_transaction_id
+        uuid source_context_id
+        varchar source_context_kind "business"
+        uuid created_by
+        uuid posted_by
+        timestamptz posted_at
+        uuid discarded_by
+        timestamptz discarded_at
+        varchar discard_reason
+    }
+    accounting_journal_lines {
+        uuid id PK
+        uuid entry_id "FK compuesta"
+        smallint line_no
+        uuid account_id "FK compuesta"
+        numeric debit "18,2; PYG entero"
+        numeric credit "18,2; PYG entero"
+        varchar description
+        char fx_currency "USD|BRL|ARS|EUR, informativo"
+        numeric fx_amount "18,2"
+        numeric fx_rate "18,6"
+    }
+```
+
+Cambios en tablas de finanzas: `finance.contexts` recibe `UNIQUE (id, kind)` (D-035) y `UNIQUE (id, organization_id)`; `finance.transactions`, `UNIQUE (id, context_id)` (D-044); `finance.accounts` y `finance.categories`, `ledger_account_id uuid NULL` FK `accounting.ledger_accounts` (que sea del contexto `business`, de la misma organización, imputable y del tipo correcto lo valida `accounting/finance_link.py`).
+
+### Restricciones
+| Restricción | Qué impide |
+|---|---|
+| `ck_ledger_accounts_code_format` | Código que no sea `^[0-9]+(\.[0-9]+)*$` |
+| `uq_ledger_accounts_organization_id_code` | Dos cuentas con el mismo código en la organización |
+| `fk_ledger_accounts_parent_id_ledger_accounts`, `ck_ledger_accounts_not_own_parent` | `(parent_id, organization_id)`: padre de otra organización o la cuenta como su propio padre |
+| `ck_ledger_accounts_{kind,normal_side,origin}_valid`, `ck_ledger_accounts_name_not_blank` | Valores fuera de catálogo; nombre vacío |
+| `uq_settings_organization_id` | Más de una configuración por organización (D-045) |
+| `ck_settings_chart_validation_complete` | Plan `validated` sin nombre, matrícula y fecha del contador, o esos datos con otro estado (BR-ACC-10) |
+| `fk_settings_retained_earnings_account_id_ledger_accounts` | `(retained_earnings_account_id, organization_id)`: cuenta de otra organización |
+| `ck_fiscal_years_dates_ordered`, `ck_fiscal_years_at_most_one_year` | Fin anterior al inicio; ejercicio de más de 12 meses (`end_date < start_date + 1 año`) |
+| `ex_fiscal_years_no_overlap` | `EXCLUDE USING gist (organization_id WITH =, daterange(start_date, end_date, '[]') WITH &&)`: ejercicios solapados |
+| `ck_fiscal_years_closed_complete`, `ck_fiscal_years_closing_entry_when_closed` | Cerrado sin fecha y usuario; refundición en un ejercicio abierto |
+| `ck_fiscal_years_last_entry_number_non_negative` | Contador negativo |
+| `uq_periods_fiscal_year_id_start_date`, `ck_periods_dates_ordered`, `ck_periods_closed_complete`, `ck_periods_reopen_reason_length` | Períodos repetidos o mal formados; cerrado sin fecha y usuario; motivo de reapertura de menos de 3 caracteres |
+| `ck_journal_entries_number_when_posted`, `ck_journal_entries_number_positive`, `uq_journal_entries_fiscal_year_id_number` | Número en un borrador o descartado; asiento contabilizado sin número; número repetido en el ejercicio |
+| `ck_journal_entries_posted_complete`, `ck_journal_entries_discarded_complete`, `ck_journal_entries_discard_reason_length` | Contabilizado sin usuario y fecha; descartado sin usuario, fecha y motivo (BR-ACC-04) |
+| `ck_journal_entries_reversal_has_original`, `ck_journal_entries_not_self`, `uq_journal_entries_reverses_entry_id` | `(kind = 'reversal') = (reverses_entry_id IS NOT NULL)`; revertirse a sí mismo; revertir dos veces |
+| `ck_journal_entries_source_complete`, `ck_journal_entries_source_business_only`, `ck_journal_entries_finance_has_source` | Origen incompleto; origen personal (D-035); `kind = 'finance'` si y solo si hay movimiento de origen |
+| `fk_journal_entries_source_transaction_id_transactions` | `(source_transaction_id, source_context_id) → finance.transactions (id, context_id)`: el movimiento es de ese contexto |
+| `fk_journal_entries_source_context_kind_contexts` | `(source_context_id, source_context_kind) → finance.contexts (id, kind)`: el contexto es de verdad `business` |
+| `fk_journal_entries_source_context_org_contexts` | `(source_context_id, organization_id) → finance.contexts (id, organization_id)`: el contexto es de la misma organización (D-044) |
+| `uq_journal_entries_live_source` (parcial `WHERE status IN ('draft','posted')`) | Dos asientos vivos para el mismo movimiento (D-041) |
+| `uq_journal_entries_closing_per_year` (parcial `WHERE kind = 'closing' AND status IN ('draft','posted')`) | Dos refundiciones en el mismo ejercicio |
+| `ck_journal_lines_debit_xor_credit`, `ck_journal_lines_amounts_non_negative`, `ck_journal_lines_pyg_integer` | Línea con debe y haber, sin ninguno, negativa o con decimales en guaraníes (BR-ACC-05) |
+| `ck_journal_lines_fx_complete`, `ck_journal_lines_fx_currency_valid`, `ck_journal_lines_fx_{amount,rate}_positive` | Moneda extranjera incompleta, `PYG` como moneda extranjera, importes o cotización no positivos (D-036) |
+| `fk_journal_lines_account_id_ledger_accounts`, `fk_journal_lines_entry_id_journal_entries` | `(x_id, organization_id)`: cuenta o asiento de otra organización |
+| `ix_journal_entries_org_date_number`, `ix_journal_entries_year_status`, `ix_journal_lines_account_entry`, `ix_ledger_accounts_parent` | Índices: diario y listados, borradores por ejercicio, mayor y sumas por cuenta, hijos de una cuenta |
+
+### Triggers (la base es la última defensa, BR-ACC-01/02/03)
+Funciones PL/pgSQL `BEFORE` en el esquema `accounting`. Rechazan con `SQLSTATE 23000` y un nombre estable en `CONSTRAINT` (`diag.constraint_name`), que el servicio traduce a un error legible (`accounting/common.py`). Cada uno tiene una prueba con SQL directo en `tests/test_accounting_db_triggers.py` que falla si se quita el trigger.
+
+| Trigger (tabla) | Nombre del rechazo | Qué impide |
+|---|---|---|
+| `ledger_accounts_guard` (`ledger_accounts`, INSERT/UPDATE) | `trg_ledger_accounts_parent_prefix` | Código que no empieza con el del padre más un punto |
+| | `trg_ledger_accounts_parent_postable` | Colgar una cuenta de una imputable |
+| | `trg_ledger_accounts_in_use` | Cambiar código, tipo, naturaleza o imputabilidad de una cuenta con líneas (BR-ACC-09) |
+| | `trg_ledger_accounts_has_children` | Cambiar el código de una cuenta con hijas |
+| `fiscal_years_guard` (`fiscal_years`, UPDATE) | `trg_fiscal_years_closed_final` | Modificar o reabrir un ejercicio cerrado |
+| | `trg_fiscal_years_dates_fixed` | Cambiar las fechas de un ejercicio |
+| | `trg_fiscal_years_numbering` | Que `last_entry_number` retroceda (D-049) |
+| `periods_guard` (`periods`, UPDATE) | `trg_periods_dates_fixed`, `trg_periods_year_closed` | Cambiar fechas; cerrar o reabrir un período de un ejercicio cerrado |
+| `journal_entries_guard` (`journal_entries`, INSERT/UPDATE/DELETE) | `trg_journal_entries_no_delete` | Borrar cualquier asiento |
+| | `trg_journal_entries_insert_draft` | Insertar un asiento que no sea borrador |
+| | `trg_journal_entries_final` | Modificar un asiento `reversed` o `discarded` |
+| | `trg_journal_entries_posted_immutable` | Cambiar cualquier columna de un asiento `posted` (solo admite `status → reversed`) |
+| | `trg_journal_entries_reversal_missing` | Pasar a `reversed` sin una reversión contabilizada |
+| | `trg_journal_entries_date_outside_year` | Fecha fuera de su ejercicio |
+| | `trg_journal_entries_number_assigned` | Número puesto a mano (lo asigna el trigger, D-049) |
+| | `trg_journal_entries_year_closed`, `trg_journal_entries_period_closed` | Contabilizar en un ejercicio o período cerrado (BR-ACC-03) |
+| | `trg_journal_entries_min_lines`, `trg_journal_entries_unbalanced` | Contabilizar con menos de dos líneas o con Σ debe ≠ Σ haber (BR-ACC-01) |
+| | `trg_journal_entries_account_not_postable` | Contabilizar con una cuenta que se volvió agrupadora o se archivó después del borrador |
+| | `trg_journal_entries_closing_invalid` | Refundición que no va fechada el último día o con períodos abiertos (D-050) |
+| | `trg_journal_entries_reversal_invalid`, `trg_journal_entries_reversal_mismatch` | Reversión de un asiento no contabilizado, o con líneas que no son las del original invertidas (D-051) |
+| | `trg_journal_entries_source_voided` | Contabilizar el asiento de un movimiento anulado (BR-ACC-11) |
+| `journal_lines_guard` (`journal_lines`, INSERT/UPDATE/DELETE) | `trg_journal_lines_entry_not_draft` | Tocar líneas de un asiento que no es borrador (BR-ACC-02) |
+| | `trg_journal_lines_account_not_postable` | Línea con cuenta agrupadora o archivada (BR-ACC-09) |
+| `fiscal_years_no_delete`, `periods_no_delete` | `trg_fiscal_years_no_delete`, `trg_periods_no_delete` | Borrar ejercicios o períodos |
+| `*_no_truncate` (asientos, líneas, ejercicios, períodos) | `trg_<tabla>_no_delete` | `TRUNCATE` |
+
+Al pasar a `posted`, el trigger toma `FOR SHARE` el período y, si hay, el movimiento de origen, y numera con `UPDATE accounting.fiscal_years … RETURNING` (candado de fila, sin huecos). El trigger de líneas toma `FOR SHARE` el asiento: una línea no puede colarse mientras otro lo contabiliza.
+
+### Rendimiento de los reportes (D-042, D-055)
+Los reportes se calculan al vuelo (una consulta agrupada por cuenta con `ix_journal_lines_account_entry`); no hay tablas de saldos. Con 100.000 líneas contabilizadas (PostgreSQL 18.7 en Docker, mediana de 9 tras 2 de calentamiento, dentro de la prueba `slow`): balance de comprobación anual ~32 ms, mayor de una cuenta con 20.000 líneas (primera página de 200) ~40 ms, balance general ~44 ms. Requisito: < 300 ms.
+
+### Datos iniciales (migración `0003`)
+Permisos `accounting.read` (owner, admin, accountant, viewer), `accounting.manage` (owner, admin, accountant) y `accounting.post` (owner, accountant), con copia congelada en la migración (D-031). La bajada borra los permisos, las columnas `ledger_account_id`, las tablas, las funciones y el esquema, y las restricciones nuevas de finanzas; deja `btree_gist`.
+
+## Modelo objetivo (fases 4 a 7)
+
+Se implementa por fases; cada tabla nace con su migración, su prueba y su pantalla. Lo que sigue es el diseño de referencia y **se revisará** en cada fase. Finanzas (fase 2) y el núcleo contable (fase 3) ya están implementados (secciones anteriores): en el diagrama aparecen solo como punto de enganche.
+
+```mermaid
+erDiagram
     organizations ||--o| tax_profiles : ""
     tax_rules ||--|{ tax_rule_versions : "versionado"
     tax_rule_versions ||--o{ tax_obligations : "regla aplicada"
     tax_obligations ||--o{ tax_payments : ""
-    billing_documents ||--o{ journal_entries : "origen"
+    billing_documents ||--o{ accounting_journal_entries : "origen"
     billing_documents ||--o{ tax_obligations : "base imponible"
     documents ||--o{ document_versions : ""
     documents ||--o{ document_relations : "transacción / asiento / obligación"
 ```
 
 ### Decisiones de modelado clave
-- **Contexto financiero**: implementado en la fase 2 como `finance.contexts` (ver arriba). En la fase 3, los asientos referenciarán el contexto `business` con la misma técnica de claves foráneas compuestas. Lo consolidado es una **vista**, nunca datos mezclados.
-- **Asientos**: `journal_entries.status ∈ {draft, posted, reversed}`. Un trigger rechaza modificar líneas de un asiento `posted` y contabilizar en un período cerrado; otro valida `Σ debe = Σ haber` por moneda al pasar a `posted`. La corrección es un asiento de reversión (`reverses_entry_id`).
+- **Contexto financiero**: implementado en la fase 2 como `finance.contexts`. Los asientos de la fase 3 referencian el contexto `business` con claves foráneas compuestas (D-035, D-044). Lo consolidado es una **vista**, nunca datos mezclados.
+- **Asientos**: implementados en la fase 3 (`accounting.journal_entries`, ver arriba). Pendiente para fases siguientes: conciliación bancaria y el vínculo con documentos y facturas.
 - **Reglas tributarias**: `tax_rule_versions` con `valid_from`, `valid_to`, `source_url`, `legal_reference`, `published_at`, `consulted_at`, `validation_status ∈ {pending, verified, deprecated}`, `reviewed_by`. Las obligaciones guardan la versión aplicada. Se cargan como datos, no como código.
 - **Facturación**: esquema `billing` propio del servicio SIFEN (fase 5), referenciado desde contabilidad y tributación por `billing_documents.id`.
 - **IA**: `ai.ai_interactions`, `ai.ai_tool_executions` (entrada, salida, duración, usuario) y `ai.ai_approvals` (borrador → aprobado/rechazado por un humano).

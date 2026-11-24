@@ -22,6 +22,8 @@ La especificación OpenAPI completa y navegable está en `http://127.0.0.1:8765/
 | 423 | `ACCOUNT_LOCKED` (`details.locked_until`) |
 | 500 | `INTERNAL_ERROR` |
 
+Los códigos de contabilidad (fase 3) están en su propia tabla, al final de [Contabilidad](#contabilidad-accounting).
+
 ## Sistema
 
 | Método | Ruta | Permiso | Descripción |
@@ -121,7 +123,58 @@ Especificación: `docs/specs/FASE2_FINANZAS.md`. **Acceso:** el contexto `busine
 - Las filas de totales o saldo final al pie de un extracto quedan como filas con error (sin fecha o sin importe) y no se importan.
 - Cada fila trae `row_number` (fila del archivo), `raw` (la fila original como texto), los valores interpretados, `error` (en español, p. ej. `"Fecha inválida: 31/02/2026"`), `duplicate_of` (movimiento existente no anulado de la misma cuenta con la misma clave) y `duplicate_in_file` (fila anterior igual). Duplicados y filas con error nacen con `decision = "skip"`.
 
+## Contabilidad (`/accounting`)
+
+Especificación: `docs/specs/FASE3_CONTABILIDAD.md` (D-035 a D-043; implementación D-044 a D-055). Contabilidad de la organización: no hay contextos personales. **Permisos:** `accounting.read` para leer (todos los roles), `accounting.manage` para el plan y los borradores (propietario, administrador, contador) y `accounting.post` para contabilizar, revertir, validar el plan, configurar, crear ejercicios y cerrar (propietario y contador; el administrador recibe 403 con `details.missing = ["accounting.post"]`).
+
+**Importes:** debe y haber en guaraníes enteros, como string (`"150000"`); un número JSON da 422. La cotización (`fx_rate`) admite hasta 6 decimales (`"7300.25"`). Las columnas `fx_*` de una línea son informativas: el asiento balancea en guaraníes (D-036).
+
+**Estados del asiento:** `draft` → `posted` (número correlativo por ejercicio, lo asigna la base) → `reversed` (con su reversión contabilizada); `draft` → `discarded`. Lo contabilizado no cambia ni se borra: lo impiden triggers (ver `docs/DATABASE_SCHEMA.md`). Todos los reportes devuelven `chart_status` (`none`, `pending`, `validated`): si no es `validated`, la interfaz avisa que el plan no lo validó un contador.
+
+| Método | Ruta | Permiso | Descripción |
+|---|---|---|---|
+| GET | `/accounting/chart` | read | `{chart_status, chart_validated_*, retained_earnings_account_id, balance_at, accounts}`. Árbol por código (`children`) o lista plana con `?flat=true`. Con `?balance_at=YYYY-MM-DD`, `balance` de cada cuenta a esa fecha en el sentido de su tipo (las agrupadoras suman su subárbol). Cada cuenta: `{id, code, name, kind, normal_side, is_postable, parent_id, origin, note, archived_at, in_use}`. Sin paginación |
+| POST | `/accounting/chart/load-proposed` | manage | Carga las 159 cuentas del plan propuesto (RG 49/2014, `docs/research/plan_de_cuentas_propuesto.yaml`) y deja el plan `pending`. 201 con la lista; 409 `CHART_NOT_EMPTY` si ya hay cuentas |
+| POST | `/accounting/chart/accounts` | manage | `{parent_id?, code, name, is_postable, kind?, normal_side?, note?}`. El código es el del padre más un segmento (sin padre, un solo segmento); el padre es agrupador; el tipo, por defecto el del padre, es del mismo estado (patrimonial o de resultados); la naturaleza, por defecto la del tipo. Vuelve el plan a `pending` (D-046). 201 |
+| PATCH | `/accounting/chart/accounts/{id}` | manage | `{name?, note?, code?, kind?, normal_side?, is_postable?, archived?}`. Con líneas, solo `name`, `note` y `archived` (409 `ACCOUNT_IN_USE`). No se archiva con saldo, con hijas sin archivar, usada en borradores, en la configuración o en finanzas. Un cambio estructural vuelve el plan a `pending` |
+| POST | `/accounting/chart/validate` | post | `{validated_by_name, validated_reference}` (nombre y matrícula del contador) → `validated`. 409 `CHART_EMPTY` sin cuentas |
+| POST | `/accounting/chart/invalidate` | post | Vuelve a `pending`. 409 `CHART_NOT_VALIDATED` si no estaba validado |
+| GET | `/accounting/settings` | read | `{chart_status, chart_validated_by_name, chart_validated_reference, chart_validated_at, retained_earnings_account_id}` |
+| PUT | `/accounting/settings` | post | `{retained_earnings_account_id}` (cuenta de patrimonio imputable y no archivada, o `null`); 422 `INVALID_RETAINED_EARNINGS_ACCOUNT` |
+| GET | `/accounting/fiscal-years` | read | Todos, más nuevos primero, con `periods` |
+| POST | `/accounting/fiscal-years` | post | `{year}` (año civil) o `{start_date, end_date}` (a lo sumo 12 meses calendario, D-047). Crea un período por mes calendario. 201; 422 `FISCAL_YEAR_INVALID`; 409 `FISCAL_YEAR_OVERLAP` |
+| GET | `/accounting/fiscal-years/{id}` | read | `{id, start_date, end_date, status, closed_at, closed_by, closing_entry_id, last_entry_number, periods}` |
+| POST | `/accounting/fiscal-years/{id}/close` | post | Exige todos los períodos cerrados (409 `PERIODS_OPEN`, `details.periods`), ningún borrador (409 `FISCAL_YEAR_HAS_DRAFTS`) y la cuenta de resultados configurada (409 `RETAINED_EARNINGS_NOT_SET`). Contabiliza la refundición (cada cuenta de ingreso y gasto con saldo, contra esa cuenta, fechada el último día; sin resultados no hay asiento) y cierra el ejercicio para siempre (D-050) |
+| POST | `/accounting/periods/{id}/close` | post | 409 `PERIOD_HAS_DRAFTS` con `details.drafts = [{id, entry_date, description}]`; 409 `PERIOD_ALREADY_CLOSED`; 409 `FISCAL_YEAR_CLOSED` |
+| POST | `/accounting/periods/{id}/reopen` | post | `{reason}` (3 a 300 caracteres). 409 `PERIOD_NOT_CLOSED`, `FISCAL_YEAR_CLOSED`. Queda auditado con el motivo |
+| GET | `/accounting/entries` | read | Más recientes primero (fecha, id), sin líneas (`lines: null`). Filtros: `fiscal_year_id`, `status`, `kind`, `from`, `to`, `account_id`, `q` (descripción, referencia o número). Cursor `?limit=1..200` (50) `&before=<id>` |
+| POST | `/accounting/entries` | manage | Borrador `{entry_date, description, document_reference?, lines: [{account_id, debit?, credit?, description?, fx_currency?, fx_amount?, fx_rate?}]}` (1 a 500 líneas; puede estar desbalanceado). El ejercicio sale de la fecha (422 `FISCAL_YEAR_NOT_FOUND`, 409 `FISCAL_YEAR_CLOSED`). 201 |
+| GET | `/accounting/entries/{id}` | read | `{id, fiscal_year_id, number, status, kind, entry_date, description, document_reference, reverses_entry_id, reversed_by_entry_id, source_transaction_id, source_context_id, created_by, posted_by, posted_at, discarded_*, total_debit, total_credit, balanced, lines: [{id, line_no, account_id, account_code, account_name, debit, credit, description, fx_*}]}` |
+| PATCH | `/accounting/entries/{id}` | manage | Mismo cuerpo que el alta: reemplaza cabecera y líneas, solo en borrador (409 `ENTRY_NOT_DRAFT`) |
+| POST | `/accounting/entries/{id}/post` | post | Contabiliza y numera. 422 `ENTRY_UNBALANCED` (`details: {debit, credit, difference}`), `ENTRY_TOO_FEW_LINES`, `ACCOUNT_NOT_POSTABLE` (`details.lines`); 409 `PERIOD_CLOSED`, `FISCAL_YEAR_CLOSED`, `SOURCE_TRANSACTION_VOIDED`, `ENTRY_NOT_DRAFT` |
+| POST | `/accounting/entries/{id}/reverse` | post | `{reason, date?}` → la reversión contabilizada (líneas invertidas); el original queda `reversed`. Por defecto en la fecha del original; si su período está cerrado, 409 `PERIOD_CLOSED` con `details.date` para elegir otra (no anterior: 422 `REVERSAL_DATE_INVALID`). 409 `ENTRY_NOT_POSTED`, `ENTRY_NOT_REVERSIBLE` (reversiones y refundiciones) |
+| POST | `/accounting/entries/{id}/discard` | manage | `{reason}`, solo borradores |
+| POST | `/accounting/entries/from-transaction/{tid}` | manage | Borrador propuesto desde un movimiento **de la empresa** (D-041, D-052): ingreso = debe banco / haber categoría; gasto al revés. Cuerpo opcional `{fx_rate?, amount_pyg?}` para movimientos en otra moneda. 404 `TRANSACTION_NOT_FOUND` (también si es personal); 409 `TRANSACTION_HAS_ENTRY` (`details.entry_id`), `TRANSACTION_VOIDED`; 422 `LEDGER_ACCOUNT_MISSING` (`details.missing` dice cuál), `CATEGORY_REQUIRED`, `TRANSFER_NOT_SUPPORTED`, `FX_RATE_REQUIRED`, `FX_NOT_APPLICABLE`, `FX_ROUNDING_REQUIRED` (`details: {exact, floor, ceil}`), `FX_ROUNDING_INVALID`. 201 |
+| GET | `/accounting/reports/journal` | read | Libro diario `?from&to` (obligatorios): asientos contabilizados y revertidos por fecha y número, con líneas; `total_debit`, `total_credit`. Cursor `?limit=1..1000` (200) `&after=<id del último asiento>`; `next_cursor` |
+| GET | `/accounting/reports/ledger/{account_id}` | read | Libro mayor de una cuenta imputable `?from&to`: `opening_balance` (antes del rango), `movements` con `balance` acumulado (según la naturaleza de la cuenta), `total_debit`, `total_credit`, `closing_balance`. Cursor `?limit=1..1000` (200) `&after=<line_id>`; el acumulado sigue entre páginas |
+| GET | `/accounting/reports/trial-balance` | read | `?from&to`: por cuenta con movimiento en el rango, sumas (`debit`, `credit`) y saldos (`debit_balance`, `credit_balance`); totales y `balanced` |
+| GET | `/accounting/reports/balance-sheet` | read | `?at=`: `assets`, `liabilities`, `equity` por la jerarquía del plan (cada nodo con `amount` de su subárbol; las regularizadoras restan), totales, `result` (resultado no refundido), `total_liabilities_and_equity` y `balanced` |
+| GET | `/accounting/reports/income-statement` | read | `?from&to`: `accounts` (ingresos y gastos por la jerarquía, RG 49/2014 Anexo 2), `total_income`, `total_expense`, `result`. No cuenta la refundición |
+
+**Finanzas ↔ contabilidad:** `PATCH /finance/contexts/{cid}/accounts/{id}` y `/categories/{id}` aceptan `ledger_account_id` (o `null`) solo en el contexto `business` (422 `LEDGER_ACCOUNT_BUSINESS_ONLY` en el personal) y con `accounting.manage`; la cuenta contable es imputable (422 `ACCOUNT_NOT_POSTABLE`) y del tipo correcto (422 `LEDGER_ACCOUNT_KIND_MISMATCH`: activo o pasivo para un banco, el de la categoría para una categoría). Los movimientos del contexto `business` traen `journal_entry` (`{id, number, status}` del asiento vivo o del último revertido; `null` si no hay); en el personal siempre `null`. Con asiento contabilizado, anular o cambiar importe, fecha o cuenta da 409 `TRANSACTION_HAS_POSTED_ENTRY` (BR-ACC-11, D-048).
+
+**Errores de contabilidad:**
+
+| HTTP | Códigos |
+|---|---|
+| 400 | `INVALID_CURSOR` |
+| 404 | `LEDGER_ACCOUNT_NOT_FOUND`, `FISCAL_YEAR_NOT_FOUND`, `PERIOD_NOT_FOUND`, `ENTRY_NOT_FOUND`, `TRANSACTION_NOT_FOUND` |
+| 409 | `CHART_NOT_EMPTY`, `CHART_EMPTY`, `CHART_NOT_VALIDATED`, `ACCOUNT_CODE_TAKEN`, `ACCOUNT_IN_USE`, `ACCOUNT_HAS_BALANCE`, `ACCOUNT_HAS_CHILDREN`, `ACCOUNT_IN_DRAFTS`, `ACCOUNT_IN_SETTINGS`, `ACCOUNT_MAPPED_IN_FINANCE`, `FISCAL_YEAR_OVERLAP`, `FISCAL_YEAR_CLOSED`, `FISCAL_YEAR_HAS_DRAFTS`, `PERIODS_OPEN`, `RETAINED_EARNINGS_NOT_SET`, `PERIOD_CLOSED`, `PERIOD_ALREADY_CLOSED`, `PERIOD_NOT_CLOSED`, `PERIOD_HAS_DRAFTS`, `ENTRY_NOT_DRAFT`, `ENTRY_NOT_POSTED`, `ENTRY_NOT_REVERSIBLE`, `ENTRY_CHANGED`, `SOURCE_TRANSACTION_VOIDED`, `TRANSACTION_HAS_ENTRY`, `TRANSACTION_HAS_POSTED_ENTRY`, `TRANSACTION_VOIDED` |
+| 422 | `ACCOUNT_CODE_INVALID`, `ACCOUNT_KIND_MISMATCH`, `ACCOUNT_KIND_REQUIRED`, `PARENT_IS_POSTABLE`, `INVALID_RETAINED_EARNINGS_ACCOUNT`, `FISCAL_YEAR_INVALID`, `FISCAL_YEAR_NOT_FOUND` (fecha sin ejercicio), `LEDGER_ACCOUNT_NOT_FOUND` (en una línea), `ACCOUNT_NOT_POSTABLE`, `LINE_DEBIT_XOR_CREDIT`, `FX_INCOMPLETE`, `INVALID_AMOUNT`, `ENTRY_UNBALANCED`, `ENTRY_TOO_FEW_LINES`, `REVERSAL_DATE_INVALID`, `INVALID_RANGE`, `LEDGER_ACCOUNT_BUSINESS_ONLY`, `LEDGER_ACCOUNT_KIND_MISMATCH`, `LEDGER_ACCOUNT_MISSING`, `CATEGORY_REQUIRED`, `TRANSFER_NOT_SUPPORTED`, `FX_RATE_REQUIRED`, `FX_NOT_APPLICABLE`, `FX_ROUNDING_REQUIRED`, `FX_ROUNDING_INVALID` |
+
 ## Acciones auditadas
 `system.setup`, `organization.updated`, `user.created`, `user.updated`.
 
 Finanzas (`entity_type` = `finance.<entidad>`; en un contexto personal, `finance.personal.<entidad>`, visible solo para su dueño): `finance.context.created` (personal), `finance.account.{created,updated,archived,unarchived}`, `finance.category.{created,updated}`, `finance.counterparty.{created,updated}`, `finance.transaction.{created,updated,voided}`, `finance.import.{previewed,committed,cancelled}` (un evento por lote, no por fila). Los cambios registran solo los campos que cambian.
+
+Contabilidad (`entity_type` = `accounting.<entidad>`): `accounting.chart.{loaded,pending,validated,invalidated}`, `accounting.ledger_account.{created,updated,archived,unarchived}` (la carga del plan propuesto audita cada cuenta), `accounting.settings.updated`, `accounting.fiscal_year.{created,closed}` (el cierre registra el resultado y la refundición), `accounting.period.{closed,reopened}` (con el motivo), `accounting.journal_entry.{created,updated,posted,reversed,discarded}` (las líneas van en el registro del alta y de la edición; la reversión registra el asiento que revierte y el motivo).

@@ -4,6 +4,17 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Agregado — Fase 3, backend de contabilidad (núcleo) (2026-11-24)
+- Módulo `backend/app/modules/accounting/` y migración `0003_contabilidad` (esquema `accounting`, triggers PL/pgSQL, extensión `btree_gist`). Especificación: `docs/specs/FASE3_CONTABILIDAD.md`; decisiones de implementación D-044 a D-055.
+- **Plan de cuentas** jerárquico por organización: carga del plan propuesto (159 cuentas, RG 49/2014; copia empaquetada en `proposed_chart.py`, verificada idéntica al YAML de `docs/research/`), altas bajo un padre, edición, archivo y saldos por fecha. El plan nace `pending` y lo valida un contador con nombre y matrícula; un cambio estructural lo vuelve a `pending` (D-046). Configuración de la cuenta de resultados para la refundición (`accounting.settings`, D-045).
+- **Ejercicios** (año civil o fechas, a lo sumo 12 meses, sin solapamiento en la base) con un período por mes calendario; cierre y reapertura de períodos con motivo; **cierre del ejercicio** con asiento de refundición, definitivo.
+- **Asientos**: borradores (pueden estar desbalanceados), contabilización con número correlativo por ejercicio asignado por la base (sin huecos, también con contabilizaciones concurrentes), reversión con líneas invertidas y descarte con motivo. Lo contabilizado no se modifica ni se borra: lo impiden triggers, probados con SQL directo.
+- **Desde finanzas**: borrador propuesto desde un movimiento de la empresa (banco contra categoría, moneda extranjera con cotización explícita y sin redondeo silencioso); `ledger_account_id` en cuentas y categorías del contexto `business`; los movimientos muestran su `journal_entry`; un movimiento con asiento contabilizado no se anula ni cambia importe, fecha o cuenta (409 `TRANSACTION_HAS_POSTED_ENTRY`). Un movimiento personal nunca origina un asiento: lo impide la base (D-035).
+- **Reportes** al vuelo: libro diario, libro mayor (saldo anterior y acumulado, paginado), balance de comprobación, balance general (con verificación activo = pasivo + patrimonio) y estado de resultados. Todos informan `chart_status`.
+- Permisos `accounting.read`, `accounting.manage` y `accounting.post` (el administrador no contabiliza ni cierra). Todo se audita (`accounting.*`).
+- Dependencia de desarrollo `pyyaml==6.0.4` (solo para la prueba que compara el plan empaquetado con el YAML).
+- Pruebas nuevas (68): triggers y D-035 por SQL directo (`test_accounting_db_triggers.py`; cada una falla si se quita su trigger o restricción), plan de cuentas, asientos, períodos, cierre y permisos, finanzas ↔ contabilidad, numeración concurrente con conexiones reales (`test_accounting_numbering_concurrency.py`), reportes contra un cálculo de referencia en Python (`test_accounting_reports_reference.py`), migración (`test_accounting_migration.py`) y rendimiento con 100.000 líneas (`slow`: balance de comprobación ~32 ms, mayor ~40 ms, balance general ~44 ms).
+
 ### Corregido — Importación de extractos con formatos reales (2026-11-24)
 - Se probó el importador con extractos armados como los de los bancos paraguayos. Cuatro casos válidos daban error de fila y ahora se leen bien:
   - fecha con la hora de la operación (`15/01/2026 10:23`);
