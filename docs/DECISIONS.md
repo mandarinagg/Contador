@@ -95,3 +95,16 @@ Formato: contexto → decisión → alternativas → consecuencias. Estado: **Ac
 
 ## D-034 — Confirmar importaciones: orden de candados y prueba con conexiones reales
 **Aceptada · 2026-11-24.** `imports.commit` toma los candados **siempre en este orden**: fila del lote (`FOR UPDATE`) y luego fila de la cuenta (`FOR UPDATE`); ninguna otra operación toma el de la cuenta después de un lote, así que no hay interbloqueo. El del lote hace idempotente confirmar dos veces el mismo lote (el segundo espera, relee el estado ya confirmado y recibe 409 `IMPORT_ALREADY_COMMITTED`); el de la cuenta serializa lotes distintos de la misma cuenta, de modo que la búsqueda de duplicados (`READ COMMITTED`: instantánea por sentencia) ve lo que el otro ya confirmó y responde 409 `IMPORT_NEW_DUPLICATES` en vez de duplicar. Verificado en `tests/test_finance_import_concurrency.py`: hilos, un pedido HTTP y una conexión por hilo, contra una base propia confirmada (`<base de pruebas>_conc`, que el fixture crea y borra). La prueba **retiene el candado de la cuenta desde otra conexión** hasta que los dos pedidos están bloqueados y recién entonces lo suelta, para que la carrera sea determinista; además repite seis veces la carrera libre. Se comprobó que las pruebas fallan si se quita cualquiera de los dos candados. No se encontró una carrera real en el servicio. Límite conocido: las altas manuales no toman el candado de la cuenta, pero tampoco prohíben duplicados (solo se señalan, BR-FIN-03).
+
+## D-035 a D-043 — Modelo de la contabilidad (fase 3)
+**Aceptadas · 2026-11-24.** Detalle y motivos en `docs/specs/FASE3_CONTABILIDAD.md` §1:
+- **D-035:** la contabilidad es de la organización. La base impide que un movimiento personal origine un asiento (FK a `finance.contexts (id, kind)` con `kind = 'business'`).
+- **D-036:** moneda funcional PYG; la moneda extranjera es informativa y la cotización la escribe la persona.
+- **D-037:** plan de cuentas jerárquico por organización. Se carga el propuesto (RG 49/2014) y solo las cuentas imputables reciben líneas.
+- **D-038:** el plan nace `pending` y lo valida explícitamente un contador (nombre y matrícula).
+- **D-039:** ejercicio por defecto = año civil (duda D-9 abierta), 12 períodos que se cierran y reabren con motivo. El ejercicio cerrado no se reabre.
+- **D-040:** borrador → contabilizado → revertido. Inmutabilidad por triggers y numeración correlativa al contabilizar.
+- **D-041:** desde finanzas solo se proponen borradores; el movimiento no se anula si tiene un asiento contabilizado.
+- **D-042:** reportes calculados al vuelo, sin tablas de saldos.
+- **D-043:** permisos `accounting.read`, `accounting.manage` y `accounting.post`; el administrador no contabiliza.
+

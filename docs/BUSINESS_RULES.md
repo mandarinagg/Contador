@@ -34,16 +34,22 @@ Cada regla tiene un identificador estable, su estado y dónde se hace cumplir. *
 | BR-AUD-03 | Una alteración de la auditoría es detectable | Implementada | Cadena de hashes, `test_hash_chain_detects_tampering` |
 | BR-AUD-04 | Ingresos, fallos, bloqueos, cierres de sesión y cambios de contraseña se registran como eventos de seguridad | Implementada | `audit.security_events` |
 
-## Contabilidad (fase 3 — diseñadas)
+## Contabilidad (fase 3 — especificadas en `docs/specs/FASE3_CONTABILIDAD.md`)
 
 | ID | Regla |
 |---|---|
-| BR-ACC-01 | Un asiento solo se contabiliza si Σ debe = Σ haber (por moneda) y tiene al menos dos líneas |
+| BR-ACC-01 | Un asiento solo se contabiliza si Σ debe = Σ haber en guaraníes (moneda funcional, D-036) y tiene al menos dos líneas |
 | BR-ACC-02 | Un asiento contabilizado no se modifica ni se borra; se corrige con un asiento de reversión |
 | BR-ACC-03 | No se contabiliza en un período cerrado |
 | BR-ACC-04 | Todo asiento registra usuario responsable y documento respaldatorio cuando exista |
 | BR-ACC-05 | Ningún cálculo monetario usa punto flotante |
 | BR-ACC-06 | Un movimiento importado nunca genera un asiento definitivo sin confirmación humana |
+| BR-ACC-07 | La contabilidad es de la empresa: un movimiento personal nunca origina un asiento (D-035) |
+| BR-ACC-08 | Los asientos contabilizados llevan número correlativo por ejercicio, sin huecos (D-040) |
+| BR-ACC-09 | Solo las cuentas imputables reciben líneas; una cuenta usada no cambia de código ni de naturaleza (D-037) |
+| BR-ACC-10 | El plan de cuentas propuesto no se presenta como validado hasta que un contador lo marca, con nombre y matrícula (D-038) |
+| BR-ACC-11 | Un movimiento de finanzas con asiento contabilizado no se anula sin revertir antes el asiento (D-041) |
+| BR-ACC-12 | El cierre del ejercicio exige todos sus períodos cerrados y deja en cero las cuentas de resultado con un asiento de refundición (D-039) |
 
 ## Finanzas (fase 2)
 
