@@ -30,6 +30,16 @@ from app.modules.finance.models import (
 )
 from app.modules.identity.models import PermissionRow, RolePermission, RoleRow, User, UserSession
 from app.modules.organizations.models import Organization, OrganizationMember
+from app.modules.tax.models import (
+    DueDateException,
+    Holiday,
+    Obligation,
+    Profile,
+    ProfileObligation,
+    RuleVersion,
+    TaxSettings,
+    Voucher,
+)
 
 __all__ = [
     "Account",
@@ -43,25 +53,33 @@ __all__ = [
     "Counterparty",
     "DepreciationItem",
     "DepreciationRun",
+    "DueDateException",
     "FinancialContext",
     "FiscalYear",
     "FixedAsset",
+    "Holiday",
     "ImportBatch",
     "ImportRow",
     "JournalEntry",
     "JournalLine",
     "LedgerAccount",
+    "Obligation",
     "Organization",
     "OrganizationMember",
     "Period",
     "PermissionRow",
+    "Profile",
+    "ProfileObligation",
     "RecurringGeneration",
     "RecurringTemplate",
     "RecurringTemplateLine",
     "RolePermission",
     "RoleRow",
+    "RuleVersion",
     "SecurityEvent",
+    "TaxSettings",
     "Transaction",
     "User",
     "UserSession",
+    "Voucher",
 ]

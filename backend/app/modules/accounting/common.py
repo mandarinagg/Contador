@@ -117,6 +117,11 @@ _TRIGGER_ERRORS: Mapping[str, tuple[str, str, int]] = {
         409,
     ),
     "trg_journal_entries_final": ("ENTRY_NOT_DRAFT", "El asiento ya no se modifica.", 409),
+    "trg_journal_entries_voucher_has_entry": (
+        "TRANSACTION_VOUCHER_HAS_ENTRY",
+        "Un comprobante vinculado al movimiento ya tiene asiento vivo.",
+        409,
+    ),
     "trg_journal_entries_source_voided": (
         "SOURCE_TRANSACTION_VOIDED",
         "El movimiento de finanzas de origen está anulado.",

@@ -71,22 +71,24 @@ Cada regla tiene un identificador estable, su estado y dónde se hace cumplir. *
 | BR-FIN-08 | Una importación no crea movimientos hasta que el usuario confirma el lote; confirmar dos veces no duplica | Implementada | `finance/imports.py`, `test_commit_is_idempotent_and_audited_once`, `test_cancel` |
 | BR-FIN-09 | Las transferencias entre cuentas propias no son ingreso ni gasto; un aporte entre contextos no es una transferencia | Implementada | `transfer_group_id`, `ck_transactions_transfer_without_category`, `test_transfer_creates_two_linked_movements_outside_income_and_expense`, `test_consolidated_identifies_each_context` |
 
-## Tributación (fase 4 — especificadas en `docs/specs/FASE4_TRIBUTACION.md`)
+## Tributación (fase 4, núcleo — `docs/specs/FASE4_TRIBUTACION.md`)
 
-| ID | Regla |
-|---|---|
-| BR-TAX-01 | Toda obligación, vencimiento o estimación indica la regla aplicada; si no está `verified` se muestra «sin verificar» y nunca como oficial (D-082, reformulada el 2026-11-24) |
-| BR-TAX-02 | Todo cálculo indica la versión de la regla aplicada y su vigencia |
-| BR-TAX-03 | Un cálculo es una estimación interna, nunca una declaración oficial; la presentación es manual en Marangatu |
-| BR-TAX-04 | Sin perfil fiscal no se generan obligaciones (D-083) |
-| BR-TAX-05 | Un vencimiento en día inhábil pasa al siguiente hábil; las excepciones fechadas reemplazan la fecha (D-086) |
-| BR-TAX-06 | Las obligaciones presentadas no cambian de vencimiento ni de regla; ninguna se borra (D-087) |
-| BR-TAX-07 | Sin comprobantes duplicados: misma dirección, RUC, timbrado y número (D-088) |
-| BR-TAX-08 | Los comprobantes de un mes con el registro confirmado no se tocan sin reabrirlo (D-089) |
-| BR-TAX-09 | El IVA se calcula con la regla de tasas vigente a la fecha del comprobante; se acepta el impreso con ±1 ₲ (D-088) |
-| BR-TAX-10 | Nunca dos asientos vivos para el mismo hecho, desde el comprobante o desde el movimiento (D-091) |
-| BR-TAX-11 | El prorrateo del crédito fiscal no se calcula: se avisa (D-090) |
-| BR-TAX-12 | Solo `tax.verify` verifica reglas y perfiles, con nombre y matrícula (D-094) |
+Todas las reglas tributarias cargadas están `pending` hasta que las verifique un contador: se usan con la marca «sin verificar» (D-082). Nada se presenta en Marangatu desde la aplicación.
+
+| ID | Regla | Estado | Dónde |
+|---|---|---|---|
+| BR-TAX-01 | Toda obligación, vencimiento o estimación indica la regla aplicada; si no está `verified` se muestra «sin verificar» y nunca como oficial (D-082, reformulada el 2026-11-24) | Implementada | `rules_applied` y `rule_status` en obligaciones, comprobantes, IVA y Marangatu (`rules.applied`, `rules.worst_status`); una `deprecated` no rige (`rules.rule_for`); sin regla vigente, 422 `RULE_MISSING` (D-111); aviso `RULES_UNVERIFIED`. `test_load_candidates_is_idempotent`, `test_sync_is_idempotent_and_covers_until_three_months_ahead`, `test_estimate_by_rate_with_notes_and_estimated_previous_balance`, `test_formats_are_validated` (CDC de 2017 sin regla), `test_each_alert_goes_away_when_resolved` |
+| BR-TAX-02 | Todo cálculo indica la versión de la regla aplicada y su vigencia | Implementada | `rule_versions` con `valid_from`/`valid_to` y exclusión `ex_rule_versions_no_overlap`; las obligaciones guardan `rule_version_id` y `calendar_rule_version_id`, los comprobantes `vat_rule_version_id`. `test_validity_ranges_do_not_overlap`, `test_rule_in_force_at_a_date`, `test_included_vat_by_rate_with_rounding` |
+| BR-TAX-03 | Un cálculo es una estimación interna, nunca una declaración oficial; la presentación es manual en Marangatu | Implementada | `is_estimate: true` en `GET /tax/vat/{y}/{m}`; Marangatu es un borrador (`is_draft`, `notice`, D-096); presentar y pagar solo registran lo que la persona hizo. `test_estimate_by_rate_with_notes_and_estimated_previous_balance`, `test_credit_notes_change_section_and_electronic_are_excluded` |
+| BR-TAX-04 | Sin perfil fiscal no se generan obligaciones (D-083) | Implementada | `obligations.sync` (`profile_missing`), `trg_profiles_ruc_required` (sin RUC no hay perfil), aviso `PROFILE_MISSING`. `test_no_profile_no_obligations`, `test_no_profile_without_organization_ruc`, `test_missing_profile_and_unverified_rules` |
+| BR-TAX-05 | Un vencimiento en día inhábil pasa al siguiente hábil; las excepciones fechadas reemplazan la fecha (D-086, D-098) | Implementada (feriados y sábados `pending`, D-F4-11) | `calendar.BusinessDays`, `calendar.Exceptions`, `obligations.plan_due`; `remind_by` (columna generada) y `shift_explanation` (D-098); `trg_holidays_in_use`. `test_all_ruc_digits_for_dj_and_dji`, `test_weekend_and_consecutive_non_business_days_shift_forward`, `test_rg_60_2026_exception_replaces_only_what_it_names`, `test_user_exception_for_some_digits_only`, `test_reference_calendar_for_a_whole_year`, `test_overdue_due_soon_and_remind_by`, `test_holiday_that_shifted_a_filed_due_date_is_kept` |
+| BR-TAX-06 | Las obligaciones presentadas no cambian de vencimiento ni de regla; ninguna se borra (D-087) | Implementada | `trg_obligations_filed_fixed`, `_identity_fixed`, `_invalid_transition`, `_born_pending`, `_no_delete`; la sincronización recalcula solo lo pendiente y marca `not_applicable` lo que el perfil quita (D-103). `test_profile_change_recalculates_only_what_was_not_filed`, `test_transitions_by_api_and_by_sql`, `test_obligation_removed_from_profile_becomes_not_applicable_and_returns`, `test_concurrent_syncs_do_not_duplicate` |
+| BR-TAX-07 | Sin comprobantes duplicados: misma dirección, RUC, timbrado y número (D-088; con el tipo, D-104) | Implementada | `uq_vouchers_purchase_live`, `uq_vouchers_sale_live` (solo vivos), 409 `VOUCHER_DUPLICATE`. `test_duplicates_are_rejected`, `test_concurrent_duplicates` |
+| BR-TAX-08 | Los comprobantes de un mes con el registro confirmado no se tocan sin reabrirlo (D-089) | Implementada | `trg_vouchers_period_locked` (cuenta el mes de origen y el de destino; deja cambiar solo `journal_entry_id`, D-106), 409 `PERIOD_CONFIRMED`; reabrir la obligación con motivo, auditado. `test_confirmed_register_locks_the_month` |
+| BR-TAX-09 | El IVA se calcula con la regla de tasas vigente a la fecha del comprobante; se acepta el impreso con ±1 ₲ (D-088) | Implementada (redondeo por comprobante, D-F4-7 abierta) | `vouchers.included_vat` (importe/11 y /21, mitad hacia arriba), `vouchers._check_vat` (422 `VAT_MISMATCH`). `test_included_vat_by_rate_with_rounding`, `test_edit_recalculates_vat_and_keeps_audit` |
+| BR-TAX-10 | Nunca dos asientos vivos para el mismo hecho, desde el comprobante o desde el movimiento (D-091) | Implementada | `voucher_entry.propose` (409 `VOUCHER_HAS_ENTRY`, `VOUCHER_TRANSACTION_HAS_ENTRY`), `links.check_transaction_free` en `finance_link` (409 `TRANSACTION_VOUCHER_HAS_ENTRY`), `trg_journal_entries_voucher_has_entry`, índice único de asiento vivo por movimiento. `test_linked_transaction_uses_its_bank_and_one_live_entry_per_fact`, `test_purchase_on_credit_goes_to_suppliers_with_vat_credit` |
+| BR-TAX-11 | El prorrateo del crédito fiscal no se calcula: se avisa (D-090) | Implementada | `proration_warning` y aviso `PRORATION_POSSIBLE` (ventas exentas y compras con crédito en el mes); casilla 164 vacía con nota (D-097). `test_proration_warning`, `test_form_120_boxes` |
+| BR-TAX-12 | Solo `tax.verify` verifica reglas y perfiles, con nombre y matrícula (D-094) | Implementada | `Verifier` en `tax/router.py`; esquemas que exigen nombre y matrícula; también para el estado de un feriado; el Administrador no tiene `tax.verify`. `test_verify_requires_name_and_license_and_permission`, `test_verification_requires_license_and_is_final`, `test_admin_manages_but_does_not_verify`, `test_user_holiday_needs_source_and_verification_needs_permission` |
 
 ## Facturación (fase 5 — diseñadas)
 

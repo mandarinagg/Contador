@@ -1,7 +1,7 @@
 # Cumplimiento tributario — Paraguay
 
-> **Estado: ninguna regla tributaria está implementada ni verificada todavía.**
-> Este documento define cómo se incorporan. Nada de lo que sigue es asesoramiento tributario.
+> **Estado (2026-11-24): el núcleo tributario de la fase 4 está implementado, pero ninguna regla está verificada.**
+> Las 39 reglas candidatas y los feriados se cargan `pending` y se usan marcados «sin verificar» (D-082). La aplicación no presenta nada en Marangatu: arma el calendario, el registro de comprobantes, borradores (Formulario 120, archivo de importación) y avisos. Nada de lo que sigue es asesoramiento tributario.
 
 ## Investigación preliminar (2026-11-24): pendiente de revisión del contador
 
@@ -10,7 +10,9 @@ Hay una primera investigación con fuentes oficiales leídas. **Todo está en `p
 | Documento | Contenido |
 |---|---|
 | [`research/TRIBUTACION_PY.md`](research/TRIBUTACION_PY.md) | EAS (Ley 6480 y Decreto 3998), IVA, IRE, IDU, IRP, anticipos, calendario por RUC, registro de comprobantes, estados financieros, SIFEN y laboral. Cada punto con cita, enlace, fecha y nivel de confianza. Incluye contradicciones, dudas y lo no verificado. |
-| [`research/tax_rules_candidatas.yaml`](research/tax_rules_candidatas.yaml) | 25 reglas candidatas con el formato de `tax_rule_versions`. Todas con `validation_status: pending` y `reviewed_by: null`. |
+| [`research/tax_rules_candidatas.yaml`](research/tax_rules_candidatas.yaml) | 39 reglas candidatas con el formato de `tax.rule_versions`. Todas con `validation_status: pending` y `reviewed_by: null`. Empaquetadas tal cual en `backend/app/modules/tax/candidate_rules.py` (una prueba verifica que son idénticas). |
+| [`research/TRIBUTACION_FASE4.md`](research/TRIBUTACION_FASE4.md) | Formato de importación del registro de comprobantes (RG 90/2021), Formulario 120 v4, crédito fiscal del IVA, comprobantes, CDC y DV, feriados y días inhábiles. 14 dudas para el contador (D-F4-1 a D-F4-14). |
+| [`research/formato_registro_comprobantes.yaml`](research/formato_registro_comprobantes.yaml) y [`research/feriados_py.yaml`](research/feriados_py.yaml) | Columnas oficiales del archivo de importación (VENTAS, COMPRAS, INGRESOS, EGRESOS) y feriados de la Ley 7544/2025 con traslados y adicionales conocidos (estos, de fuente secundaria). Los feriados van empaquetados en `candidate_holidays.py` (copia idéntica). |
 | [`research/PLAN_DE_CUENTAS_PY.md`](research/PLAN_DE_CUENTAS_PY.md) | No hay un plan de cuentas oficial obligatorio. Explica el modelo de estados financieros de la RG 49/2014. |
 | [`research/plan_de_cuentas_propuesto.yaml`](research/plan_de_cuentas_propuesto.yaml) | Plan propuesto de 173 cuentas, basado en los códigos de la RG 49/2014. Es una propuesta para validar. |
 | [`research/DEPRECIACION_PY.md`](research/DEPRECIACION_PY.md) y [`research/categorias_activo_fijo_candidatas.yaml`](research/categorias_activo_fijo_candidatas.yaml) | Depreciación del activo fijo para el IRE: vidas útiles y valor residual (Decreto 3182, art. 31, texto del Decreto 6105/2021), método, inicio, venta y baja, revalúo, cuadro de depreciación de la RG 77/2020 y diferencias del IRE SIMPLE. 34 categorías propuestas, todas `pending`; 17 dudas para el contador (D-DEP-1 a D-DEP-17). |
@@ -22,7 +24,7 @@ Ninguna fila está verificada. Todas dependen de la revisión del contador y de 
 | Tema | Hallazgo (pendiente) | Confianza | Bloqueante para validar |
 |---|---|---|---|
 | IVA General (211) | Mensual, tasas 10% y 5%, vence según la terminación del RUC | oficial leída | Constancia de RUC |
-| Registro de comprobantes (955) | Mensual, calendario DJI del mes subsiguiente | oficial leída | Formato de importación no encontrado |
+| Registro de comprobantes (955) | Mensual, calendario DJI del mes subsiguiente; formato de importación de la RG 90/2021 encontrado (`TRIBUTACION_FASE4.md` §1) | oficial leída | D-F4-1 (separador) y D-F4-4 (notas de crédito): probar con un archivo de una o dos líneas |
 | IRE (700 o 701) | 10%. Régimen General anual, 4.º mes. SIMPLE anual, 3.er mes | oficial leída | **Duda D-1/D-2: ¿la EAS puede ir al SIMPLE?** |
 | Anticipos IRE (735/736) | 4 cuotas; promedio de 3 ejercicios; no aplican hasta ₲ 10 M | oficial leída | Duda D-4 (contradicción entre fuentes) |
 | Estados financieros (948) | IRE General, 4.º mes, modelo RG 49/2014 | oficial leída | Duda D-10 (¿SIMPLE?) |
@@ -32,15 +34,29 @@ Ninguna fila está verificada. Todas dependen de la revisión del contador y de 
 | IPS / MTESS | 9% + 16,5%; salario mínimo G. 3.044.000 desde el 01-07-2026; planillas anuales | oficial leída | Solo con empleados; vencimiento IPS no encontrado |
 | Patente municipal, beneficiarios finales | — | no encontrada | Investigar |
 
-Hasta que un contador marque `verified`, la aplicación sigue sin generar obligaciones ni cálculos tributarios (BR-TAX-01).
+Desde la fase 4 (D-082, BR-TAX-01 reformulada), una regla `pending` alimenta el calendario, los avisos y las estimaciones, siempre marcada «sin verificar» y nunca presentada como oficial; una `deprecated` no se usa. Sin perfil fiscal no hay obligaciones (BR-TAX-04).
 
 ## Principios
 
 1. **Fuente oficial obligatoria.** Una regla solo pasa a `verified` con una fuente de DNIT, MIC, IPS, MTESS o la legislación publicada (Ley, Decreto, Resolución General), con artículo y fecha de vigencia.
 2. **La memoria del modelo no es fuente.** Lo que Claude "sepa" sobre impuestos paraguayos se trata como hipótesis hasta verificarlo en la fuente.
-3. **Pendiente por defecto.** Lo no verificado se muestra como "pendiente de verificación profesional" y no genera obligaciones ni cálculos.
+3. **Pendiente por defecto.** Lo no verificado se muestra como «sin verificar» (pendiente de verificación profesional) en cada obligación, vencimiento y estimación que lo usa (D-082).
 4. **Estimación ≠ declaración.** El sistema calcula estimaciones internas para planificar; la declaración se presenta en el sistema de la DNIT (Marangatu) por una persona.
-5. **Datos, no código.** Las reglas se cargan como versiones en la base (`tax_rule_versions`), así se actualizan sin cambiar el código.
+5. **Datos, no código.** Las reglas se cargan como versiones en la base (`tax.rule_versions`), así se actualizan sin cambiar el código.
+
+## Qué hace la fase 4 con lo investigado
+
+| Tema | Cómo se usa | Duda abierta |
+|---|---|---|
+| Calendario (`CAL-PERPETUO-DJ`, `CAL-PERPETUO-DJI`) | Día por la terminación del RUC sin DV; si cae sábado, domingo o feriado cargado, pasa al siguiente hábil (D-086). Se avisa por la fecha fija sin correr (`remind_by`, D-098) y se explica el traslado «sin verificar» | D-F4-11 (sábados), D-F4-12 (feriados) |
+| Excepciones fechadas (`CAL-EXCEPCION-2026-11`, RG DNIT 60/2026) | Reemplazan la fecha de las determinativas de noviembre de 2026 por terminación; no tocan DJI ni retenciones | — |
+| Feriados (Ley 7544/2025) | Cargados `pending`; los traslados y adicionales de 2025 y 2026 son de fuente secundaria | D-F4-12 |
+| Registro de comprobantes (955) | Carga con timbrado, número, CDC (con su DV), RUC (DV módulo 11) o los otros tipos de identificación de la Tabla 3 (D-099); confirmar el talón bloquea el mes (D-089) | D-F4-3 (importar después del talón), D-F4-10 (RUC antiguo con letra) |
+| Archivo de importación | Borrador `format=marangatu` con las columnas oficiales; los electrónicos no van (D-096) | D-F4-1 (coma o punto y coma), D-F4-2 (IMPUTA IRE en el IRE General), D-F4-4 (lugar de las notas de crédito), D-F4-13 |
+| IVA (211) | Estimación por tasa con IVA incluido (importe/11 y /21, redondeo por comprobante, ±1 ₲ con el impreso) y borrador del Formulario 120 v4 sin IVA ni céntimos (D-090, D-097). Sin prorrateo: se avisa | D-F4-5, D-F4-6 (casillas de la EAS), D-F4-7 (redondeo), D-F4-8 (tipo de cambio), D-F4-9, D-F4-14 |
+| IRE (700/701) y estados financieros (948) | Solo vencimientos, según el cierre del ejercicio del perfil | D-1, D-2, D-10 |
+
+Las dudas D-F4-x viajan en la respuesta de la API (casillas del F120, vista previa del archivo de Marangatu).
 
 ## Ficha de cada regla
 
@@ -67,7 +83,7 @@ Hasta que un contador marque `verified`, la aplicación sigue sin generar obliga
 | Calendario de vencimientos | Pendiente | Calendario oficial DNIT |
 | Facturación electrónica: timbrado, establecimientos, puntos | En incorporación | Marangatu / e-Kuatia |
 
-## Fuentes a relevar en la fase 4
+## Fuentes oficiales de referencia
 
 - DNIT: <https://www.dnit.gov.py/> — impuestos, calendario de vencimientos, resoluciones generales, e-Kuatia.
 - Documentación técnica SIFEN: <https://www.dnit.gov.py/web/e-kuatia/documentacion-tecnica> (ya usada por el proyecto de facturación: Manual Técnico v150 y notas técnicas).

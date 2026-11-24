@@ -1,7 +1,9 @@
 """Migración 0003: sin diferencias con los modelos, reversible y con permisos (spec §5.11).
 
-`TRIGGERS` son los de la 0003; con la 0004 (`head`) se suman los de `TRIGGERS_0004`. La
-reversibilidad propia de la 0004 está en `test_accounting_migration_3b.py`.
+`TRIGGERS` son los de la 0003; con la 0004 se suman los de `TRIGGERS_0004` y con la 0005
+(`head`) el de `TRIGGERS_0005` (de la tributación, sobre `journal_entries`). La
+reversibilidad propia de la 0004 está en `test_accounting_migration_3b.py` y la de la 0005 en
+`test_tax_migration.py`.
 
 Corre sobre una base propia y desechable (`<base de pruebas>_mig`), como la de la 0002.
 """
@@ -53,6 +55,9 @@ TRIGGERS_0004 = {
     "recurring_templates_no_truncate",
     "recurring_generations_no_truncate",
 }
+
+# BR-TAX-10: un asiento de un movimiento no nace si un comprobante del movimiento ya tiene uno.
+TRIGGERS_0005 = {"journal_entries_voucher_guard"}
 
 
 def _role_permissions(engine: Engine) -> set[tuple[str, str]]:
@@ -109,7 +114,7 @@ def test_upgrade_check_downgrade_upgrade(migration_db: tuple[Config, Engine]) ->
     assert _role_permissions(engine) == expected
     # El catálogo de la base coincide con el del código (todas las fases).
     assert _catalog(engine) == {p.value: d for p, d in PERMISSION_DESCRIPTIONS.items()}
-    assert _accounting_triggers(engine) == TRIGGERS | TRIGGERS_0004
+    assert _accounting_triggers(engine) == TRIGGERS | TRIGGERS_0004 | TRIGGERS_0005
     assert _finance_columns(engine) == {
         "accounts.ledger_account_id",
         "categories.ledger_account_id",
@@ -156,4 +161,4 @@ def test_upgrade_check_downgrade_upgrade(migration_db: tuple[Config, Engine]) ->
     command.upgrade(cfg, "head")
     command.check(cfg)
     assert _role_permissions(engine) == expected
-    assert _accounting_triggers(engine) == TRIGGERS | TRIGGERS_0004
+    assert _accounting_triggers(engine) == TRIGGERS | TRIGGERS_0004 | TRIGGERS_0005

@@ -1,0 +1,535 @@
+"""Exportación del registro de comprobantes (D-093, D-096).
+
+`xlsx`: libro de compras y ventas con las columnas del formato oficial de la RG 90/2021
+(`docs/research/formato_registro_comprobantes.yaml`), más el IVA, si es electrónico y el CDC.
+Sin los anulados. Importes como números enteros (`#,##0`).
+
+`marangatu` (D-096): el archivo de **importación** de Marangatu según la Especificación
+Técnica para Importación, versión 1 (junio de 2021), transcripta en ese YAML (`pending`):
+- CSV en UTF-8, sin encabezado, dentro de un ZIP con el mismo nombre
+  `<RUC sin DV>_REG_<MMAAAA>_<id>` (id de hasta 5 posiciones, distinto en cada archivo), un
+  ZIP por lote de hasta 5.000 filas; si hay más de un lote, un ZIP que los contiene;
+- columnas de VENTAS (19) y COMPRAS (20) en el orden oficial; montos enteros con IVA
+  incluido, en guaraníes (los de otra moneda ya están convertidos, D-041);
+- **los electrónicos no se exportan**: Marangatu los trae solo (RG 90/2021, art. 6°). La
+  vista previa dice cuántos y cuáles se excluyeron, para imputarlos en Marangatu;
+- separador: la especificación dice coma y su ejemplo usa punto y coma (D-F4-1). Por
+  defecto, el punto y coma del ejemplo oficial; `separator=comma` usa la coma. En los textos
+  libres (nombres) se reemplaza el separador por un espacio y se avisa;
+- notas de crédito según la guía de registro manual (D-F4-4): la **recibida** va en VENTAS
+  y la **emitida** en COMPRAS; las notas de débito, en la sección de su comprobante;
+- «NO IMPUTA» (solo compras) va en `N`: la app no registra imputaciones parciales. Un
+  comprobante que no imputa a ninguna obligación no se exporta (Marangatu exige al menos
+  una) y se lista;
+- es un **borrador**: Marangatu valida hasta en 72 horas y puede rechazar líneas. Conviene
+  probar primero con uno o dos comprobantes (`limit`).
+"""
+
+import csv
+import io
+import uuid
+import zipfile
+from dataclasses import dataclass, field
+from datetime import date
+from decimal import Decimal
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session, aliased
+
+from app.core.errors import AppError
+from app.modules.accounting.exports import Column, Styled, workbook
+from app.modules.organizations.models import Organization
+from app.modules.tax import fast_xlsx, rules
+from app.modules.tax import profile as profiles
+from app.modules.tax.common import ZERO, month_end
+from app.modules.tax.models import Voucher
+
+IMPORT_RULE = "REG-COMPROB-IMPORTACION"
+MAX_ROWS = 5000
+REGISTER_SALES, REGISTER_PURCHASES = 1, 2
+VOUCHER_CODES = {"invoice": 109, "credit_note": 110, "debit_note": 111}
+IDENTIFICATION_CODES = {
+    "ruc": 11,
+    "identity_card": 12,
+    "passport": 13,
+    "foreign_id": 14,
+    "unnamed": 15,
+    "diplomatic": 16,
+    "tax_id": 17,
+}
+SEPARATORS = {"semicolon": ";", "comma": ","}
+MIN_DATE = date(2021, 1, 1)
+DRAFT_NOTICE = (
+    "Borrador del archivo de importación de Marangatu, sin verificar por un contador. "
+    "Marangatu lo valida hasta en 72 horas y puede rechazar líneas. Probá primero con un "
+    "archivo de uno o dos comprobantes (`limit`) y usá un identificador distinto en cada "
+    "archivo: Marangatu no acepta dos archivos con el mismo nombre para el mismo período."
+)
+DOUBTS = {
+    "D-F4-1": "Separador: la especificación dice coma y su ejemplo usa punto y coma.",
+    "D-F4-2": "La columna «IMPUTA IRE» aplica solo al IRE SIMPLE según las guías de la DNIT.",
+    "D-F4-4": "Notas de crédito: la recibida va en VENTAS y la emitida en COMPRAS (guía de "
+    "registro manual de 2022).",
+}
+
+
+def _yn(value: bool) -> str:
+    return "S" if value else "N"
+
+
+def _int(value: Decimal) -> str:
+    return str(int(value))
+
+
+def _section(voucher: Voucher) -> int:
+    is_sale = voucher.direction == "sale"
+    if voucher.voucher_type == "credit_note":
+        is_sale = not is_sale  # D-F4-4
+    return REGISTER_SALES if is_sale else REGISTER_PURCHASES
+
+
+@dataclass
+class MarangatuPlan:
+    organization_ruc: str
+    period: str  # MMAAAA
+    separator: str
+    rows: list[list[str]] = field(default_factory=list)
+    excluded_electronic: list[Voucher] = field(default_factory=list)
+    excluded_not_imputed: list[Voucher] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    rule: Any = None
+    total_rows: int = 0
+
+    def batches(self) -> list[list[list[str]]]:
+        return [self.rows[i : i + MAX_ROWS] for i in range(0, len(self.rows), MAX_ROWS)] or []
+
+    def names(self, first_id: int) -> list[str]:
+        return [
+            f"{self.organization_ruc}_REG_{self.period}_{first_id + i:05d}"
+            for i in range(len(self.batches()))
+        ]
+
+
+def _clean(text: str, separator: str, changed: list[str]) -> str:
+    cleaned = " ".join(text.replace(separator, " ").replace('"', " ").split())
+    if cleaned != " ".join(text.split()):
+        changed.append(text)
+    return cleaned
+
+
+def marangatu_plan(
+    db: Session,
+    organization_id: uuid.UUID,
+    year: int,
+    month: int,
+    *,
+    separator: str = "semicolon",
+    limit: int | None = None,
+) -> MarangatuPlan:
+    org = db.get(Organization, organization_id)
+    assert org is not None
+    if org.ruc is None:
+        raise AppError(
+            "ORGANIZATION_RUC_REQUIRED",
+            "Cargá el RUC de la organización: el nombre del archivo lo lleva.",
+            status_code=422,
+        )
+    first = date(year, month, 1)
+    rule = rules.require_rule(db, IMPORT_RULE, first)
+    sep = SEPARATORS[separator]
+    plan = MarangatuPlan(org.ruc, f"{month:02d}{year}", separator, rule=rule)
+    original = aliased(Voucher)
+    rows = db.execute(
+        select(Voucher, original.number, original.timbrado)
+        .outerjoin(original, original.id == Voucher.related_voucher_id)
+        .where(
+            Voucher.organization_id == organization_id,
+            Voucher.voided_at.is_(None),
+            Voucher.issued_on >= first,
+            Voucher.issued_on <= month_end(first),
+        )
+        .order_by(Voucher.issued_on, Voucher.direction, Voucher.number, Voucher.id)
+    ).all()
+    changed: list[str] = []
+    unnamed_numbers = 0
+    non_ruc_purchases = 0
+    old_cash = 0
+    ire_imputed = 0
+    for voucher, related_number, related_timbrado in rows:
+        if voucher.is_electronic:
+            plan.excluded_electronic.append(voucher)
+            continue
+        if not (voucher.imputes_vat or voucher.imputes_ire or voucher.imputes_irp):
+            plan.excluded_not_imputed.append(voucher)
+            continue
+        if limit is not None and len(plan.rows) >= limit:
+            continue
+        section = _section(voucher)
+        doc_type = voucher.counterparty_doc_type
+        number = voucher.counterparty_ruc or voucher.counterparty_document or ""
+        if doc_type == "unnamed":
+            unnamed_numbers += 1
+        if section == REGISTER_PURCHASES and doc_type != "ruc":
+            non_ruc_purchases += 1
+        if voucher.issued_on < MIN_DATE and voucher.condition == "cash":
+            old_cash += 1
+        ire_imputed += voucher.imputes_ire
+        total = voucher.taxed_10 + voucher.taxed_5 + voucher.exempt
+        row = [
+            str(section),
+            str(IDENTIFICATION_CODES[doc_type]),
+            _clean(number, sep, changed)[:20],
+            _clean(voucher.counterparty_name, sep, changed)[:250],
+            str(VOUCHER_CODES[voucher.voucher_type]),
+            f"{voucher.issued_on:%d/%m/%Y}",
+            voucher.timbrado,
+            voucher.number,
+            _int(voucher.taxed_10),
+            _int(voucher.taxed_5),
+            _int(voucher.exempt),
+            _int(total),
+            "1" if voucher.condition == "cash" else "2",
+            _yn(voucher.currency != "PYG"),
+            _yn(voucher.imputes_vat),
+            _yn(voucher.imputes_ire),
+            _yn(voucher.imputes_irp),
+        ]
+        if section == REGISTER_PURCHASES:
+            row.append("N")  # NO IMPUTA
+        row.extend([related_number or "", related_timbrado or ""])
+        plan.rows.append(row)
+    plan.total_rows = len(plan.rows)
+    if changed:
+        plan.warnings.append(
+            f"{len(changed)} nombre(s) o documento(s) tenían el separador, comillas o saltos "
+            "de línea: se "
+            "reemplazaron por espacios en el archivo."
+        )
+    if unnamed_numbers:
+        plan.warnings.append(
+            f"{unnamed_numbers} venta(s) «sin nombre» (identificación 15) van sin número de "
+            "identificación: la especificación lo pide y no dice qué número va. Revisalo antes "
+            "de importar."
+        )
+    if non_ruc_purchases:
+        plan.warnings.append(
+            f"{non_ruc_purchases} fila(s) en COMPRAS no son RUC (notas de crédito emitidas a "
+            "clientes sin RUC): la especificación pide RUC en compras. Ver la duda D-F4-4."
+        )
+    if old_cash:
+        plan.warnings.append(
+            f"{old_cash} comprobante(s) al contado anteriores al 01/01/2021: Marangatu no los "
+            "acepta."
+        )
+    history = profiles.versions(db, organization_id)
+    current = profiles.vigente(history, month_end(first))
+    if ire_imputed and current is not None and current.profile.ire_regime == "ire_general":
+        plan.warnings.append(
+            f"{ire_imputed} comprobante(s) imputan al IRE, pero el perfil es del IRE General: "
+            "según las guías de la DNIT esa imputación es solo del IRE SIMPLE (D-F4-2)."
+        )
+    if plan.excluded_electronic:
+        plan.warnings.append(
+            f"{len(plan.excluded_electronic)} comprobante(s) electrónicos no van en el archivo: "
+            "imputalos en Marangatu, en «Obtener Comprobantes Electrónicos y Virtuales»."
+        )
+    if plan.excluded_not_imputed:
+        plan.warnings.append(
+            f"{len(plan.excluded_not_imputed)} comprobante(s) no imputan a ninguna obligación y "
+            "no van en el archivo: Marangatu exige imputar cada uno al menos a una."
+        )
+    return plan
+
+
+def _csv(rows: list[list[str]], separator: str) -> bytes:
+    buffer = io.StringIO()
+    writer = csv.writer(
+        buffer, delimiter=SEPARATORS[separator], quoting=csv.QUOTE_NONE, lineterminator="\r\n"
+    )
+    writer.writerows(rows)
+    return buffer.getvalue().encode("utf-8")
+
+
+def _zip(entries: list[tuple[str, bytes]]) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, content in entries:
+            archive.writestr(name, content)
+    return buffer.getvalue()
+
+
+def marangatu_file(plan: MarangatuPlan, first_id: int) -> tuple[str, bytes]:
+    """(nombre del archivo, contenido) del ZIP a descargar."""
+    batches = plan.batches()
+    if not batches:
+        raise AppError(
+            "NOTHING_TO_EXPORT",
+            "No hay comprobantes para el archivo de importación en ese mes (los electrónicos "
+            "y los que no imputan no van).",
+            status_code=422,
+        )
+    names = plan.names(first_id)
+    if len(names[-1].rsplit("_", 1)[1]) > 5:
+        raise AppError(
+            "FILE_ID_TOO_LONG",
+            "El identificador del archivo tiene hasta 5 posiciones: usá un `first_id` menor.",
+            status_code=422,
+        )
+    inner = [
+        (f"{name}.zip", _zip([(f"{name}.csv", _csv(rows, plan.separator))]))
+        for name, rows in zip(names, batches, strict=True)
+    ]
+    if len(inner) == 1:
+        return inner[0]
+    return f"{plan.organization_ruc}_REG_{plan.period}_lotes.zip", _zip(inner)
+
+
+def excluded_out(voucher: Voucher) -> dict[str, Any]:
+    return {
+        "id": str(voucher.id),
+        "direction": voucher.direction,
+        "voucher_type": voucher.voucher_type,
+        "issued_on": voucher.issued_on.isoformat(),
+        "number": voucher.number,
+        "cdc": voucher.cdc,
+        "counterparty_name": voucher.counterparty_name,
+    }
+
+
+def marangatu_preview(plan: MarangatuPlan, first_id: int) -> dict[str, Any]:
+    names = plan.names(first_id)
+    return {
+        "is_draft": True,
+        "notice": DRAFT_NOTICE,
+        "format": "csv",
+        "encoding": "UTF-8",
+        "header": False,
+        "separator": plan.separator,
+        "rows": plan.total_rows,
+        "batches": [
+            {"name": f"{n}.zip", "rows": len(b)} for n, b in zip(names, plan.batches(), strict=True)
+        ],
+        "excluded_electronic": {
+            "count": len(plan.excluded_electronic),
+            "vouchers": [excluded_out(v) for v in plan.excluded_electronic],
+        },
+        "excluded_not_imputed": {
+            "count": len(plan.excluded_not_imputed),
+            "vouchers": [excluded_out(v) for v in plan.excluded_not_imputed],
+        },
+        "warnings": plan.warnings,
+        "doubts": [{"code": code, "text": text} for code, text in DOUBTS.items()],
+        "rules_applied": [rules.applied(plan.rule)],
+        "rule_status": plan.rule.validation_status,
+    }
+
+
+# ------------------------------------------------------------------ XLSX
+
+_TYPE_TEXT = {
+    "invoice": "Factura",
+    "credit_note": "Nota de crédito",
+    "debit_note": "Nota de débito",
+}
+_DOC_TEXT = {
+    "ruc": "RUC",
+    "identity_card": "Cédula de identidad",
+    "passport": "Pasaporte",
+    "foreign_id": "Cédula extranjera",
+    "unnamed": "Sin nombre",
+    "diplomatic": "Diplomático",
+    "tax_id": "Identificación tributaria",
+}
+
+
+def vouchers_xlsx(
+    db: Session,
+    organization_id: uuid.UUID,
+    *,
+    year: int,
+    month: int | None,
+    direction: str | None,
+) -> bytes:
+    first = date(year, month or 1, 1)
+    last = month_end(first) if month else date(year, 12, 31)
+    original = aliased(Voucher)
+    query = (
+        select(Voucher, original.number, original.timbrado)
+        .outerjoin(original, original.id == Voucher.related_voucher_id)
+        .where(
+            Voucher.organization_id == organization_id,
+            Voucher.voided_at.is_(None),
+            Voucher.issued_on >= first,
+            Voucher.issued_on <= last,
+        )
+        .order_by(Voucher.direction, Voucher.issued_on, Voucher.number, Voucher.id)
+    )
+    if direction:
+        query = query.where(Voucher.direction == direction)
+    columns = [
+        Column("Registro", width=10),
+        Column("Tipo de identificación", width=18),
+        Column("Número de identificación", width=16),
+        Column("DV", width=4),
+        Column("Nombre o razón social", width=34),
+        Column("Tipo de comprobante", width=16),
+        Column("Fecha de emisión", width=12),
+        Column("Timbrado", width=10),
+        Column("Número de comprobante", width=17),
+        Column("Gravado 10 % (IVA incluido)", money=True),
+        Column("Gravado 5 % (IVA incluido)", money=True),
+        Column("No gravado o exento", money=True),
+        Column("Total", money=True),
+        Column("IVA 10 %", money=True),
+        Column("IVA 5 %", money=True),
+        Column("Condición", width=9),
+        Column("Moneda", width=7),
+        Column("Imputa IVA", width=8),
+        Column("Imputa IRE", width=8),
+        Column("Imputa IRP-RSP", width=8),
+        Column("Comprobante asociado", width=17),
+        Column("Timbrado asociado", width=10),
+        Column("Electrónico", width=9),
+        Column("CDC", width=48),
+    ]
+    totals = {key: ZERO for key in ("t10", "t5", "ex", "tot", "v10", "v5")}
+
+    def data() -> Any:
+        for voucher, related_number, related_timbrado in db.execute(query):
+            total = voucher.taxed_10 + voucher.taxed_5 + voucher.exempt
+            for key, value in (
+                ("t10", voucher.taxed_10),
+                ("t5", voucher.taxed_5),
+                ("ex", voucher.exempt),
+                ("tot", total),
+                ("v10", voucher.vat_10),
+                ("v5", voucher.vat_5),
+            ):
+                totals[key] += value
+            yield [
+                "Venta" if voucher.direction == "sale" else "Compra",
+                _DOC_TEXT[voucher.counterparty_doc_type],
+                voucher.counterparty_ruc or voucher.counterparty_document or "",
+                voucher.counterparty_ruc_dv or "",
+                voucher.counterparty_name,
+                _TYPE_TEXT[voucher.voucher_type],
+                voucher.issued_on.strftime("%d/%m/%Y"),
+                voucher.timbrado,
+                voucher.number,
+                voucher.taxed_10,
+                voucher.taxed_5,
+                voucher.exempt,
+                total,
+                voucher.vat_10,
+                voucher.vat_5,
+                "Contado" if voucher.condition == "cash" else "Crédito",
+                voucher.currency,
+                _yn(voucher.imputes_vat),
+                _yn(voucher.imputes_ire),
+                _yn(voucher.imputes_irp),
+                related_number or "",
+                related_timbrado or "",
+                _yn(voucher.is_electronic),
+                voucher.cdc or "",
+            ]
+        yield Styled(
+            [
+                "Total",
+                *[None] * 8,
+                totals["t10"],
+                totals["t5"],
+                totals["ex"],
+                totals["tot"],
+                totals["v10"],
+                totals["v5"],
+            ]
+        )
+
+    which = {"purchase": "compras", "sale": "ventas"}.get(direction or "", "compras y ventas")
+    period = f"{month:02d}/{year}" if month else str(year)
+    return fast_xlsx.workbook(
+        db,
+        organization_id,
+        title=f"Registro de comprobantes de {which}",
+        subtitle=f"Período {period}",
+        chart_status="validated",
+        columns=columns,
+        rows=data(),
+        notes=[
+            "Importes en guaraníes con IVA incluido, como en el comprobante (RG 90/2021). "
+            "Sin los comprobantes anulados.",
+            "Para copiar o importar en Marangatu: no reemplaza la carga ni la confirmación "
+            "del registro.",
+        ],
+        sheet="Comprobantes",
+    )
+
+
+def vat_xlsx(db: Session, organization_id: uuid.UUID, estimate: dict[str, Any]) -> bytes:
+    """Estimación del IVA y borrador del Formulario 120, con los mismos totales del JSON."""
+
+    def amount(value: str | None) -> Decimal | None:
+        return None if value is None else Decimal(value)
+
+    rows: list[Any] = [Styled(["Estimación (rubros genéricos)", None, None])]
+    for label, block in (
+        ("Ventas", estimate["debit"]["sales"]),
+        ("Notas de crédito emitidas", estimate["debit"]["credit_notes"]),
+        ("Compras", estimate["credit"]["purchases"]),
+        ("Notas de crédito recibidas", estimate["credit"]["credit_notes"]),
+    ):
+        for rate, key in (("10 %", "rate_10"), ("5 %", "rate_5")):
+            rows.append([f"{label}: IVA {rate}", None, amount(block[key]["vat"])])
+        rows.append([f"{label}: exento", None, amount(block["exempt"])])
+    previous = estimate["previous_balance"]
+    rows.extend(
+        [
+            Styled(["Débito fiscal", None, amount(estimate["debit"]["total"])]),
+            Styled(["Crédito fiscal", None, amount(estimate["credit"]["total"])]),
+            [
+                f"Saldo a favor del mes anterior ({previous['source']})",
+                None,
+                amount(previous["amount"]),
+            ],
+            Styled(["Resultado: a ingresar", None, amount(estimate["result"]["to_pay"])]),
+            Styled(
+                ["Resultado: saldo a favor", None, amount(estimate["result"]["credit_balance"])]
+            ),
+            [],
+        ]
+    )
+    form = estimate["form_120"]
+    if form["available"]:
+        rows.append(Styled(["Borrador del Formulario 120 v4 (sin IVA y sin céntimos)", None, None]))
+        for box in form["boxes"]:
+            doubt = f" [{', '.join(box['doubts'])}]" if box["doubts"] else ""
+            label = f"Rubro {box['rubro']}: {box['label']}{doubt}"
+            rows.append([label, box["box"], amount(box["value"]), box["note"] or ""])
+    else:
+        rows.append([form["message"]])
+    notes = [
+        "Estimación, no declaración: copiá los valores a mano en Marangatu y revisalos.",
+        "Reglas aplicadas: "
+        + ", ".join(
+            f"{r['code']} v{r['version']} ({r['validation_status']})"
+            for r in estimate["rules_applied"]
+        ),
+        *[w["message"] for w in estimate["warnings"]],
+    ]
+    return workbook(
+        db,
+        organization_id,
+        title="Estimación del IVA y borrador del Formulario 120",
+        subtitle=f"Período {estimate['month']:02d}/{estimate['year']}",
+        chart_status="validated",
+        columns=[
+            Column("Concepto", width=70),
+            Column("Casilla", width=10),
+            Column("Importe", money=True, width=16),
+            Column("Nota", width=60),
+        ],
+        rows=rows,
+        notes=notes,
+        sheet="IVA",
+    )

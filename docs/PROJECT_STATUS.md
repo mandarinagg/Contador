@@ -12,7 +12,8 @@
 | 2 — Finanzas empresa/personal | 🟡 Backend y interfaz hechos; probado de punta a punta en navegador (ver tabla). Falta validarlo con extractos reales del propietario |
 | 3 — Contabilidad (núcleo) | ✅ Backend e interfaz hechos; probado de punta a punta en navegador (ver tabla). El plan de cuentas sigue sin validar por un contador |
 | 3B — Activos fijos, centros, recurrentes, XLSX | ✅ Backend e interfaz hechos; probado de punta a punta en navegador (ver tabla). Vidas útiles, residuales y cuadro fiscal `pending` hasta que los valide el contador; descarga de Excel en la app de escritorio sin probar |
-| 4 a 8 | ⏳ No iniciadas |
+| 4 — Tributación (núcleo) | 🟡 Backend hecho en la rama del agente (sin integrar; falta la interfaz). Las 39 reglas y los feriados quedan `pending` hasta que los verifique el contador; nada se presenta en Marangatu |
+| 5 a 8 | ⏳ No iniciadas |
 
 **Destino definido por el propietario:** una PC con Windows 11, uso en una sola máquina (D-016). Desarrollo en esta PC Linux; instaladores generados en GitHub Actions.
 
@@ -56,6 +57,7 @@
 | Exportar a Excel en la app de escritorio (Tauri) | 🟡 | ✅ | n/a | n/a | ✅ | sin probar | ✅ |
 
 ## Pruebas ejecutadas (2026-11-24)
+- Backend fase 4 (rama `worktree-agent-ada1a2c7521376704`): `pytest` 322 aprobadas (241 previas + 81 nuevas de tributación, incluidas las lentas) contra PostgreSQL 18, 6 min 30 s; ruff, `ruff format` y mypy estricto sin errores; `alembic check` limpio; `downgrade 0004` → `upgrade head` con datos OK y la bajada se niega con comprobantes u obligaciones presentadas. Los 18 triggers nuevos se quitaron uno por uno (dentro de la transacción de la prueba) y su prueba falló cada vez. Estimación de IVA de un mes con 20.000 comprobantes ~44 ms; XLSX del año ~1,3 s. Ejecutable PyInstaller (`packaging/contador-backend.spec`, compila en ~31 s) probado sobre una base vacía: migra hasta 0005 al arrancar, `POST /tax/rules/load-candidates` carga 39 reglas (y 7 excepciones), feriados 45, el perfil con 211 y 955 genera 28 obligaciones (la sincronización siguiente no crea ninguna), las alertas responden y el XLSX del registro abre.
 - Interfaz 3B: Vitest 124/124 (34 nuevas); `tsc -b` y build OK; oxlint con las mismas 2 advertencias; E2E 38/38 (10 + 8 + 11 de `contabilidad.spec.ts` + 9 de `contabilidad-3b.spec.ts`), dos corridas seguidas en verde (~75 s cada una).
 - Backend 3B (rama del agente): 239/239 pytest (4 `slow`); ruff, `ruff format` y mypy estricto sin errores; `alembic check` limpio; `downgrade 0003` → `upgrade head` con datos OK. Las 22 reglas nuevas de la base se quitaron una por una y su prueba falló cada vez. Backend empaquetado (PyInstaller, Linux): migró una base nueva a la 0004, cargó las 34 categorías y exportó XLSX. Corrida de 2.000 bienes ~0,4 s; XLSX del diario con 20.000 líneas ~2,1 s.
 - Interfaz de contabilidad: Vitest 90/90 (36 nuevas); `tsc -b` y build OK (414 kB JS inicial; contabilidad en fragmentos aparte); oxlint sin advertencias nuevas; E2E 27/27 (10 + 8 + 9 de `contabilidad.spec.ts`), dos corridas seguidas en verde (52 y 62 s). Cierre del ejercicio con refundición probado a mano.
@@ -91,7 +93,7 @@
 | P-10 | ~~Los asientos traen el id de quien creó/contabilizó, no el nombre~~ | **Resuelto**: en la API (`test_accounting_entry_user_names.py`) y en la interfaz (asiento y libro diario, sin leer `/users`) |
 
 ## Decisiones tomadas en esta sesión
-D-001 a D-034 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requiere tu confirmación.**
+D-001 a D-116 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requiere tu confirmación.**
 
 ## Información requerida del propietario
 1. **Confirmar D-007**: reutilizar el núcleo SIFEN como servicio Node (recomendado) en lugar de portarlo a Python.
@@ -106,12 +108,17 @@ D-001 a D-034 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 ## Para retomar (traspaso, 2026-11-24)
 **Estado de `main`:** fases 0, 1, 2 y 3 (núcleo + 3B) integradas, con backend, interfaz y E2E. Todo verde en Linux y en Windows. Pruebas: backend 241 (pytest contra PostgreSQL real, incluidas las `slow`), Vitest 124, E2E 38 (`flujos`, `finanzas`, `contabilidad`, `contabilidad-3b`). Migraciones hasta `0004_contabilidad_3b`.
 
+**Fase 4, backend (rama `worktree-agent-ada1a2c7521376704`, sin integrar):** migración `0005_tributacion`, módulo `backend/app/modules/tax/`, API `/api/v1/tax` (ver `API_SPECIFICATION.md`), 322 pruebas en verde (81 nuevas), ejecutable empaquetado probado. Investigación integrada como D-096 a D-099; decisiones propias D-100 a D-116.
+- Para integrar: revisar y fusionar la rama; después, la interfaz de la fase 4 (calendario con `remind_by` y `shift_explanation`, registro de comprobantes, vista previa de Marangatu, IVA y F120, avisos en Inicio).
+- **Antes de usarlo en serio** (contador): verificar las reglas en uso (`POST /tax/rules/{id}/verify`), el perfil fiscal con la constancia de RUC y los feriados; responder las dudas D-F4-1 a D-F4-14 de `docs/research/TRIBUTACION_FASE4.md`. Probar el archivo de Marangatu con uno o dos comprobantes (`limit=1`) antes de un mes entero.
+- Abierto: sábados como inhábiles (D-F4-11); redondeo del IVA por comprobante (D-F4-7); casillas 33/36/39 y 164 del F120 vacías hasta saber del prorrateo (D-F4-14); la nota de débito electrónica no controla el tipo del CDC (D-107).
+
 **Lo primero:**
 1. El propietario prueba el instalador NSIS (artefacto `contador-ai-windows-instalador` del último CI verde, vence a los 30 días) en su PC con Windows 11: P-8 (usuario con tildes o ñ) y P-12 (descarga de Excel dentro de la app).
-2. **Validación del contador** (bloquea usar la contabilidad "en serio"): plan de cuentas propuesto (173 cuentas, `docs/research/PLAN_DE_CUENTAS_PY.md`), las 34 categorías de activo fijo y sus vidas útiles y residuales, y las 17 dudas D-DEP de `docs/research/DEPRECIACION_PY.md`. En la app se marca con nombre y matrícula (`accounting.post`).
+2. **Validación del contador** (bloquea usar la contabilidad y la tributación "en serio"): plan de cuentas propuesto (173 cuentas, `docs/research/PLAN_DE_CUENTAS_PY.md`), las 34 categorías de activo fijo y sus vidas útiles y residuales, las 17 dudas D-DEP de `docs/research/DEPRECIACION_PY.md`, y en la fase 4 las reglas, el perfil y las dudas D-F4. En la app se marca con nombre y matrícula (`accounting.post`, `tax.verify`).
 
 **Después:**
-- **Fase 4 (tributación)**: necesita el perfil fiscal del propietario (régimen IRE general o SIMPLE, obligaciones en Marangatu, calendario según el dígito del RUC). Sin presentación automática (regla 15 del prompt maestro): recordatorios, registro de comprobantes y borradores que el usuario confirma en Marangatu.
+- **Fase 4 (tributación)**: integrar el backend y hacer la interfaz. Necesita el perfil fiscal del propietario (régimen IRE general o SIMPLE, obligaciones en Marangatu, cierre del ejercicio, RUC). Sin presentación automática (regla 15 del prompt maestro): recordatorios, registro de comprobantes y borradores que el usuario confirma en Marangatu.
 - Fase 2: probar el importador con extractos reales anonimizados del propietario y guardar un mapeo por banco.
 - CI de Windows: si algo falla, el paso "Lanzador — registros si falló" muestra cada comando (`$ ...`) y su resultado (`→`); la prueba del instalador vuelca `%LOCALAPPDATA%\ContadorAI\logs` y su paso 4b informa si el cierre cayó durante el arranque. `gh run view --log` a veces sale vacío: usar `gh api repos/mandarinagg/Contador/actions/jobs/<id>/logs`.
 - Sigue abierto, decisión del propietario: tabla de totales mensuales para el resumen (solo si en la PC real se nota lento).

@@ -12,6 +12,8 @@
 - En otra moneda, la persona escribe la cotización (D-036). Si el importe en guaraníes no
   da entero, no se redondea en silencio: se pide `amount_pyg` explícito (el entero de
   abajo o el de arriba del producto exacto).
+- Si un comprobante vinculado al movimiento ya tiene asiento vivo, el movimiento no propone
+  otro (409 `TRANSACTION_VOUCHER_HAS_ENTRY`, D-091, BR-TAX-10).
 """
 
 import uuid
@@ -29,6 +31,7 @@ from app.modules.accounting.balances import ZERO
 from app.modules.accounting.common import pyg_amount
 from app.modules.accounting.models import JournalEntry, LedgerAccount
 from app.modules.finance.models import Account, Category, FinancialContext, Transaction
+from app.modules.tax import links as tax_links
 
 BANK_KINDS = ("asset", "liability")
 
@@ -87,7 +90,7 @@ def check_ledger_assignment(
         )
 
 
-def _business_transaction(
+def business_transaction(
     db: Session, organization_id: uuid.UUID, transaction_id: uuid.UUID
 ) -> Transaction:
     tx = db.scalar(
@@ -177,9 +180,11 @@ def propose_from_transaction(
     fx_rate: Decimal | None,
     amount_pyg: Decimal | None,
 ) -> JournalEntry:
-    tx = _business_transaction(db, organization_id, transaction_id)
+    tx = business_transaction(db, organization_id, transaction_id)
     if tx.voided_at is not None:
         raise Conflict("TRANSACTION_VOIDED", "El movimiento está anulado.")
+    # BR-TAX-10: si un comprobante del movimiento ya tiene asiento vivo, no hay otro.
+    tax_links.check_transaction_free(db, tx.id)
     live = db.execute(
         select(JournalEntry.id, JournalEntry.number, JournalEntry.status).where(
             JournalEntry.source_transaction_id == tx.id,
