@@ -16,6 +16,7 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 ### Corregido — Lanzador en Windows (2026-11-24)
 - La prueba de copias (`tests/backup.rs`) arrancaba `pg_ctl` con `Command::output`: en Windows `postgres` hereda los handles del pipe y la prueba esperaba para siempre. Ahora la salida va a un archivo, igual que en `stack.rs`.
 - CI: límites de tiempo en el job `windows` y registros del lanzador cuando la prueba falla o se cuelga.
+- Con la app instalada, `initdb` no arrancaba porque Tauri entrega la carpeta de recursos como `\\?\C:\...` y `initdb` no encuentra `postgres.exe` con ese prefijo. El lanzador ahora lo quita (`dunce`) para las herramientas de PostgreSQL y el backend. `tests/stack.rs` usa rutas `canonicalize` para cubrir este caso en Windows.
 
 ### Agregado — Fase 2, interfaz de finanzas (2026-11-24)
 - Menú **Finanzas** (Resumen, Movimientos, Cuentas, Importar extracto, Categorías, Contrapartes) y selector de contexto permanente: pestañas Empresa / Personal ("solo vos") / Consolidado, franja que dice dónde se opera y si es solo lectura, y botón para crear el espacio personal. El contexto va en la URL (`/finanzas/:cid/...`); `localStorage` solo recuerda cuál abrir (`contador.finanzas.contexto.<usuario>`).

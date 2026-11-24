@@ -55,7 +55,16 @@ impl StackConfig {
 
 /// Ruta de una herramienta de PostgreSQL dentro de su carpeta `bin` (agrega `.exe` en Windows).
 pub(crate) fn pg_tool(pg_bin: &Path, name: &str) -> PathBuf {
-    pg_bin.join(format!("{name}{}", std::env::consts::EXE_SUFFIX))
+    plain_path(pg_bin).join(format!("{name}{}", std::env::consts::EXE_SUFFIX))
+}
+
+/// Ruta sin el prefijo `\\?\` de Windows cuando no hace falta (en Linux, la misma ruta).
+///
+/// Tauri entrega la carpeta de recursos de la app instalada como `\\?\C:\...`. `initdb` y
+/// `pg_ctl` buscan `postgres.exe` junto a su propia ruta y no entienden ese prefijo: fallaban
+/// con "program \"postgres\" is needed by initdb but was not found".
+pub(crate) fn plain_path(path: &Path) -> PathBuf {
+    dunce::simplified(path).to_path_buf()
 }
 
 #[derive(Debug)]
@@ -324,7 +333,7 @@ fn spawn_backend(config: &StackConfig, password: &str, log: &Path) -> Result<Chi
     let err = out
         .try_clone()
         .map_err(|e| StackError::new(format!("No se pudo abrir {}: {e}", log.display())))?;
-    hidden(&mut Command::new(&config.backend_exe))
+    hidden(&mut Command::new(plain_path(&config.backend_exe)))
         .env("CONTADOR_ENV", "production")
         .env(
             "CONTADOR_DATABASE_URL",
@@ -534,5 +543,30 @@ mod windows_job {
             // SAFETY: handle propio, cerrado una sola vez.
             unsafe { CloseHandle(self.0) };
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pg_tool_joins_the_tool_name() {
+        let tool = pg_tool(Path::new("pgsql/bin"), "initdb");
+        assert_eq!(
+            tool,
+            Path::new("pgsql/bin").join(format!("initdb{}", std::env::consts::EXE_SUFFIX))
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn verbatim_prefix_is_removed_for_postgres_tools() {
+        let tool = pg_tool(Path::new(r"\\?\C:\Program Files\Contador AI\pgsql\bin"), "initdb");
+        assert_eq!(
+            tool,
+            Path::new(r"C:\Program Files\Contador AI\pgsql\bin\initdb.exe")
+        );
+        assert_eq!(plain_path(Path::new(r"\\?\C:\a\b.exe")), Path::new(r"C:\a\b.exe"));
     }
 }

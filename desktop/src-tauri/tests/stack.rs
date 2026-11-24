@@ -19,8 +19,12 @@ const PG_PORT: u16 = 55441;
 const API_PORT: u16 = 8791;
 
 fn config(data_dir: PathBuf) -> StackConfig {
+    // `canonicalize` devuelve en Windows rutas `\\?\C:\...`, como las que Tauri da a la app
+    // instalada: así la prueba cubre que el lanzador las acepte (initdb no las entiende).
     let var = |name: &str| {
-        PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("definir {name} (ver encabezado)")))
+        let path =
+            PathBuf::from(std::env::var(name).unwrap_or_else(|_| panic!("definir {name} (ver encabezado)")));
+        std::fs::canonicalize(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
     };
     StackConfig {
         pg_bin: var("CONTADOR_TEST_PGSQL_BIN"),

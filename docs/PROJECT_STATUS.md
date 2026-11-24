@@ -78,7 +78,11 @@ D-001 a D-034 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 **Estado de `main`:** fases 0-1 completas; fase 2 (finanzas) integrada, con backend, interfaz y rendimiento. Todo verde en Linux. No quedan worktrees ni agentes abiertos.
 
 **Lo primero:**
-1. **CI de Windows:** ver el resultado del job `windows` del último push. El lanzador se colgaba al arrancar PostgreSQL porque `Command::output` esperaba un pipe que `postgres` hereda y nunca cierra. Ya se corrigió en `stack.rs` (`97be887`) y en `tests/backup.rs` (`2c85642`). Si vuelve a fallar, el paso "Lanzador — registros si falló" muestra cada comando ejecutado (`$ ...`) y su resultado (`→`): buscar el último `$` sin `→`.
+1. **CI de Windows:** ver el resultado del job `windows` del último push.
+   - Lanzador y copias ya pasaban en Windows real desde `2c85642`. El cuelgue venía de que `Command::output` esperaba un pipe que `postgres` hereda; se corrigió en `stack.rs` y `tests/backup.rs`.
+   - Faltaba la prueba del instalador: `initdb` fallaba con la ruta `\\?\` que Tauri da a la app instalada. Se corrigió con `stack::plain_path`.
+   - Si algo vuelve a fallar, el paso "Lanzador — registros si falló" muestra cada comando ejecutado (`$ ...`) y su resultado (`→`). En la prueba del instalador, el script vuelca `%LOCALAPPDATA%\\ContadorAI\\logs`.
+   - `gh run view --log` a veces sale vacío; usar `gh api repos/mandarinagg/Contador/actions/jobs/<id>/logs`.
 2. Con Windows en verde, el propietario prueba el instalador NSIS (artefacto del CI) en su PC con Windows 11 (P-8: usuario con tildes o ñ).
 
 **Después:**
