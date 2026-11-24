@@ -139,6 +139,9 @@ jobs:
     # lanzador (Rust) e instalador NSIS, probado de punta a punta en Windows real.
     needs: test
     runs-on: windows-latest
+    # Un cuelgue (p. ej. esperar la salida de un proceso que no termina) no debe ocupar
+    # el runner 6 horas: cada paso largo tiene su propio límite.
+    timeout-minutes: 90
     defaults:
       run:
         shell: pwsh
@@ -203,6 +206,7 @@ jobs:
           cargo clippy --all-targets -- -D warnings
 
       - name: Lanzador — prueba con binarios reales y Administrador de credenciales
+        timeout-minutes: 15
         working-directory: desktop/src-tauri
         run: |
           $env:CONTADOR_TEST_PGSQL_BIN = Resolve-Path ..\..\build\pgsql\bin
@@ -225,6 +229,7 @@ jobs:
           retention-days: 30
 
       - name: Prueba del instalador (instalar, abrir, cerrar, reabrir, desinstalar)
+        timeout-minutes: 20
         run: |
           $installer = (Get-ChildItem desktop\src-tauri\target\release\bundle\nsis\*.exe).FullName
           Start-Process $installer -ArgumentList "/S" -Wait

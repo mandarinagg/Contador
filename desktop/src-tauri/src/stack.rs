@@ -409,24 +409,36 @@ fn port_in_use(port: u16) -> bool {
 }
 
 /// Ejecuta una herramienta y agrega su salida al registro; error si no termina bien.
+///
+/// La salida va **directo al archivo** de registro, no a un pipe: `pg_ctl start` deja en
+/// marcha a `postgres`, que en Windows hereda los handles de salida; con un pipe, esperar a
+/// que se cierre (como hace `Command::output`) no terminaría nunca.
 pub(crate) fn run_logged(cmd: &mut Command, log: &Path) -> std::result::Result<(), ()> {
-    let output = hidden(cmd).stdin(Stdio::null()).output().map_err(|e| {
-        append(
-            log,
-            &format!("No se pudo ejecutar {:?}: {e}\n", cmd.get_program()),
-        );
-    })?;
     append(
         log,
         &format!(
-            "$ {:?} {:?}\n{}{}\n",
+            "$ {:?} {:?}\n",
             cmd.get_program(),
-            cmd.get_args().collect::<Vec<_>>(),
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
+            cmd.get_args().collect::<Vec<_>>()
         ),
     );
-    if output.status.success() { Ok(()) } else { Err(()) }
+    let open = || fs::OpenOptions::new().create(true).append(true).open(log);
+    let (Ok(out), Ok(err)) = (open(), open()) else {
+        return Err(());
+    };
+    let status = hidden(cmd)
+        .stdin(Stdio::null())
+        .stdout(out)
+        .stderr(err)
+        .status()
+        .map_err(|e| {
+            append(
+                log,
+                &format!("No se pudo ejecutar {:?}: {e}\n", cmd.get_program()),
+            );
+        })?;
+    append(log, &format!("→ {status}\n"));
+    if status.success() { Ok(()) } else { Err(()) }
 }
 
 pub(crate) fn append(log: &Path, text: &str) {
