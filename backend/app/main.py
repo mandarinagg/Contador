@@ -18,6 +18,7 @@ from app.modules.finance.router import router as finance_router
 from app.modules.identity.router import auth_router, users_router
 from app.modules.organizations.router import router as organization_router
 from app.modules.system.router import router as system_router
+from app.modules.tax.router import router as tax_router
 
 logger = logging.getLogger("contador.http")
 
@@ -88,6 +89,7 @@ def create_app() -> FastAPI:
         finance_router,
         accounting_router,
         accounting_3b_router,
+        tax_router,
     ):
         api.include_router(router)
     app.include_router(api)

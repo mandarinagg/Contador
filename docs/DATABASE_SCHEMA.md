@@ -624,16 +624,157 @@ Medido en la prueba `slow` (PostgreSQL 18 en Docker, mediana de 5 tras 1 de cale
 ### Datos y bajada (migración `0004`)
 Sin datos iniciales: las categorías se cargan por la API. La bajada falla con un mensaje claro si hay asientos `depreciation`, `disposal` o `recurring`, o líneas con centro de costos (D-080); si no, borra las tablas y columnas de la 3B, restaura `journal_entries_guard` y `journal_lines_guard` de la 0003 y el `CHECK` de `kind`, y borra `uq_periods_id_organization_id`.
 
-## Modelo objetivo (fases 4 a 7)
+## Implementado (migración `0005` — tributación, núcleo)
 
-Se implementa por fases; cada tabla nace con su migración, su prueba y su pantalla. Lo que sigue es el diseño de referencia y **se revisará** en cada fase. Finanzas (fase 2) y el núcleo contable (fase 3) ya están implementados (secciones anteriores): en el diagrama aparecen solo como punto de enganche.
+Esquema `tax`. Especificación: `docs/specs/FASE4_TRIBUTACION.md` (D-082 a D-095; investigación D-096 a D-099; implementación D-100 a D-116). Las reglas, los feriados y las excepciones son **globales** (sin `organization_id`: la ley es la misma para todos); el resto lleva `organization_id`. Importes `NUMERIC(18,2)` en guaraníes enteros; `fx_rate NUMERIC(18,6)`. Función `tax.ruc_check_digit(text)` (módulo 11, la misma de `organizations/ruc.py`, portada del proyecto de facturación) usada por los `CHECK`.
 
 ```mermaid
 erDiagram
-    organizations ||--o| tax_profiles : ""
-    tax_rules ||--|{ tax_rule_versions : "versionado"
-    tax_rule_versions ||--o{ tax_obligations : "regla aplicada"
-    tax_obligations ||--o{ tax_payments : ""
+    tax_rule_versions ||--o{ tax_due_date_exceptions : "rule_version_id (CAL-EXCEPCION-*)"
+    tax_rule_versions ||--o{ tax_obligations : "rule_version_id, calendar_rule_version_id"
+    tax_rule_versions ||--o{ tax_vouchers : "vat_rule_version_id"
+    tax_due_date_exceptions |o--o{ tax_obligations : "exception_id"
+    core_organizations ||--o{ tax_profiles : "versiones por valid_from"
+    tax_profiles ||--o{ tax_profile_obligations : "(profile_id, organization_id)"
+    core_organizations ||--o{ tax_obligations : "una por código y período"
+    finance_transactions |o--o{ tax_obligations : "pago (contexto business)"
+    core_organizations ||--o{ tax_vouchers : ""
+    finance_contexts ||--o{ tax_vouchers : "(context_id, organization_id, context_kind=business)"
+    tax_vouchers |o--o{ tax_vouchers : "related_voucher_id (notas, misma dirección)"
+    finance_transactions |o--o{ tax_vouchers : "(transaction_id, context_id)"
+    finance_counterparties |o--o{ tax_vouchers : "(finance_counterparty_id, context_id)"
+    accounting_journal_entries |o--o{ tax_vouchers : "(journal_entry_id, organization_id)"
+    core_organizations ||--o| tax_settings : ""
+    accounting_ledger_accounts |o--o{ tax_settings : "IVA CF/DF 10 y 5, proveedores, clientes"
+    tax_holidays }o..o{ tax_obligations : "corren due_date (sin FK)"
+
+    tax_rule_versions {
+        uuid id PK
+        varchar code "ej. IVA-GENERAL-TASAS"
+        int version "UNIQUE (code, version)"
+        jsonb parameters "validados por esquema en el servicio"
+        date valid_from "NULL: nunca rige"
+        date valid_to
+        varchar validation_status "pending · verified · deprecated"
+        varchar reviewed_by_name "y reviewed_reference (matrícula)"
+    }
+    tax_holidays {
+        uuid id PK
+        date day UK
+        varchar name
+        varchar source_url "o legal_reference"
+        varchar validation_status "pending · verified"
+        varchar origin "candidate · user"
+    }
+    tax_due_date_exceptions {
+        uuid id PK
+        varchar obligation_code "o obligation_group"
+        date due_month "día 1"
+        smallint_array ruc_digits "vacío: todas"
+        date new_due_date
+        varchar origin "candidate · user"
+        bool is_active
+    }
+    tax_profiles {
+        uuid id PK
+        uuid organization_id FK
+        date valid_from "UNIQUE por organización"
+        varchar ire_regime "ire_general · ire_simple · unknown"
+        smallint fiscal_close_month
+        bool vat_taxpayer
+        varchar origin "declared · verified"
+        varchar verified_license
+    }
+    tax_profile_obligations {
+        uuid id PK
+        uuid profile_id FK
+        varchar code "código DNIT (211, 955, 700…)"
+        date registered_on
+    }
+    tax_obligations {
+        uuid id PK
+        uuid organization_id FK
+        varchar code "regla (IVA-GENERAL-LIQUIDACION…)"
+        date period_start "UNIQUE (org, code, period_start)"
+        date nominal_due_date "fecha fija del calendario"
+        date due_date "corrida o de la excepción"
+        date remind_by "GENERATED LEAST(nominal, due) (D-098)"
+        varchar status "pending · filed · paid · not_applicable"
+        numeric calculated_amount
+        numeric declared_amount "y declared_credit_balance"
+        uuid payment_transaction_id FK
+    }
+    tax_vouchers {
+        uuid id PK
+        uuid organization_id FK
+        uuid context_id FK "business"
+        varchar direction "purchase · sale"
+        varchar voucher_type "invoice · credit_note · debit_note"
+        char cdc "44, con DV (electrónicos)"
+        char timbrado "8"
+        varchar number "###-###-#######"
+        varchar counterparty_doc_type "Tabla 3 (D-099)"
+        varchar counterparty_ruc "sin DV; letra final: antiguo"
+        numeric taxed_10 "IVA incluido; también taxed_5, exempt"
+        numeric vat_10 "también vat_5"
+        bool imputes_vat "también imputes_ire, imputes_irp"
+        uuid journal_entry_id FK
+        timestamptz voided_at
+    }
+    tax_settings {
+        uuid id PK
+        uuid organization_id UK
+        uuid vat_credit_10_account_id FK
+        smallint alert_days "1 a 60, por defecto 10"
+    }
+```
+
+### Restricciones (0005)
+| Restricción | Qué impide |
+|---|---|
+| `uq_rule_versions_code_version`, `ex_rule_versions_no_overlap` (`btree_gist`, por `code` y `daterange(valid_from, valid_to)`, sin las `deprecated`) | Dos versiones con el mismo número; dos vigencias que se pisan (D-084) |
+| `ck_rule_versions_*` (`code_format`, `status_valid`, `review_complete`, `deprecation_complete`, `parameters_object`, `validity_ordered`, `confidence_valid`, `version_positive`) | Estado fuera de catálogo; `verified` sin nombre, matrícula y fecha; `deprecated` sin motivo; parámetros que no son un objeto; vigencia invertida |
+| `uq_holidays_day`, `ck_holidays_source_present`, `ck_holidays_status_valid`, `ck_holidays_origin_valid` | Dos feriados el mismo día; feriado sin fuente |
+| `ck_due_date_exceptions_target_one`, `_due_month_first_day`, `_ruc_digits_valid`, `_candidate_has_rule`, `uq_due_date_exceptions_rule_date` | Excepción sin destino o con dos; mes que no empieza el 1; terminaciones fuera de 0 a 9; candidata sin su regla; dos excepciones de la misma regla y fecha |
+| `uq_profiles_organization_id_valid_from`, `ck_profiles_verification_complete`, `ck_profiles_close_month_range`, `uq_profile_obligations_profile_id_code`, `ck_profile_obligations_code_digits` | Dos versiones el mismo día; verificado sin nombre, matrícula y constancia; una obligación dos veces |
+| `uq_obligations_organization_id_code_period_start` | Duplicar una obligación (la sincronización concurrente lo respeta con un candado) |
+| `ck_obligations_*` (`status_valid`, `filing_complete`, `declared_when_filed`, `declared_balance_when_filed`, `payment_complete`, `payment_tx_when_paid`, `payment_business_only`, `not_applicable_has_reason`, `auto_when_not_applicable`, `amounts_non_negative`, `reopen_reason_length`, `period_ordered`) y FK compuesta del pago `(payment_transaction_id, payment_context_id) → finance.transactions` con `payment_context_kind = 'business'` | Estados incoherentes; pagar con un movimiento personal |
+| `uq_vouchers_purchase_live`, `uq_vouchers_sale_live` (parciales, solo vivos) | Duplicados (BR-TAX-07, D-104) |
+| `ck_vouchers_timbrado_format`, `_number_format`, `_cdc_format` (44 dígitos con DV válido), `_cdc_when_electronic`, `_ruc_check_digit` (DV módulo 11 en un RUC numérico, o RUC antiguo con letra y sin DV, D-099), `_ruc_when_ruc`, `_dv_with_ruc`, `_document_when_document`, `_doc_type_valid`, `_purchase_has_ruc` | Formatos inválidos (BR-TAX-09) |
+| `ck_vouchers_vat_consistent`, `_amounts_non_negative`, `_total_positive`, `_fx_complete`, `_fx_positive`, `_currency_valid` | IVA con su base en cero, importes negativos, comprobante en cero, moneda extranjera sin cotización |
+| `ck_vouchers_note_has_original`, `_not_self`, FK `(related_voucher_id, organization_id, direction)` | Nota sin su original, de otra organización o de otra dirección |
+| `ck_vouchers_business_only` y FK compuestas `(context_id, organization_id)`, `(context_id, context_kind)`, `(transaction_id, context_id)`, `(finance_counterparty_id, context_id)`, `(journal_entry_id, organization_id)` | Vincular algo del contexto personal o de otra organización (D-088) |
+| `ck_vouchers_void_complete`, `_void_reason_length` | Anulación sin fecha, autor o motivo |
+| `ix_obligations_org_due`, `ix_obligations_org_remind`, `ix_vouchers_org_issued`, `ix_vouchers_transaction`, `ix_vouchers_related`, `ix_vouchers_journal_entry`, `ix_due_date_exceptions_due_month` | Índices: calendario y avisos por fecha; comprobantes por mes; vínculos |
+
+### Triggers (0005)
+`SQLSTATE 23000` con el nombre estable en `CONSTRAINT`, como en contabilidad; el servicio traduce los que pueden llegar desde la API (`accounting/common.py` para el de `journal_entries`). Se verificó que la prueba de cada uno de los 18 triggers falla si se lo quita (dentro de la transacción de la prueba).
+
+| Trigger (tabla) | Nombre del rechazo | Qué impide |
+|---|---|---|
+| `rule_versions_guard` | `trg_rule_versions_born_pending`, `_immutable`, `_invalid_transition` | Nacer verificada; cambiar el contenido; transiciones fuera de pending → verified → deprecated (y pending → deprecated) |
+| `obligations_guard` | `trg_obligations_born_pending`, `_identity_fixed`, `_invalid_transition`, `_filed_fixed` | Nacer en otro estado; cambiar organización, código o período; transiciones inválidas (`not_applicable → pending` solo si la marcó el sistema, D-103); que una presentada o pagada cambie vencimiento, regla, excepción, estimado o lo presentado |
+| `profiles_guard` | `trg_profiles_born_declared`, `_ruc_required`, `_verified_final` | Nacer verificado; perfil sin RUC en la organización (BR-TAX-04); cambiar un perfil verificado |
+| `profile_obligations_guard` | `trg_profile_obligations_verified_final` | Cambiar las obligaciones de un perfil verificado |
+| `holidays_guard` | `trg_holidays_in_use` | Borrar o mover un feriado que corrió el vencimiento de una obligación presentada (D-114) |
+| `vouchers_guard` | `trg_vouchers_voided_final`, `_identity_fixed`, `_note_mismatch`, `_transaction_has_entry` | Cambiar un anulado; cambiar organización, contexto o dirección; nota de otra contraparte o de algo que no es factura; vincular un comprobante con asiento a un movimiento que ya tiene otro (BR-TAX-10) |
+| `vouchers_period_lock` | `trg_vouchers_period_locked` | Crear, cambiar o anular un comprobante de un mes con el registro confirmado, mirando el mes de origen y el de destino; solo cambia `journal_entry_id` (D-089, D-106) |
+| `journal_entries_voucher_guard` (`accounting.journal_entries`, BEFORE INSERT) | `trg_journal_entries_voucher_has_entry` | Un asiento nuevo de un movimiento cuyo comprobante ya tiene asiento vivo (BR-TAX-10) |
+| `*_no_delete`, `*_no_truncate` (reglas, obligaciones, perfiles, comprobantes, excepciones; `reject_delete()`) | `trg_<tabla>_no_delete` | Borrar o `TRUNCATE` |
+
+### Rendimiento (0005)
+Prueba `slow` con 20.000 comprobantes en un año (mediana de 5 tras 1 de calentamiento, PostgreSQL 18 en Docker): estimación de IVA de un mes ~44 ms (requisito < 300 ms; una consulta agrupada por mes); XLSX del año ~1,3 s (requisito < 3 s; escritor propio, D-100).
+
+### Datos y bajada (migración `0005`)
+Datos iniciales: los permisos `tax.read`, `tax.manage` y `tax.verify` y sus roles (el Administrador sin `tax.verify`). Las reglas (39) y los feriados se cargan por la API desde las copias empaquetadas. La bajada falla con un mensaje claro si hay comprobantes (aunque estén anulados) u obligaciones presentadas o pagadas; si no, borra el esquema `tax`, el trigger de `journal_entries` y los permisos `tax.*`.
+
+## Modelo objetivo (fases 5 a 7)
+
+Se implementa por fases; cada tabla nace con su migración, su prueba y su pantalla. Lo que sigue es el diseño de referencia y **se revisará** en cada fase. Finanzas (fase 2), contabilidad (fase 3) y el núcleo tributario (fase 4) ya están implementados (secciones anteriores): en el diagrama aparecen solo como punto de enganche.
+
+```mermaid
+erDiagram
+    tax_obligations ||--o{ tax_payments : "pagos parciales (pendiente)"
     billing_documents ||--o{ accounting_journal_entries : "origen"
     billing_documents ||--o{ tax_obligations : "base imponible"
     documents ||--o{ document_versions : ""
@@ -643,6 +784,6 @@ erDiagram
 ### Decisiones de modelado clave
 - **Contexto financiero**: implementado en la fase 2 como `finance.contexts`. Los asientos de la fase 3 referencian el contexto `business` con claves foráneas compuestas (D-035, D-044). Lo consolidado es una **vista**, nunca datos mezclados.
 - **Asientos**: implementados en la fase 3 (`accounting.journal_entries`, ver arriba). Pendiente para fases siguientes: conciliación bancaria y el vínculo con documentos y facturas.
-- **Reglas tributarias**: `tax_rule_versions` con `valid_from`, `valid_to`, `source_url`, `legal_reference`, `published_at`, `consulted_at`, `validation_status ∈ {pending, verified, deprecated}`, `reviewed_by`. Las obligaciones guardan la versión aplicada. Se cargan como datos, no como código.
+- **Reglas tributarias**: implementadas en la fase 4 como `tax.rule_versions` (ver arriba), globales, versionadas y con vigencia sin solapes; las obligaciones y los comprobantes guardan la versión aplicada. Se cargan como datos, no como código.
 - **Facturación**: esquema `billing` propio del servicio SIFEN (fase 5), referenciado desde contabilidad y tributación por `billing_documents.id`.
 - **IA**: `ai.ai_interactions`, `ai.ai_tool_executions` (entrada, salida, duración, usuario) y `ai.ai_approvals` (borrador → aprobado/rechazado por un humano).

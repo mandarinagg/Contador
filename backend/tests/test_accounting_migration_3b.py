@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -57,6 +58,10 @@ def _tables(engine: Engine) -> set[str]:
             )
         )
         return {name for (name,) in rows}
+
+
+def _head(cfg: Config) -> str:
+    return str(ScriptDirectory.from_config(cfg).get_current_head())
 
 
 def _version(engine: Engine) -> str:
@@ -173,7 +178,7 @@ def test_downgrade_refuses_to_lose_3b_entries(
     entry = ok(api.post(f"{ACC}/entries", json=body, headers=headers), 201)
     with pytest.raises(RuntimeError, match=r"hay 0 asientos .* y 1 líneas"):
         command.downgrade(cfg, "0003")
-    assert _version(engine) == "0004"
+    assert _version(engine) == _head(cfg)  # la bajada entera se revierte
     ok(api.post(f"{ACC}/entries/{entry['id']}/discard", json={"reason": "Prueba"}, headers=headers))
     # Un borrador descartado igual conserva sus líneas con centro: sigue sin poder bajar.
     with pytest.raises(RuntimeError):
@@ -183,5 +188,5 @@ def test_downgrade_refuses_to_lose_3b_entries(
     ok(run(api, books, 2026, 2), 201)
     with pytest.raises(RuntimeError, match="hay 1 asientos"):
         command.downgrade(cfg, "0003")
-    assert _version(engine) == "0004"
+    assert _version(engine) == _head(cfg)  # la bajada entera se revierte
     assert _tables(engine) >= TABLES_3B
