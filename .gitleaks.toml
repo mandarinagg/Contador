@@ -1,0 +1,10 @@
+# Escáner de secretos (gitleaks). El repositorio es PÚBLICO: ver docs/SECURITY.md.
+title = "CONTADOR AI"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Contraseñas ficticias usadas solo en pruebas contra bases desechables"
+regexTarget = "secret"
+regexes = ['''^Clave-Segura-2026$''', '''^Otra-Clave-Segura-99$''']

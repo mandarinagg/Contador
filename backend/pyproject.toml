@@ -1,0 +1,62 @@
+[project]
+name = "contador-backend"
+version = "0.1.0"
+description = "CONTADOR AI — backend local (FastAPI)"
+requires-python = ">=3.12"
+# Versiones fijas: verificadas en Python 3.14 el 2026-11-23 (ver docs/DECISIONS.md).
+dependencies = [
+  "fastapi==0.165.0",
+  "uvicorn[standard]==0.54.0",
+  "pydantic[email]==2.14.4",
+  "pydantic-settings==2.16.3",
+  "sqlalchemy==2.1.9",
+  "alembic==1.20.1",
+  "psycopg[binary]==3.3.9",
+  "argon2-cffi==25.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==9.2.0",
+  "httpx2==2.16.2",  # cliente de TestClient (starlette depreca httpx)
+  "ruff==0.17.6",
+  "mypy==2.4.1",
+]
+
+# Empaquetado del backend como ejecutable (ver docs/ARCHITECTURE.md § Distribución).
+build = [
+  "pyinstaller==6.22.3",
+]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"
+filterwarnings = ["error::sqlalchemy.exc.SAWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM", "RUF"]
+ignore = [
+  "S101",    # assert en pruebas
+  "RUF012",  # __table_args__ de SQLAlchemy es un dict de clase por diseño
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S105", "S106"]
+"migrations/*" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+exclude = ["migrations/"]

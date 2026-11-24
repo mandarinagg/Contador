@@ -1,0 +1,168 @@
+# CI de CONTADOR AI.
+# - test: pruebas, lint y tipos de backend y frontend (Linux, PostgreSQL 18 real).
+# - backend-windows: empaqueta el backend para Windows y lo prueba contra PostgreSQL
+#   portable (la misma combinación que usará la app instalada en Windows 11).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.14"
+  NODE_VERSION: "24"
+  PG_WINDOWS_ZIP: postgresql-18.7-1-windows-x64-binaries.zip
+
+jobs:
+  secrets:
+    # El repositorio es público: se revisa todo el historial en cada push.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" \
+            -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo \
+            ghcr.io/gitleaks/gitleaks:v8.30.1 git /repo --config /repo/.gitleaks.toml --redact --no-banner
+
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: contador
+          POSTGRES_PASSWORD: contador_dev
+          POSTGRES_DB: contador
+        ports: ["55433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U contador -d contador"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Backend — dependencias
+        working-directory: backend
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -e ".[dev]"
+      - name: Backend — lint, tipos, migraciones y pruebas
+        working-directory: backend
+        run: |
+          .venv/bin/ruff check .
+          .venv/bin/ruff format --check .
+          .venv/bin/mypy app
+          .venv/bin/alembic upgrade head
+          .venv/bin/alembic check
+          .venv/bin/alembic downgrade base
+          .venv/bin/alembic upgrade head
+          .venv/bin/pytest
+
+      - name: Frontend — dependencias
+        working-directory: frontend
+        run: npm ci
+      - name: Frontend — tipos, lint, pruebas y build
+        working-directory: frontend
+        run: |
+          npm run typecheck
+          npm run lint
+          npm test
+          npm run build
+
+  backend-windows:
+    needs: test
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Empaquetar backend (PyInstaller)
+        working-directory: backend
+        run: |
+          python -m venv .venv
+          .venv\Scripts\pip install -e ".[build]"
+          .venv\Scripts\pyinstaller packaging/contador-backend.spec --noconfirm --log-level WARN
+
+      - name: PostgreSQL portable (cache)
+        uses: actions/cache@v6
+        with:
+          path: pgsql
+          key: ${{ env.PG_WINDOWS_ZIP }}-trimmed
+
+      - name: PostgreSQL portable (descarga y recorte)
+        run: |
+          if (-not (Test-Path pgsql\bin\postgres.exe)) {
+            Invoke-WebRequest "https://get.enterprisedb.com/postgresql/$env:PG_WINDOWS_ZIP" -OutFile pg.zip
+            Expand-Archive pg.zip -DestinationPath .
+            Remove-Item pg.zip
+            # Solo hace falta el servidor: fuera pgAdmin, documentación y StackBuilder.
+            Remove-Item -Recurse -Force "pgsql\pgAdmin 4", pgsql\doc, pgsql\StackBuilder -ErrorAction SilentlyContinue
+          }
+          pgsql\bin\postgres.exe --version
+          "Tamaño de pgsql: {0:N0} MB" -f ((Get-ChildItem pgsql -Recurse | Measure-Object Length -Sum).Sum / 1MB)
+
+      - name: Prueba de humo en Windows (PostgreSQL portable + backend empaquetado)
+        run: |
+          $tmp = $env:RUNNER_TEMP
+          $data = Join-Path $tmp "pgdata"
+          $pw = "contador_ci"
+          [IO.File]::WriteAllText((Join-Path $tmp "pw.txt"), $pw)  # sin salto de línea
+          pgsql\bin\initdb.exe -D $data -U contador --pwfile="$tmp\pw.txt" --auth=scram-sha-256 -E UTF8 --locale=C
+          pgsql\bin\pg_ctl.exe -D $data -o "-p 55440 -c listen_addresses=127.0.0.1" -l "$tmp\pg.log" -w start
+          $env:PGPASSWORD = $pw
+          pgsql\bin\createdb.exe -h 127.0.0.1 -p 55440 -U contador contador
+
+          $env:CONTADOR_ENV = "production"
+          $env:CONTADOR_DATABASE_URL = "postgresql+psycopg://contador:$pw@127.0.0.1:55440/contador"
+          $api = Start-Process backend\dist\contador-backend\contador-backend.exe -PassThru -NoNewWindow `
+            -RedirectStandardOutput "$tmp\api.log" -RedirectStandardError "$tmp\api.err"
+          try {
+            $base = "http://127.0.0.1:8765/api/v1"
+            $ok = $false
+            for ($i = 0; $i -lt 60; $i++) {
+              try { Invoke-RestMethod "$base/system/health" | Out-Null; $ok = $true; break } catch { Start-Sleep 1 }
+            }
+            if (-not $ok) { Get-Content "$tmp\api.log", "$tmp\api.err"; throw "El backend no respondió" }
+
+            $setup = @{
+              organization = @{ legal_name = "Prueba CI EAS"; legal_form = "EAS" }
+              owner = @{ full_name = "Prueba CI"; email = "ci@example.com"; password = "Clave-Segura-2026" }
+            } | ConvertTo-Json
+            Invoke-RestMethod "$base/system/setup" -Method Post -ContentType "application/json" -Body $setup | Out-Null
+            $login = Invoke-RestMethod "$base/auth/login" -Method Post -ContentType "application/json" `
+              -Body (@{ email = "ci@example.com"; password = "Clave-Segura-2026" } | ConvertTo-Json)
+            $verify = Invoke-RestMethod "$base/audit/verify" -Headers @{ Authorization = "Bearer $($login.token)" }
+            if (-not $verify.valid) { throw "La cadena de auditoría no es válida" }
+            Get-Content "$tmp\api.log" -TotalCount 3
+            "Prueba de humo OK: migración, configuración inicial, ingreso y auditoría en Windows"
+          } finally {
+            Stop-Process -Id $api.Id -Force -ErrorAction SilentlyContinue
+            pgsql\bin\pg_ctl.exe -D $data -m fast stop
+          }
+
+      - name: Publicar backend empaquetado
+        uses: actions/upload-artifact@v7
+        with:
+          name: contador-backend-windows
+          path: backend/dist/contador-backend
+          retention-days: 14

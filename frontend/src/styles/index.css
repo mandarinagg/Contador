@@ -1,0 +1,122 @@
+@import "tailwindcss";
+@import "@fontsource-variable/ibm-plex-sans";
+
+/*
+ * Sistema de diseño CONTADOR AI — ver docs/ARCHITECTURE.md § "Sistema de diseño".
+ * Los colores son variables CSS que cambian con el tema; Tailwind los expone como
+ * utilidades (bg-surface, text-ink, border-line, etc.).
+ */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  --paper: #f6f7f5;      /* fondo de la aplicación: papel frío */
+  --surface: #ffffff;    /* hojas: tablas, formularios */
+  --sunken: #eef1ee;     /* zonas hundidas: cabeceras de tabla, sidebar */
+  --ink: #1b2420;        /* texto principal: tinta de libro */
+  --ink-2: #4a5752;      /* texto secundario */
+  --ink-3: #7a8681;      /* texto terciario, placeholders */
+  --line: #dde3df;       /* divisiones */
+  --line-strong: #b9c3be;
+  --ledger: #1f5c4a;     /* primario: verde de libro mayor */
+  --ledger-strong: #174638;
+  --ledger-soft: #e3efe9;
+  --lapacho: #c2477a;    /* marca: flor del lapacho. Solo marca y navegación activa. */
+  --debit-red: #b3412e;  /* negativos, errores, acciones destructivas */
+  --debit-red-soft: #f8e6e2;
+  --amber: #946200;      /* pendientes de verificar */
+  --amber-soft: #fbf0d9;
+  --focus: #1f5c4a;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --paper: #0f1513;
+  --surface: #161e1b;
+  --sunken: #121a17;
+  --ink: #e4ebe7;
+  --ink-2: #a9b6b0;
+  --ink-3: #74827c;
+  --line: #26312d;
+  --line-strong: #3a4842;
+  --ledger: #5fb596;
+  --ledger-strong: #7fcaae;
+  --ledger-soft: #1b2f28;
+  --lapacho: #e07aa5;
+  --debit-red: #e57a66;
+  --debit-red-soft: #3a1f1a;
+  --amber: #e0b155;
+  --amber-soft: #33290f;
+  --focus: #7fcaae;
+  color-scheme: dark;
+}
+
+@theme {
+  --font-sans: "IBM Plex Sans Variable", system-ui, sans-serif;
+
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ledger: var(--ledger);
+  --color-ledger-strong: var(--ledger-strong);
+  --color-ledger-soft: var(--ledger-soft);
+  --color-lapacho: var(--lapacho);
+  --color-debit: var(--debit-red);
+  --color-debit-soft: var(--debit-red-soft);
+  --color-amber: var(--amber);
+  --color-amber-soft: var(--amber-soft);
+
+  /* Escala tipográfica (razón ~1.2) */
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+
+  /* Radios: jerarquía, no uno solo para todo */
+  --radius-sm: 4px;   /* controles */
+  --radius-md: 6px;   /* hojas y modales */
+
+  --shadow-sheet: 0 1px 0 var(--line), 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-float: 0 12px 32px -8px rgb(0 0 0 / 0.22), 0 0 0 1px var(--line);
+
+  --animate-rise: rise 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    @apply bg-paper text-ink font-sans text-base antialiased;
+    font-feature-settings: "tnum" 1; /* cifras tabulares en toda la app */
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  ::selection { background: var(--ledger-soft); }
+}
+
+@layer components {
+  /* Convención contable: doble raya bajo un total o encabezado de libro. */
+  .ledger-rule {
+    border-bottom: 3px double var(--ink);
+    padding-bottom: 0.375rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

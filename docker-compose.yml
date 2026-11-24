@@ -1,0 +1,23 @@
+# Infraestructura de DESARROLLO. La app de escritorio no depende de Docker
+# (ver docs/ARCHITECTURE.md, "Distribución").
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: contador
+      POSTGRES_PASSWORD: contador_dev
+      POSTGRES_DB: contador
+      TZ: America/Asuncion
+    ports:
+      # Solo localhost; 55433 para no chocar con otros Postgres de la máquina.
+      - "127.0.0.1:55433:5432"
+    volumes:
+      - contador_pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U contador -d contador"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  contador_pgdata:
