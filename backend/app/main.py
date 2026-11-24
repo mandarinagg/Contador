@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
 from app.core.logging import configure_logging, request_id_var
+from app.modules.accounting.router import router as accounting_router
 from app.modules.audit.router import router as audit_router
 from app.modules.finance.router import router as finance_router
 from app.modules.identity.router import auth_router, users_router
@@ -82,6 +83,7 @@ def create_app() -> FastAPI:
         organization_router,
         audit_router,
         finance_router,
+        accounting_router,
     ):
         api.include_router(router)
     app.include_router(api)

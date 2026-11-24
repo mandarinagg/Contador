@@ -12,9 +12,11 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, File, Form, Query, UploadFile, status
 from pydantic import ValidationError
+from sqlalchemy.orm import Session
 
 from app.api.deps import Auth, DbSession
 from app.core.errors import AppError, Conflict
+from app.modules.accounting import finance_link, links
 from app.modules.finance import imports, suggested, summary, transactions
 from app.modules.finance import service as fs
 from app.modules.finance.importing import MAX_FILE_BYTES, ImportMapping, import_error
@@ -45,6 +47,7 @@ from app.modules.finance.schemas import (
     CurrencyTotalsOut,
     ImportBatchOut,
     ImportRowOut,
+    JournalEntryRefOut,
     MonthTotalsOut,
     RowDecisionUpdate,
     SummaryOut,
@@ -89,12 +92,13 @@ def _account_out(account: Account, balance: Decimal) -> AccountOut:
         opening_balance=format_amount(account.opening_balance, account.currency),
         opening_date=account.opening_date,
         balance=format_amount(balance, account.currency),
+        ledger_account_id=account.ledger_account_id,
         archived_at=account.archived_at,
         created_at=account.created_at,
     )
 
 
-def _tx_out(tx: Transaction) -> TransactionOut:
+def _tx_out(tx: Transaction, ref: links.EntryRef | None = None) -> TransactionOut:
     return TransactionOut(
         id=tx.id,
         context_id=tx.context_id,
@@ -115,7 +119,18 @@ def _tx_out(tx: Transaction) -> TransactionOut:
         void_reason=tx.void_reason,
         created_by=tx.created_by,
         created_at=tx.created_at,
+        journal_entry=(
+            JournalEntryRefOut(id=ref.id, number=ref.number, status=ref.status)
+            if ref is not None
+            else None
+        ),
     )
+
+
+def _txs_out(db: Session, ctx: FinancialContext, txs: list[Transaction]) -> list[TransactionOut]:
+    """Movimientos con su asiento contable; solo en el contexto empresarial (D-035)."""
+    refs = links.journal_refs(db, [t.id for t in txs]) if ctx.kind == "business" else {}
+    return [_tx_out(t, refs.get(t.id)) for t in txs]
 
 
 def _row_out(row: ImportRow, currency: str) -> ImportRowOut:
@@ -208,7 +223,13 @@ def update_account(
     cid: uuid.UUID, account_id: uuid.UUID, body: AccountUpdate, auth: Auth, db: DbSession
 ) -> AccountOut:
     ctx = fs.resolve_context(db, auth, cid, write=True)
-    account = fs.update_account(db, ctx, auth.user_id, account_id, _changes(body))
+    changes = _changes(body)
+    if "ledger_account_id" in changes:
+        fs.get_account(db, ctx, account_id)  # 404 antes que la validación contable
+        finance_link.check_ledger_assignment(
+            db, auth, ctx, changes["ledger_account_id"], target="account"
+        )
+    account = fs.update_account(db, ctx, auth.user_id, account_id, changes)
     return _account_out(account, fs.account_balance(db, account))
 
 
@@ -269,7 +290,18 @@ def update_category(
     cid: uuid.UUID, category_id: uuid.UUID, body: CategoryUpdate, auth: Auth, db: DbSession
 ) -> CategoryOut:
     ctx = fs.resolve_context(db, auth, cid, write=True)
-    category = fs.update_category(db, ctx, auth.user_id, category_id, _changes(body))
+    changes = _changes(body)
+    if "ledger_account_id" in changes:
+        current = fs.get_category(db, ctx, category_id)
+        finance_link.check_ledger_assignment(
+            db,
+            auth,
+            ctx,
+            changes["ledger_account_id"],
+            target="category",
+            category_kind=current.kind,
+        )
+    category = fs.update_category(db, ctx, auth.user_id, category_id, changes)
     return CategoryOut.model_validate(category)
 
 
@@ -350,7 +382,7 @@ def list_transactions(
         include_voided=include_voided,
     )
     rows = transactions.list_transactions(db, ctx, filters, limit=limit, before=before)
-    return [_tx_out(t) for t in rows]
+    return _txs_out(db, ctx, rows)
 
 
 @router.post(
@@ -375,7 +407,7 @@ def update_transaction(
 ) -> TransactionOut:
     ctx = fs.resolve_context(db, auth, cid, write=True)
     tx = transactions.update_transaction(db, ctx, auth.user_id, transaction_id, _changes(body))
-    return _tx_out(tx)
+    return _txs_out(db, ctx, [tx])[0]
 
 
 @router.post(
@@ -387,7 +419,7 @@ def void_transaction(
     """Devuelve los movimientos anulados (dos si era una transferencia)."""
     ctx = fs.resolve_context(db, auth, cid, write=True)
     voided = transactions.void_transaction(db, ctx, auth.user_id, transaction_id, body.reason)
-    return [_tx_out(t) for t in voided]
+    return _txs_out(db, ctx, voided)
 
 
 @router.post(

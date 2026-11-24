@@ -73,6 +73,10 @@ class FinancialContext(TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(_in("kind", CONTEXT_KINDS), name="kind_valid"),
         CheckConstraint("(kind = 'business') = (owner_user_id IS NULL)", name="owner_matches_kind"),
+        # D-035: los asientos referencian (id, kind) con kind = 'business', y (id,
+        # organization_id) para que el contexto sea de la organización del asiento.
+        UniqueConstraint("id", "kind"),
+        UniqueConstraint("id", "organization_id"),
         # Exactamente un contexto empresarial por organización (el alta lo hace el setup).
         Index(
             "uq_contexts_business_per_org",
@@ -125,6 +129,11 @@ class Account(TimestampMixin, Base):
     opening_balance: Mapped[Decimal] = mapped_column(Money, nullable=False, server_default="0")
     opening_date: Mapped[date] = mapped_column(Date, nullable=False)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Cuenta contable del banco o la caja (D-041). Solo en el contexto empresarial y de la
+    # misma organización: lo valida `accounting.mapping`.
+    ledger_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("accounting.ledger_accounts.id")
+    )
 
 
 class Category(TimestampMixin, Base):
@@ -148,6 +157,10 @@ class Category(TimestampMixin, Base):
     kind: Mapped[str] = mapped_column(String(10), nullable=False)
     parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Cuenta contable de resultado (D-041), con las mismas reglas que en `Account`.
+    ledger_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("accounting.ledger_accounts.id")
+    )
 
 
 class Counterparty(TimestampMixin, Base):
@@ -266,6 +279,8 @@ class Transaction(TimestampMixin, Base):
             "transfer_group_id IS NULL OR category_id IS NULL", name="transfer_without_category"
         ),
         CheckConstraint("octet_length(dedupe_key) = 32", name="dedupe_key_length"),
+        # Destino de la clave foránea compuesta de los asientos (D-035, migración 0003).
+        UniqueConstraint("id", "context_id"),
         # D-025: cuenta, categoría, contraparte y lote del mismo contexto; moneda de la cuenta.
         ForeignKeyConstraint(
             ["account_id", "context_id", "currency"],
