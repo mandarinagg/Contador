@@ -7,6 +7,7 @@
 //!   `pgdata.init` y solo se renombra a `pgdata` cuando terminó bien.
 //! - PostgreSQL escucha solo en 127.0.0.1 con `scram-sha-256` y una contraseña aleatoria
 //!   guardada en un [`SecretStore`] (Administrador de credenciales en Windows).
+//! - Las copias de seguridad (`backup.rs`) solo escriben en `backups/` y nunca tocan `pgdata`.
 //! - Si la app se cerró mal y PostgreSQL quedó en marcha, se reutiliza.
 //! - En Windows el backend queda atado a la app: si la app muere, el backend también.
 
@@ -19,6 +20,7 @@ use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use crate::backup::BackupJob;
 use crate::secret::SecretStore;
 
 pub const DB_NAME: &str = "contador";
@@ -46,10 +48,14 @@ impl StackConfig {
     pub fn logs_dir(&self) -> PathBuf {
         self.data_dir.join("logs")
     }
-    fn pg_tool(&self, name: &str) -> PathBuf {
-        self.pg_bin
-            .join(format!("{name}{}", std::env::consts::EXE_SUFFIX))
+    pub(crate) fn pg_tool(&self, name: &str) -> PathBuf {
+        pg_tool(&self.pg_bin, name)
     }
+}
+
+/// Ruta de una herramienta de PostgreSQL dentro de su carpeta `bin` (agrega `.exe` en Windows).
+pub(crate) fn pg_tool(pg_bin: &Path, name: &str) -> PathBuf {
+    pg_bin.join(format!("{name}{}", std::env::consts::EXE_SUFFIX))
 }
 
 #[derive(Debug)]
@@ -60,13 +66,13 @@ pub struct StackError {
 }
 
 impl StackError {
-    fn new(message: impl Into<String>) -> Self {
+    pub(crate) fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
             log: None,
         }
     }
-    fn with_log(message: impl Into<String>, log: PathBuf) -> Self {
+    pub(crate) fn with_log(message: impl Into<String>, log: PathBuf) -> Self {
         Self {
             message: message.into(),
             log: Some(log),
@@ -86,11 +92,13 @@ impl fmt::Display for StackError {
 
 impl std::error::Error for StackError {}
 
-type Result<T> = std::result::Result<T, StackError>;
+pub(crate) type Result<T> = std::result::Result<T, StackError>;
 
 /// Servicios en marcha. Llamar a [`Stack::stop`] al cerrar la app.
 pub struct Stack {
     config: StackConfig,
+    /// Contraseña de la base: solo en memoria, para las copias de seguridad.
+    password: String,
     backend: Child,
     #[cfg(windows)]
     _job: windows_job::Job,
@@ -148,6 +156,7 @@ impl Stack {
         }
         Ok(Self {
             config: config.clone(),
+            password,
             backend,
             #[cfg(windows)]
             _job: job,
@@ -156,6 +165,16 @@ impl Stack {
 
     pub fn api_port(&self) -> u16 {
         self.config.api_port
+    }
+
+    /// Datos para hacer copias desde otro hilo sin retener el `Stack` (se puede clonar y mover).
+    pub fn backup_job(&self) -> BackupJob {
+        BackupJob::new(self.config.clone(), self.password.clone())
+    }
+
+    /// Hace una copia de seguridad ahora (siempre crea una nueva) y aplica la retención.
+    pub fn backup(&self) -> Result<PathBuf> {
+        self.backup_job().run()
     }
 
     /// Detiene el backend y luego PostgreSQL (parada rápida: confirma lo confirmado).
@@ -378,7 +397,7 @@ fn port_in_use(port: u16) -> bool {
 }
 
 /// Ejecuta una herramienta y agrega su salida al registro; error si no termina bien.
-fn run_logged(cmd: &mut Command, log: &Path) -> std::result::Result<(), ()> {
+pub(crate) fn run_logged(cmd: &mut Command, log: &Path) -> std::result::Result<(), ()> {
     let output = hidden(cmd).stdin(Stdio::null()).output().map_err(|e| {
         append(
             log,
@@ -398,14 +417,14 @@ fn run_logged(cmd: &mut Command, log: &Path) -> std::result::Result<(), ()> {
     if output.status.success() { Ok(()) } else { Err(()) }
 }
 
-fn append(log: &Path, text: &str) {
+pub(crate) fn append(log: &Path, text: &str) {
     if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(log) {
         let _ = f.write_all(text.as_bytes());
     }
 }
 
 /// Conserva el registro anterior como `<nombre>.1` (un solo nivel alcanza para diagnosticar).
-fn rotate(log: &Path) {
+pub(crate) fn rotate(log: &Path) {
     if log.exists() {
         let _ = fs::rename(log, log.with_extension("log.1"));
     }
@@ -430,7 +449,7 @@ fn write_private(path: &Path, content: &str) -> Result<()> {
 }
 
 /// En Windows, evita que cada herramienta abra una ventana de consola.
-fn hidden(cmd: &mut Command) -> &mut Command {
+pub(crate) fn hidden(cmd: &mut Command) -> &mut Command {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
