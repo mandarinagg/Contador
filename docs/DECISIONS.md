@@ -67,3 +67,9 @@ Formato: contexto → decisión → alternativas → consecuencias. Estado: **Ac
 
 ## D-022 — Lanzador en Rust (`desktop/src-tauri/src/stack.rs`)
 **Aceptada.** Sin dependencias de red extra (HTTP mínimo sobre `TcpStream` para el chequeo de salud). Reglas: nunca borra una carpeta de datos existente (la creación inicial ocurre en `pgdata.init` y se renombra al terminar); contraseña aleatoria de 256 bits en el Administrador de credenciales (`ContadorAI` / `postgresql`); PostgreSQL solo TCP en `127.0.0.1:55440`, sin sockets Unix, `scram-sha-256`, ICU `es-PY` para ordenar en español; backend atado a la app con un *job object* de Windows (muere con ella aunque la app falle); si PostgreSQL quedó en marcha tras un cierre brusco, se reutiliza; una sola instancia de la app. Fuera de Windows (solo desarrollo) la contraseña va a un archivo `0600`.
+
+## D-023 a D-027 — Modelo de finanzas (fase 2)
+**Aceptadas · 2026-11-24.** Detalle y motivos en [`specs/FASE2_FINANZAS.md`](specs/FASE2_FINANZAS.md) §1: contextos `business` (uno por organización) y `personal` (uno por usuario) (D-023); finanzas personales privadas de su dueño sin importar el rol (D-024); separación impuesta en la base con claves foráneas compuestas, incluida la moneda (D-025); importes `NUMERIC(18,2)`/`Decimal`/string, sin mezclar monedas (D-026); nada se borra, se anula o archiva con auditoría (D-027).
+
+## D-028 — Equipo de agentes
+**Aceptada · 2026-11-24 (autorizada por el propietario).** El trabajo se reparte entre agentes especializados, cada uno en su propio *worktree* de git y con su propia base de pruebas (`contador_test_<agente>`), bajo una especificación escrita por el jefe de proyecto. El jefe revisa, corre todas las pruebas e integra en `main`; ningún agente decide el modelo de datos ni sube código por su cuenta.

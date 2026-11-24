@@ -52,6 +52,12 @@ Cada regla tiene un identificador estable, su estado y dónde se hace cumplir. *
 | BR-FIN-01 | Personal y empresarial son contextos separados; una operación pertenece a uno solo |
 | BR-FIN-02 | Lo consolidado identifica el contexto de origen de cada importe |
 | BR-FIN-03 | La importación detecta duplicados (cuenta, fecha, importe, referencia/descripción normalizada) y pide confirmación |
+| BR-FIN-04 | Las finanzas personales solo las ve y opera su dueño, sin importar el rol (D-024) |
+| BR-FIN-05 | Un movimiento no puede usar cuenta, categoría o contraparte de otro contexto ni otra moneda que la de su cuenta: lo impide la base (D-025) |
+| BR-FIN-06 | Importes en decimal exacto; no se suman ni convierten monedas distintas (D-026) |
+| BR-FIN-07 | Nada se borra: los movimientos se anulan con motivo y el resto se archiva; todo queda auditado (D-027) |
+| BR-FIN-08 | Una importación no crea movimientos hasta que el usuario confirma el lote; confirmar dos veces no duplica |
+| BR-FIN-09 | Las transferencias entre cuentas propias no son ingreso ni gasto; un aporte entre contextos no es una transferencia |
 
 ## Tributación (fase 4 — diseñadas)
 
