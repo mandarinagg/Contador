@@ -45,19 +45,19 @@ Cada regla tiene un identificador estable, su estado y dónde se hace cumplir. *
 | BR-ACC-05 | Ningún cálculo monetario usa punto flotante |
 | BR-ACC-06 | Un movimiento importado nunca genera un asiento definitivo sin confirmación humana |
 
-## Finanzas (fase 2 — diseñadas)
+## Finanzas (fase 2)
 
-| ID | Regla |
-|---|---|
-| BR-FIN-01 | Personal y empresarial son contextos separados; una operación pertenece a uno solo |
-| BR-FIN-02 | Lo consolidado identifica el contexto de origen de cada importe |
-| BR-FIN-03 | La importación detecta duplicados (cuenta, fecha, importe, referencia/descripción normalizada) y pide confirmación |
-| BR-FIN-04 | Las finanzas personales solo las ve y opera su dueño, sin importar el rol (D-024) |
-| BR-FIN-05 | Un movimiento no puede usar cuenta, categoría o contraparte de otro contexto ni otra moneda que la de su cuenta: lo impide la base (D-025) |
-| BR-FIN-06 | Importes en decimal exacto; no se suman ni convierten monedas distintas (D-026) |
-| BR-FIN-07 | Nada se borra: los movimientos se anulan con motivo y el resto se archiva; todo queda auditado (D-027) |
-| BR-FIN-08 | Una importación no crea movimientos hasta que el usuario confirma el lote; confirmar dos veces no duplica |
-| BR-FIN-09 | Las transferencias entre cuentas propias no son ingreso ni gasto; un aporte entre contextos no es una transferencia |
+| ID | Regla | Estado | Dónde |
+|---|---|---|---|
+| BR-FIN-01 | Personal y empresarial son contextos separados; una operación pertenece a uno solo | Implementada | `finance.contexts` (un `business` por organización, un `personal` por usuario), `test_setup_creates_exactly_one_business_context`, `test_one_business_context_per_organization`, `test_ids_from_another_context_are_not_found` |
+| BR-FIN-02 | Lo consolidado identifica el contexto de origen de cada importe | Implementada | `GET /finance/summary/consolidated`, `test_consolidated_identifies_each_context` |
+| BR-FIN-03 | La importación detecta duplicados (cuenta, fecha, importe, referencia/descripción normalizada) y pide confirmación | Implementada | `finance/normalize.py` (`dedupe_key`), `finance/imports.py`, `test_dedupe_key_ignores_case_accents_spaces_and_scale`, `test_csv_utf8_semicolon_errors_and_duplicates`, `test_duplicates_appearing_after_preview_block_commit` |
+| BR-FIN-04 | Las finanzas personales solo las ve y opera su dueño, sin importar el rol (D-024) | Implementada | `finance/service.resolve_context` (404), filtro `finance.personal.*` en `audit/service.list_logs`, `test_personal_context_is_invisible_to_everyone_else`, `test_viewer_reads_business_but_writes_only_personal`, `test_personal_audit_is_private_to_its_owner` |
+| BR-FIN-05 | Un movimiento no puede usar cuenta, categoría o contraparte de otro contexto ni otra moneda que la de su cuenta: lo impide la base (D-025) | Implementada | Claves foráneas compuestas de `finance.transactions`, `test_personal_transaction_cannot_use_business_account`, `test_transaction_cannot_use_category_or_counterparty_of_other_context`, `test_transaction_currency_must_match_account` |
+| BR-FIN-06 | Importes en decimal exacto; no se suman ni convierten monedas distintas (D-026) | Implementada | `finance/money.py`, `NUMERIC(18,2)`, `ck_*_pyg_integer`, `test_decimal_arithmetic_is_exact`, `test_amounts_are_strings_and_exact`, `test_float_and_bad_decimals_are_rejected`, `test_summary_never_mixes_currencies` |
+| BR-FIN-07 | Nada se borra: los movimientos se anulan con motivo y el resto se archiva; todo queda auditado (D-027) | Implementada | `ck_transactions_void_*`, `test_void_excludes_from_balance_and_summary_and_is_audited`, `test_account_archive_and_names`, `test_each_entity_audits_creation_and_only_changed_fields` |
+| BR-FIN-08 | Una importación no crea movimientos hasta que el usuario confirma el lote; confirmar dos veces no duplica | Implementada | `finance/imports.py`, `test_commit_is_idempotent_and_audited_once`, `test_cancel` |
+| BR-FIN-09 | Las transferencias entre cuentas propias no son ingreso ni gasto; un aporte entre contextos no es una transferencia | Implementada | `transfer_group_id`, `ck_transactions_transfer_without_category`, `test_transfer_creates_two_linked_movements_outside_income_and_expense`, `test_consolidated_identifies_each_context` |
 
 ## Tributación (fase 4 — diseñadas)
 
