@@ -38,6 +38,6 @@ export function exportFilename(report: ExportReport, scope: { from?: string; to?
     case 'income-statement':
       return `estado-de-resultados-${range}.xlsx`
     case 'depreciation-schedule':
-      return 'cuadro-de-depreciacion.xlsx'
+      return `cuadro-de-depreciacion-${range}.xlsx`
   }
 }

@@ -40,7 +40,9 @@ def create_app() -> FastAPI:
         allow_origins=settings.cors_origins,
         allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE"],
         allow_headers=["Authorization", "Content-Type", "X-Request-Id"],
-        expose_headers=["X-Request-Id"],
+        # Content-Disposition: para que el navegador deje leer el nombre de los archivos
+        # exportados.
+        expose_headers=["X-Request-Id", "Content-Disposition"],
     )
 
     @app.middleware("http")

@@ -412,7 +412,7 @@ test('cuadro de depreciación: columnas de la RG 77/2020, concilia con el balanc
   const downloading = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Descargar Excel' }).click()
   const file = await downloading
-  expect(file.suggestedFilename()).toBe('cuadro-de-depreciacion.xlsx')
+  expect(file.suggestedFilename()).toBe('cuadro-de-depreciacion-2026-01-01-2026-12-31.xlsx')
   expectXlsx(await file.path())
 })
 

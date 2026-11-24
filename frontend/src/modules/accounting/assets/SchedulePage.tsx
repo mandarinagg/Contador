@@ -211,7 +211,7 @@ export function SchedulePage() {
               title={`Cuadro de depreciación ${view === 'fiscal' ? 'fiscal' : 'contable'} del ejercicio ${year ? yearLabel(year) : ''}`}
               scope={`Columnas del Anexo de la RG 77/2020, ${rangeText(data.date_from, data.date_to)}`}
               status={data.chart_status}
-              aside={<ReportActions path={`/accounting/reports/depreciation-schedule?fiscal_year_id=${data.fiscal_year_id}`} report="depreciation-schedule" scope={{}} disabled={assetCount === 0} />}
+              aside={<ReportActions path={`/accounting/reports/depreciation-schedule?fiscal_year_id=${data.fiscal_year_id}`} report="depreciation-schedule" scope={{ from: year?.start_date, to: year?.end_date }} disabled={assetCount === 0} />}
             />
             {data.warnings.length > 0 && (
               <div className="border-b border-line px-6 py-4">

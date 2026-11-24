@@ -208,3 +208,24 @@ def test_validated_chart_has_no_notice(client: TestClient, books: dict[str, Any]
     ws = _sheet(client, books, "/reports/journal", **RANGE)
     first = [row[0] for row in ws.iter_rows(min_row=1, max_row=8, values_only=True)]
     assert UNVALIDATED_NOTICE not in first
+
+
+def test_depreciation_schedule_xlsx_name_carries_the_fiscal_year(
+    client: TestClient, books: dict[str, Any]
+) -> None:
+    """Dos ejercicios no se pisan al descargar: el nombre lleva las fechas del ejercicio."""
+    year_id = books["years"][2026]["id"]
+    res = _get(
+        client, books, "/reports/depreciation-schedule", format="xlsx", fiscal_year_id=year_id
+    )
+    assert res.status_code == 200, res.text
+    assert res.headers["content-disposition"] == (
+        'attachment; filename="cuadro-de-depreciacion-2026-01-01-2026-12-31.xlsx"'
+    )
+
+
+def test_cors_exposes_content_disposition(client: TestClient) -> None:
+    """Sin este encabezado expuesto, el navegador no deja leer el nombre del archivo."""
+    res = client.get("/api/v1/health", headers={"Origin": "http://tauri.localhost"})
+    assert res.headers["access-control-allow-origin"] == "http://tauri.localhost"
+    assert "content-disposition" in res.headers["access-control-expose-headers"].lower()

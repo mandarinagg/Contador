@@ -10,8 +10,8 @@
 | 1 — Fundación | ✅ Funcional en navegador |
 | 1B — Instalador Windows 11 | 🟡 CI verde en Windows real (lanzador, copias, instalador instalado, abierto, cerrado y desinstalado). Falta instalarlo en la PC del propietario |
 | 2 — Finanzas empresa/personal | 🟡 Backend y interfaz hechos; probado de punta a punta en navegador (ver tabla). Falta validarlo con extractos reales del propietario |
-| 3 — Contabilidad (núcleo) | 🟡 Backend e interfaz hechos; probado de punta a punta en navegador (ver tabla). El plan de cuentas sigue sin validar por un contador |
-| 3B — Activos fijos, centros, recurrentes, XLSX | 🟡 Backend e interfaz hechos; probado de punta a punta en navegador (ver tabla). Vidas útiles, residuales y cuadro fiscal `pending` hasta que los valide el contador; descarga de Excel en la app de escritorio sin probar |
+| 3 — Contabilidad (núcleo) | ✅ Backend e interfaz hechos; probado de punta a punta en navegador (ver tabla). El plan de cuentas sigue sin validar por un contador |
+| 3B — Activos fijos, centros, recurrentes, XLSX | ✅ Backend e interfaz hechos; probado de punta a punta en navegador (ver tabla). Vidas útiles, residuales y cuadro fiscal `pending` hasta que los valide el contador; descarga de Excel en la app de escritorio sin probar |
 | 4 a 8 | ⏳ No iniciadas |
 
 **Destino definido por el propietario:** una PC con Windows 11, uso en una sola máquina (D-016). Desarrollo en esta PC Linux; instaladores generados en GitHub Actions.
@@ -85,6 +85,9 @@
 | P-4 | 2 advertencias de oxlint (`only-export-components`) | Hooks junto a sus providers; solo afecta la recarga en caliente |
 | P-6 | La política de contraseñas del frontend cuenta como "símbolo" las letras con tilde | El backend es quien decide (Unicode); solo cambia el aviso previo |
 | P-9 | ~~La API no tiene `GET /finance/contexts/{cid}/transactions/{id}`~~ | **Resuelto**: en la API (`test_finance_transaction_detail.py`) y en la interfaz, que lee el movimiento de origen por id aunque los filtros de la lista lo excluyan (E2E en `contabilidad-3b.spec.ts`) |
+| P-11 | Detalles menores de la API | El 422 `ASSET_CATEGORY_INCOMPLETE` trae nombres pero no ids (la interfaz enlaza por nombre); las plantillas recurrentes no admiten moneda extranjera (`RecurringLineOut` sin `fx_*`, la interfaz lo deshabilita) |
+| P-12 | Descarga de Excel dentro de la app de escritorio sin probar | Probada en el navegador; en WebView2 debería abrir la descarga normal (`saveBlob`). Probarla al instalar en la PC real |
+| P-13 | El aviso de recurrentes en el E2E solo se verifica en 2026 | `contabilidad-3b.spec.ts` lo condiciona a `getFullYear() === 2026`; desde 2027 esa parte se saltea hasta ajustar las fechas de la prueba |
 | P-10 | ~~Los asientos traen el id de quien creó/contabilizó, no el nombre~~ | **Resuelto**: en la API (`test_accounting_entry_user_names.py`) y en la interfaz (asiento y libro diario, sin leer `/users`) |
 
 ## Decisiones tomadas en esta sesión
@@ -101,21 +104,19 @@ D-001 a D-034 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 8. Revisar los hallazgos R-10 y R-11 de `DISCOVERY.md` (repositorio git en la carpeta personal con `.git-credentials`).
 
 ## Para retomar (traspaso, 2026-11-24)
-**Estado de `main`:** fases 0-1 completas; fase 2 (finanzas) integrada, con backend, interfaz y rendimiento. Todo verde en Linux y en Windows. Fase 3 (núcleo) y 3B (activos fijos, centros, recurrentes, XLSX): backend e interfaz hechos (`docs/specs/FASE3_CONTABILIDAD.md`, `docs/specs/FASE3B_CONTABILIDAD.md`); falta que el contador valide el plan de cuentas y las vidas útiles.
+**Estado de `main`:** fases 0, 1, 2 y 3 (núcleo + 3B) integradas, con backend, interfaz y E2E. Todo verde en Linux y en Windows. Pruebas: backend 241 (pytest contra PostgreSQL real, incluidas las `slow`), Vitest 124, E2E 38 (`flujos`, `finanzas`, `contabilidad`, `contabilidad-3b`). Migraciones hasta `0004_contabilidad_3b`.
 
 **Lo primero:**
-1. **CI de Windows: ✅ todo verde desde `7c98639`** (ejecución 45390713831). Pasan el lanzador, las copias, el Administrador de credenciales, el instalador NSIS y su prueba completa en Windows real.
-   - Con la migración 0003 (`btree_gist`), el primer arranque en Windows funciona. Apareció una carrera: cerrar la app durante el arranque dejaba PostgreSQL en marcha. Se corrigió en `lib.rs` (la salida espera al hilo de arranque) y se agregó el paso 4b a la prueba del instalador.
-   - Causas que se resolvieron: el pipe que `postgres` hereda (`stack.rs`, `tests/backup.rs`), la ruta `\\?\` que `initdb` no entiende (`stack::plain_path`) y el código 3 de `pg_ctl status` al final del script.
-   - Si algo vuelve a fallar, el paso "Lanzador — registros si falló" muestra cada comando ejecutado (`$ ...`) y su resultado (`→`). La prueba del instalador vuelca `%LOCALAPPDATA%\ContadorAI\logs`. `gh run view --log` a veces sale vacío; usar `gh api repos/mandarinagg/Contador/actions/jobs/<id>/logs`.
-2. El propietario prueba el instalador NSIS (artefacto `contador-ai-windows-instalador` del CI, vence a los 30 días) en su PC con Windows 11 (P-8: usuario con tildes o ñ).
+1. El propietario prueba el instalador NSIS (artefacto `contador-ai-windows-instalador` del último CI verde, vence a los 30 días) en su PC con Windows 11: P-8 (usuario con tildes o ñ) y P-12 (descarga de Excel dentro de la app).
+2. **Validación del contador** (bloquea usar la contabilidad "en serio"): plan de cuentas propuesto (173 cuentas, `docs/research/PLAN_DE_CUENTAS_PY.md`), las 34 categorías de activo fijo y sus vidas útiles y residuales, y las 17 dudas D-DEP de `docs/research/DEPRECIACION_PY.md`. En la app se marca con nombre y matrícula (`accounting.post`).
 
 **Después:**
-- Fase 2: el importador ya se probó con extractos simulados de formato bancario paraguayo (cabecera del banco, débito y crédito, hora en la fecha, `Gs.`, totales al pie, XLSX con fechas numéricas y fórmulas), y se corrigieron 4 casos. Falta probarlo con extractos reales anonimizados del propietario (punto 6 de abajo) y guardar un mapeo por banco.
-- Fase 3: el plan de cuentas y las reglas tributarias de `docs/research/` siguen `pending` hasta que los valide el contador.
-- Sigue abierto, decisión del propietario: tabla de totales mensuales para el resumen. No se hizo: se revisa solo si en la PC real se nota lento.
+- **Fase 4 (tributación)**: necesita el perfil fiscal del propietario (régimen IRE general o SIMPLE, obligaciones en Marangatu, calendario según el dígito del RUC). Sin presentación automática (regla 15 del prompt maestro): recordatorios, registro de comprobantes y borradores que el usuario confirma en Marangatu.
+- Fase 2: probar el importador con extractos reales anonimizados del propietario y guardar un mapeo por banco.
+- CI de Windows: si algo falla, el paso "Lanzador — registros si falló" muestra cada comando (`$ ...`) y su resultado (`→`); la prueba del instalador vuelca `%LOCALAPPDATA%\ContadorAI\logs` y su paso 4b informa si el cierre cayó durante el arranque. `gh run view --log` a veces sale vacío: usar `gh api repos/mandarinagg/Contador/actions/jobs/<id>/logs`.
+- Sigue abierto, decisión del propietario: tabla de totales mensuales para el resumen (solo si en la PC real se nota lento).
 
 **Entorno local:** Postgres de desarrollo en el proyecto docker `contador` (127.0.0.1:55433). Para probar el lanzador sin `sudo` se usan los binarios de PostgreSQL 18 de Ubuntu (`apt download` + `dpkg-deb -x`, con `LD_LIBRARY_PATH`) y las variables `CONTADOR_TEST_PGSQL_BIN` y `CONTADOR_TEST_BACKEND_EXE`. E2E en paralelo con otra corrida: `CONTADOR_E2E_DB_NAME`, `CONTADOR_E2E_API_PORT` y `CONTADOR_E2E_WEB_PORT`.
 
 ## Próximo objetivo recomendado
-Cerrar la fase 1B (CI de Windows en verde e instalador probado en la PC real) y validar la fase 2 con datos reales.
+Instalar en la PC real del propietario (cierra la fase 1B), hacer validar la contabilidad por el contador y reunir los datos fiscales para empezar la fase 4.

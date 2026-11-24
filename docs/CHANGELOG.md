@@ -4,6 +4,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 
 ## [Sin publicar]
 
+### Corregido — Exportaciones (2026-11-24)
+- CORS expone `Content-Disposition`: en el navegador la interfaz usa el nombre de archivo que da la API.
+- El Excel del cuadro de depreciación lleva las fechas del ejercicio en el nombre (`cuadro-de-depreciacion-AAAA-MM-DD-AAAA-MM-DD.xlsx`), así dos ejercicios no se pisan.
+- La documentación nombraba `disposal_account_id`; el campo real es `asset_disposal_account_id`.
+
 ### Agregado — Fase 3B, interfaz de contabilidad: activos fijos, centros de costos, recurrentes y exportación (2026-11-24)
 - Menú **Contabilidad** con tres entradas nuevas: Asientos recurrentes, Activos fijos y Centros de costos.
 - **Activos fijos → Categorías**: sin categorías, invita a «Cargar las 34 categorías propuestas» (Decreto 3182/2019, art. 31, redacción del Decreto 6105/2021), que quedan **sin validar**. Cada una muestra la fuente, la referencia legal y la cita; las incompletas dicen qué les falta y se completan desde ahí. Validar (nombre y matrícula, solo `accounting.post`; una incompleta no se valida) y archivar. Configuración del inicio de la depreciación por defecto y de la cuenta de resultado por bajas. Una franja en todas las pantallas de activos dice cuántas categorías faltan validar.

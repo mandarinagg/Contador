@@ -24,6 +24,6 @@ describe('nombre del Excel descargado', () => {
     expect(exportFilename('trial-balance', range)).toBe('balance-de-comprobacion-2026-01-01-2026-03-31.xlsx')
     expect(exportFilename('income-statement', range)).toBe('estado-de-resultados-2026-01-01-2026-03-31.xlsx')
     expect(exportFilename('balance-sheet', { at: '2026-03-31' })).toBe('balance-general-2026-03-31.xlsx')
-    expect(exportFilename('depreciation-schedule', {})).toBe('cuadro-de-depreciacion.xlsx')
+    expect(exportFilename('depreciation-schedule', { from: '2026-01-01', to: '2026-12-31' })).toBe('cuadro-de-depreciacion-2026-01-01-2026-12-31.xlsx')
   })
 })

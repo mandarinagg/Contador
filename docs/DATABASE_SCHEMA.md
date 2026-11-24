@@ -465,7 +465,7 @@ erDiagram
     accounting_recurring_templates ||--o{ accounting_recurring_generations : "una viva por período"
     accounting_periods ||--o{ accounting_recurring_generations : ""
     accounting_journal_entries ||--o| accounting_recurring_generations : "entry_id (kind=recurring)"
-    accounting_settings }o--o| accounting_ledger_accounts : "disposal_account_id"
+    accounting_settings }o--o| accounting_ledger_accounts : "asset_disposal_account_id"
 
     accounting_asset_categories {
         uuid id PK
@@ -575,7 +575,7 @@ erDiagram
     }
 ```
 
-Cambios en tablas de la 0003: `journal_entries.kind` pasa a `varchar(12)` y `ck_journal_entries_kind_valid` admite `depreciation`, `disposal` y `recurring`; `journal_lines.cost_center_id uuid NULL` con FK compuesta a `cost_centers`; `settings` recibe `disposal_account_id` (FK compuesta a `ledger_accounts`), `cost_centers_required boolean` y `default_asset_start_rule` (`ck_settings_start_rule_valid`, por defecto `next_month`).
+Cambios en tablas de la 0003: `journal_entries.kind` pasa a `varchar(12)` y `ck_journal_entries_kind_valid` admite `depreciation`, `disposal` y `recurring`; `journal_lines.cost_center_id uuid NULL` con FK compuesta a `cost_centers`; `settings` recibe `asset_disposal_account_id` (FK compuesta a `ledger_accounts`), `cost_centers_required boolean` y `default_asset_start_rule` (`ck_settings_start_rule_valid`, por defecto `next_month`).
 
 ### Restricciones (3B)
 | Restricción | Qué impide |

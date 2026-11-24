@@ -23,6 +23,7 @@ from app.modules.accounting import (
     depreciation,
     entries,
     exports,
+    periods,
     recurring,
 )
 from app.modules.accounting.balances import ZERO
@@ -378,7 +379,9 @@ def depreciation_schedule_report(
     chart_status = chart.chart_status(db, auth.organization_id)
     if fmt == "xlsx":
         content = exports.schedule_xlsx(db, auth.organization_id, fiscal_year_id, chart_status)
-        return _xlsx(content, "cuadro-de-depreciacion.xlsx")
+        year = periods.get_fiscal_year(db, auth.organization_id, fiscal_year_id)
+        name = f"cuadro-de-depreciacion-{year.start_date}-{year.end_date}.xlsx"
+        return _xlsx(content, name)
     report = asset_schedule.schedule(db, auth.organization_id, fiscal_year_id)
     return DepreciationScheduleOut(
         chart_status=chart_status,
