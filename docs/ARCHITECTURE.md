@@ -151,7 +151,7 @@ Desarrollo en Linux; uso real en **una PC con Windows 11** (D-016). Los instalad
 | Backend | `contador-backend\contador-backend.exe` (PyInstaller, modo carpeta) como recurso de Tauri | `backend/packaging/contador-backend.spec` (D-019) |
 | Base de datos | PostgreSQL 18.7 portable; datos en `%LOCALAPPDATA%\ContadorAI\pgdata` | Zip oficial de EDB recortado (D-020) |
 | Secretos | Administrador de credenciales de Windows (contraseña de la base, clave de cifrado, API key de Claude) | Crate `keyring` en el proceso Rust |
-| Copias de seguridad | `pg_dump` cifrado a la carpeta que elija el propietario (puede ser un pendrive o carpeta sincronizada) | Fase 1B/8 |
+| Copias de seguridad | Diaria y automática: `pg_dump -Fc` en `%LOCALAPPDATA%\ContadorAI\backups\auto` (últimas 14), verificada con `pg_restore --list`. **Sin cifrar**; destino externo y cifrado pendientes | `src/backup.rs` (D-029); restauración manual en `docs/RESTAURACION.md` |
 | Actualizaciones | Instalar el `.exe` nuevo encima (fase 1B); luego, actualizador de Tauri con paquetes firmados | |
 | Firma de código | Sin certificado, Windows muestra "Windows protegió su PC" → "Más información" → "Ejecutar de todas formas". Para uso propio es aceptable; un certificado de firma lo elimina | Opcional |
 
@@ -161,9 +161,10 @@ Desarrollo en Linux; uso real en **una PC con Windows 11** (D-016). Los instalad
 3. Inicia PostgreSQL con `pg_ctl` (solo `127.0.0.1`, puerto fijo 55440) y espera a que responda.
 4. Lanza `contador-backend.exe` con `CONTADOR_ENV=production` y la URL de la base por variable de entorno; el backend aplica migraciones y escucha en `127.0.0.1:8765`.
 5. Cuando `/system/health` responde, carga la interfaz. Si algo falla, muestra el motivo y la ruta del log (`%LOCALAPPDATA%\ContadorAI\logs`).
-6. Al cerrar la app: detiene el backend y luego PostgreSQL (`pg_ctl stop -m fast`).
+6. **Copia de seguridad:** una vez que los servicios responden, un hilo aparte (sin demorar la apertura) revisa si existe una copia automática de hoy en `%LOCALAPPDATA%\ContadorAI\backups\auto`; si no, ejecuta `pg_dump -Fc` hacia `contador-AAAAMMDD-HHMMSS.dump.partial` (contraseña por `PGPASSWORD`), la verifica con `pg_restore --list`, la renombra y deja las últimas 14. Si falla, borra solo el `.partial`, anota el error en `logs\backup.log` y la app sigue; reintenta cada 30 minutos mientras esté abierta. Nunca escribe en `pgdata`.
+7. Al cerrar la app: detiene el backend y luego PostgreSQL (`pg_ctl stop -m fast`). Una copia en curso se interrumpe y su `.partial` se limpia en la próxima.
 
-Implementado en `desktop/src-tauri/src/stack.rs` (D-022). Registros en `%LOCALAPPDATA%\ContadorAI\logs` (`backend.log`, `postgresql.log`, `initdb.log`, `pg_ctl.log`; el anterior queda como `.log.1`).
+Implementado en `desktop/src-tauri/src/stack.rs` (D-022) y `backup.rs` (D-029). Registros en `%LOCALAPPDATA%\ContadorAI\logs` (`backend.log`, `postgresql.log`, `initdb.log`, `pg_ctl.log`, `backup.log`; el anterior queda como `.log.1`).
 
 **Verificación continua (job `windows` del CI, Windows real):** prueba del lanzador con binarios reales (primer arranque, reinicio con datos, falta de contraseña, carpeta ajena), Administrador de credenciales, y luego el instalador NSIS: instalación silenciosa, primer arranque, cierre forzado (el backend muere con la app), reapertura reutilizando PostgreSQL, cierre normal (todo detenido) y desinstalación sin pérdida de datos.
 

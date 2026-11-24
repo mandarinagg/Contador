@@ -25,6 +25,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - La interfaz espera a que la API arranque ("Iniciando Contador AI…") en lugar de mostrar un error.
 - Hook pre-commit con gitleaks; repositorio público (`docs/SECURITY.md`).
 
+### Agregado — Copias de seguridad (2026-11-24)
+- Copia automática diaria de la base (`pg_dump -Fc`) en `%LOCALAPPDATA%\ContadorAI\backups\auto`, verificada con `pg_restore --list`, retención de 14 copias y errores en `logs/backup.log` (D-029).
+- `restore_dump`: restauración en una base nueva y vacía; procedimiento manual para el propietario en `docs/RESTAURACION.md`.
+- Prueba `desktop/src-tauri/tests/backup.rs`: copia, verificación, retención, restauración en un clúster nuevo y backend arrancando sobre la base restaurada.
+- Las copias **no están cifradas** todavía (pendiente, `docs/SECURITY.md`).
+
 ### Agregado — Fase 1 (2026-11-23)
 - Backend FastAPI: configuración por entorno, logging JSON con `request_id`, errores con códigos estables.
 - Migración `0001`: esquemas `core` y `audit`; usuarios, organizaciones, membresías, roles, permisos, sesiones; auditoría de solo inserción con cadena de hashes; eventos de seguridad; catálogo de roles y permisos.

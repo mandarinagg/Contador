@@ -5,8 +5,12 @@
 //! - **Desarrollo (`tauri dev`):** no levanta nada; se usa `scripts/dev.sh`. Para probar
 //!   el modo instalado en desarrollo, definir `CONTADOR_PGSQL_BIN` y `CONTADOR_BACKEND_EXE`.
 //!
+//! Con los servicios en marcha, un hilo aparte hace la copia de seguridad diaria (`backup.rs`)
+//! sin demorar la apertura; una copia fallida solo se registra en `logs/backup.log`.
+//!
 //! La interfaz espera sola a que la API responda (muestra "Iniciando…").
 
+pub mod backup;
 pub mod secret;
 pub mod stack;
 
@@ -17,6 +21,7 @@ use std::time::Duration;
 use tauri::{Manager, RunEvent};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
+use backup::BackupJob;
 use secret::SecretStore;
 use stack::{Stack, StackConfig};
 
@@ -28,6 +33,8 @@ const PG_PORT: u16 = 55440;
 const API_PORT: u16 = 8765;
 const SECRET_SERVICE: &str = "ContadorAI";
 const SECRET_ACCOUNT: &str = "postgresql";
+/// Cada cuánto se revisa si falta la copia del día (por si la app queda abierta varios días).
+const BACKUP_RECHECK: Duration = Duration::from_secs(30 * 60);
 
 enum StackSlot {
     Starting,
@@ -87,6 +94,7 @@ fn start_in_background(handle: tauri::AppHandle, config: StackConfig) {
         match Stack::start(&config, store.as_ref()) {
             Ok(stack) => {
                 log::info!("Servicios listos en 127.0.0.1:{}", stack.api_port());
+                let backup = stack.backup_job();
                 let state = handle.state::<StackState>();
                 let mut slot = lock(&state);
                 if matches!(*slot, StackSlot::Closing) {
@@ -95,6 +103,8 @@ fn start_in_background(handle: tauri::AppHandle, config: StackConfig) {
                     stack.stop();
                 } else {
                     *slot = StackSlot::Running(stack);
+                    drop(slot);
+                    start_backups(handle.clone(), backup);
                 }
             }
             Err(e) => {
@@ -103,6 +113,27 @@ fn start_in_background(handle: tauri::AppHandle, config: StackConfig) {
             }
         }
     });
+}
+
+/// Copia de seguridad diaria en un hilo propio: la app ya está abierta y no espera a la copia.
+/// Si falla (queda en `logs/backup.log`), la app sigue funcionando y se reintenta luego.
+fn start_backups(handle: tauri::AppHandle, job: BackupJob) {
+    let spawned = std::thread::Builder::new().name("copias".into()).spawn(move || {
+        loop {
+            match job.run_if_due() {
+                Ok(Some(path)) => log::info!("Copia de seguridad hecha: {}", path.display()),
+                Ok(None) => log::info!("Ya hay una copia de seguridad de hoy"),
+                Err(e) => log::error!("Copia de seguridad fallida: {e}"),
+            }
+            std::thread::sleep(BACKUP_RECHECK);
+            if matches!(*lock(&handle.state::<StackState>()), StackSlot::Closing) {
+                return;
+            }
+        }
+    });
+    if let Err(e) = spawned {
+        log::error!("No se pudo iniciar el hilo de copias de seguridad: {e}");
+    }
 }
 
 /// `None` en desarrollo sin variables: los servicios los levanta otro proceso.
