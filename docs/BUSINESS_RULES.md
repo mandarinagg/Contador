@@ -50,6 +50,12 @@ Cada regla tiene un identificador estable, su estado y dónde se hace cumplir. *
 | BR-ACC-10 | El plan de cuentas propuesto no se presenta como validado hasta que un contador lo marca, con nombre y matrícula (D-038) | Implementada | `accounting.settings` (`ck_settings_chart_validation_complete`), `chart_status` en todos los reportes, D-046, `test_validation_requires_accountant_and_any_structural_change_resets_it`, `test_load_proposed_creates_159_accounts_with_hierarchy_and_kinds` |
 | BR-ACC-11 | Un movimiento de finanzas con asiento contabilizado no se anula sin revertir antes el asiento (D-041) | Implementada | `links.ensure_no_posted_entry` (también para importe, fecha y cuenta, D-048), `trg_journal_entries_source_voided`, `test_transaction_with_posted_entry_cannot_be_voided_or_changed`, `test_draft_of_a_voided_transaction_cannot_be_posted` |
 | BR-ACC-12 | El cierre del ejercicio exige todos sus períodos cerrados y deja en cero las cuentas de resultado con un asiento de refundición (D-039) | Implementada | `closing.close_fiscal_year`, `trg_journal_entries_closing_invalid`, `trg_fiscal_years_closed_final` (D-050), `test_closing_the_fiscal_year`, `test_closing_with_loss_and_drafts`, `test_closing_entry_only_with_all_periods_closed`, `test_closing_entry_matches_reference` |
+| BR-ACC-13 | La depreciación es lineal mensual en guaraníes enteros y la suma de las cuotas es exactamente el importe depreciable (D-057) | Especificada (3B) | |
+| BR-ACC-14 | Una categoría de activo sin vida útil o sin cuentas no se usa; las vidas útiles propuestas no se presentan como validadas (D-056) | Especificada (3B) | |
+| BR-ACC-15 | Hay a lo sumo una depreciación viva por período y no se saltean meses; la corrida es un borrador que contabiliza una persona (D-058) | Especificada (3B) | |
+| BR-ACC-16 | Un centro de costos solo va en líneas de cuentas de ingreso o gasto (D-060) | Especificada (3B) | |
+| BR-ACC-17 | Un asiento recurrente se genera como borrador una sola vez por período (D-061) | Especificada (3B) | |
+| BR-ACC-18 | La baja de un bien exige la depreciación al día y deja en cero su costo y su acumulada (D-059) | Especificada (3B) | |
 
 ## Finanzas (fase 2)
 

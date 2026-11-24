@@ -144,3 +144,15 @@ Formato: contexto → decisión → alternativas → consecuencias. Estado: **Ac
 
 ## D-055 — Siembra de la prueba de rendimiento contable
 **Aceptada · 2026-11-24.** `tests/test_accounting_performance.py` escribe las 100.000 líneas con SQL directo y los triggers de usuario desactivados **dentro de la transacción de la prueba** (se revierte). Contabilizar 50.000 asientos uno por uno en una sola transacción actualizaría 50.000 veces la misma fila del ejercicio (la numeración) y mediría la siembra, no los reportes. Los números se ponen correlativos por ejercicio, como los asignaría el trigger. Medido (PostgreSQL 18.7, Docker): balance de comprobación anual ~32 ms, mayor de una cuenta con 20.000 líneas (primera página) ~40 ms, balance general ~44 ms (mediana de 9).
+
+## D-056 a D-063 — Contabilidad 3B: activos fijos, centros de costos, recurrentes y libros exportables
+**Aceptadas · 2026-11-24.** Detalle y motivos en `docs/specs/FASE3B_CONTABILIDAD.md` §1:
+- **D-056:** categorías de activo con vida útil y cuentas, cargadas desde candidatas sin validar.
+- **D-057:** depreciación lineal mensual exacta en guaraníes; la última cuota absorbe la diferencia.
+- **D-058:** una corrida por período como borrador, sin saltear meses.
+- **D-059:** la baja genera un borrador que deja en cero el costo y la acumulada.
+- **D-060:** centros de costos solo en cuentas de resultado, impuesto por trigger.
+- **D-061:** plantillas recurrentes que generan borradores, una vez por período y sin procesos ocultos.
+- **D-062:** saldos iniciales en el balance de comprobación, sin asientos de apertura.
+- **D-063:** XLSX desde el backend y PDF por impresión de la interfaz.
+
