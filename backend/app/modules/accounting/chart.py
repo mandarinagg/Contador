@@ -37,6 +37,7 @@ from app.modules.accounting.balances import (
 from app.modules.accounting.common import apply_changes, flush_translated, now, record, snapshot
 from app.modules.accounting.models import (
     AccountingSettings,
+    AssetCategory,
     JournalEntry,
     JournalLine,
     LedgerAccount,
@@ -187,9 +188,21 @@ def invalidate_chart(
 def set_retained_earnings(
     db: Session, organization_id: uuid.UUID, actor_id: uuid.UUID, account_id: uuid.UUID | None
 ) -> AccountingSettings:
+    return update_settings(
+        db, organization_id, actor_id, {"retained_earnings_account_id": account_id}
+    )
+
+
+def update_settings(
+    db: Session, organization_id: uuid.UUID, actor_id: uuid.UUID, changes: dict[str, Any]
+) -> AccountingSettings:
+    """Cambia solo los campos que llegan: cuenta de resultados del cierre (patrimonio), cuenta
+    de resultado de la baja de bienes (ingreso o gasto, D-059), centros obligatorios (D-060) e
+    inicio de depreciación por defecto (D-064)."""
     settings = lock_settings(db, organization_id)
-    if account_id is not None:
-        account = get_account(db, organization_id, account_id)
+    retained = changes.get("retained_earnings_account_id")
+    if retained is not None:
+        account = get_account(db, organization_id, retained)
         if account.kind != "equity" or not account.is_postable or account.archived_at:
             raise AppError(
                 "INVALID_RETAINED_EARNINGS_ACCOUNT",
@@ -197,7 +210,30 @@ def set_retained_earnings(
                 "(por ejemplo, 3.03.02 RESULTADO DEL EJERCICIO).",
                 status_code=422,
             )
-    before, after = apply_changes(settings, {"retained_earnings_account_id": account_id})
+    disposal = changes.get("asset_disposal_account_id")
+    if disposal is not None:
+        account = get_account(db, organization_id, disposal)
+        if (
+            account.kind not in ("income", "expense")
+            or not account.is_postable
+            or account.archived_at
+        ):
+            raise AppError(
+                "INVALID_DISPOSAL_ACCOUNT",
+                "La cuenta de la baja de bienes tiene que ser de ingreso o de gasto, imputable y "
+                "no archivada (por ejemplo, 17.01 UTILIDAD/PÉRDIDA EN VENTA DE ACTIVOS FIJOS).",
+                status_code=422,
+            )
+    for key in ("cost_centers_required", "default_asset_start_rule"):
+        if key in changes and changes[key] is None:
+            raise AppError("FIELD_REQUIRED", f"`{key}` no puede quedar vacío.", status_code=422)
+    allowed = (
+        "retained_earnings_account_id",
+        "asset_disposal_account_id",
+        "cost_centers_required",
+        "default_asset_start_rule",
+    )
+    before, after = apply_changes(settings, {k: v for k, v in changes.items() if k in allowed})
     if after:
         db.flush()
         record(
@@ -418,6 +454,27 @@ def _check_not_assigned(db: Session, account: LedgerAccount, action: str) -> Non
             f"Es la cuenta de resultados del cierre: cambiala en la configuración antes de "
             f"{action}la.",
         )
+    if settings is not None and settings.asset_disposal_account_id == account.id:
+        raise Conflict(
+            "ACCOUNT_IN_SETTINGS",
+            f"Es la cuenta de la baja de bienes: cambiala en la configuración antes de {action}la.",
+        )
+    category = db.scalar(
+        select(AssetCategory.name).where(
+            AssetCategory.archived_at.is_(None),
+            or_(
+                AssetCategory.asset_account_id == account.id,
+                AssetCategory.accumulated_account_id == account.id,
+                AssetCategory.expense_account_id == account.id,
+            ),
+        )
+    )
+    if category is not None:
+        raise Conflict(
+            "ACCOUNT_IN_ASSET_CATEGORY",
+            f"La cuenta está asignada a la categoría de activo fijo «{category}»: quitala allí "
+            f"antes de {action}la.",
+        )
     mapped = db.scalar(
         select(
             or_(
@@ -535,7 +592,7 @@ def update_account(
 def load_proposed(
     db: Session, organization_id: uuid.UUID, actor_id: uuid.UUID
 ) -> list[LedgerAccount]:
-    """Carga el plan propuesto (159 cuentas) si la organización no tiene ninguna."""
+    """Carga el plan propuesto (173 cuentas) si la organización no tiene ninguna."""
     settings = lock_settings(db, organization_id)  # serializa dos cargas simultáneas
     if _has_accounts(db, organization_id):
         raise Conflict(

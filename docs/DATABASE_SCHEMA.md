@@ -443,6 +443,187 @@ Los reportes se calculan al vuelo (una consulta agrupada por cuenta con `ix_jour
 ### Datos iniciales (migración `0003`)
 Permisos `accounting.read` (owner, admin, accountant, viewer), `accounting.manage` (owner, admin, accountant) y `accounting.post` (owner, accountant), con copia congelada en la migración (D-031). La bajada borra los permisos, las columnas `ledger_account_id`, las tablas, las funciones y el esquema, y las restricciones nuevas de finanzas; deja `btree_gist`.
 
+## Implementado (migración `0004` — contabilidad 3B)
+
+Esquema `accounting`. Especificación: `docs/specs/FASE3B_CONTABILIDAD.md` (D-056 a D-067; decisiones de implementación D-068 a D-081). Mismas convenciones que la 0003: `id uuid` (`uuidv7()`), `organization_id`, `created_at`, `updated_at`, claves foráneas compuestas `(x_id, organization_id)` y `UNIQUE (id, organization_id)` en las tablas referenciadas (la 0004 agrega `uq_periods_id_organization_id`). Importes `NUMERIC(18,2)` en guaraníes enteros.
+
+```mermaid
+erDiagram
+    accounting_asset_categories ||--o{ accounting_fixed_assets : "category_id"
+    accounting_ledger_accounts |o--o{ accounting_asset_categories : "asset / accumulated / expense_account_id"
+    accounting_fixed_assets ||--o{ accounting_depreciation_items : "cuotas"
+    accounting_depreciation_runs ||--|{ accounting_depreciation_items : "detalle por bien"
+    accounting_periods ||--o{ accounting_depreciation_runs : "una viva por período"
+    accounting_journal_entries ||--o| accounting_depreciation_runs : "entry_id (kind=depreciation)"
+    accounting_journal_entries |o--o| accounting_fixed_assets : "disposal_entry_id (kind=disposal)"
+    accounting_journal_entries |o--o{ accounting_fixed_assets : "acquisition_entry_id"
+    finance_transactions |o--o{ accounting_fixed_assets : "(source_transaction_id, source_context_id)"
+    accounting_fixed_assets ||--o{ accounting_asset_year_values : "uno por ejercicio cerrado"
+    accounting_fiscal_years ||--o{ accounting_asset_year_values : ""
+    accounting_cost_centers |o--o{ accounting_journal_lines : "cost_center_id (solo ingreso o gasto)"
+    accounting_recurring_templates ||--|{ accounting_recurring_template_lines : "líneas"
+    accounting_recurring_templates ||--o{ accounting_recurring_generations : "una viva por período"
+    accounting_periods ||--o{ accounting_recurring_generations : ""
+    accounting_journal_entries ||--o| accounting_recurring_generations : "entry_id (kind=recurring)"
+    accounting_settings }o--o| accounting_ledger_accounts : "disposal_account_id"
+
+    accounting_asset_categories {
+        uuid id PK
+        varchar code "único por organización (slug)"
+        varchar name
+        int useful_life_months "NULL = incompleta"
+        numeric residual_rate "5,2; 0 a 20"
+        uuid asset_account_id "FK compuesta"
+        uuid accumulated_account_id "FK compuesta"
+        uuid expense_account_id "FK compuesta"
+        varchar source_url
+        varchar legal_reference
+        text citation
+        text note
+        varchar validation_status "pending|validated"
+        varchar validated_by_name
+        varchar validated_reference
+        timestamptz validated_at
+        timestamptz archived_at
+    }
+    accounting_fixed_assets {
+        uuid id PK
+        uuid category_id "FK compuesta"
+        varchar name
+        varchar description
+        varchar serial_or_reference
+        date acquired_on
+        varchar start_rule "next_month|next_fiscal_year"
+        date depreciation_start "día 1"
+        numeric cost
+        numeric residual_value "contable"
+        int useful_life_months "contable"
+        int fiscal_useful_life_months
+        numeric fiscal_residual_rate "0 a 20"
+        numeric fiscal_residual_value "floor(costo x %)"
+        uuid acquisition_entry_id
+        uuid source_transaction_id
+        uuid source_context_id
+        varchar source_context_kind "business"
+        varchar status "active|disposed"
+        date disposed_on
+        varchar disposal_kind "sale|scrap|donation"
+        varchar disposal_reason
+        varchar disposal_document_reference
+        uuid disposal_entry_id "único"
+        uuid created_by
+    }
+    accounting_depreciation_runs {
+        uuid id PK
+        uuid period_id "FK compuesta"
+        uuid entry_id "único"
+        varchar entry_status "copiado por trigger"
+        uuid created_by
+    }
+    accounting_depreciation_items {
+        uuid id PK
+        uuid run_id
+        uuid asset_id
+        int installment
+        numeric amount "> 0, entero"
+    }
+    accounting_asset_year_values {
+        uuid id PK
+        uuid asset_id
+        uuid fiscal_year_id
+        numeric fiscal_net_value
+        numeric accounting_net_value
+        numeric fiscal_depreciation
+        numeric accounting_depreciation
+    }
+    accounting_cost_centers {
+        uuid id PK
+        varchar code "único por organización"
+        varchar name
+        timestamptz archived_at
+    }
+    accounting_recurring_templates {
+        uuid id PK
+        varchar description
+        varchar document_reference
+        smallint day_of_month "1 a 31"
+        date start_date
+        date end_date
+        varchar status "active|paused"
+        uuid created_by
+    }
+    accounting_recurring_template_lines {
+        uuid id PK
+        uuid template_id
+        smallint line_no
+        uuid account_id "FK compuesta"
+        numeric debit
+        numeric credit
+        varchar description
+        uuid cost_center_id
+        char fx_currency
+        numeric fx_amount
+        numeric fx_rate
+    }
+    accounting_recurring_generations {
+        uuid id PK
+        uuid template_id
+        uuid period_id
+        uuid entry_id "único"
+        varchar entry_status "copiado por trigger"
+        uuid created_by
+    }
+```
+
+Cambios en tablas de la 0003: `journal_entries.kind` pasa a `varchar(12)` y `ck_journal_entries_kind_valid` admite `depreciation`, `disposal` y `recurring`; `journal_lines.cost_center_id uuid NULL` con FK compuesta a `cost_centers`; `settings` recibe `disposal_account_id` (FK compuesta a `ledger_accounts`), `cost_centers_required boolean` y `default_asset_start_rule` (`ck_settings_start_rule_valid`, por defecto `next_month`).
+
+### Restricciones (3B)
+| Restricción | Qué impide |
+|---|---|
+| `uq_asset_categories_organization_id_code`, `ck_asset_categories_name_not_blank` | Códigos repetidos; nombre vacío |
+| `ck_asset_categories_useful_life_positive`, `ck_asset_categories_residual_rate_range` | Vida útil no positiva; residual fuera de 0 a 20 % (Ley 6380, art. 11) |
+| `ck_asset_categories_validation_status_valid`, `ck_asset_categories_validation_complete` | Categoría `validated` sin nombre, matrícula y fecha del contador, o esos datos con `pending` (D-056) |
+| `ck_fixed_assets_cost_positive_integer`, `ck_fixed_assets_residual_valid` | Costo no positivo o con decimales; residual negativo, con decimales o no menor que el costo |
+| `ck_fixed_assets_useful_life_positive`, `ck_fixed_assets_fiscal_residual_rate_range`, `ck_fixed_assets_fiscal_residual_value_exact` | Vidas no positivas; residual fiscal fuera de 0 a 20 %; valor residual fiscal distinto de `floor(costo × %)` (D-065) |
+| `ck_fixed_assets_start_rule_valid`, `ck_fixed_assets_depreciation_start_first_day`, `ck_fixed_assets_start_after_acquisition` | Regla de inicio fuera de catálogo; inicio que no es un día 1 o no es posterior a la adquisición (D-064) |
+| `ck_fixed_assets_status_valid`, `ck_fixed_assets_disposed_has_entry`, `ck_fixed_assets_disposal_complete`, `ck_fixed_assets_disposal_kind_valid`, `ck_fixed_assets_disposed_after_acquired`, `uq_fixed_assets_disposal_entry_id` | Dado de baja sin asiento; datos de la baja incompletos (fecha, tipo, motivo y documento van juntos con el asiento, D-072); baja anterior a la adquisición; un asiento para dos bajas |
+| `ck_fixed_assets_source_complete`, `ck_fixed_assets_source_business_only` y FK `(source_transaction_id, source_context_id) → finance.transactions` | Origen incompleto o personal (D-035) |
+| `uq_depreciation_runs_entry_id`, `uq_depreciation_runs_live_period` (parcial `WHERE entry_status IN ('draft','posted')`), `ck_depreciation_runs_entry_status_valid` | Dos corridas con el mismo asiento; dos corridas vivas en el mismo período (D-058) |
+| `uq_depreciation_items_run_id_asset_id`, `ck_depreciation_items_amount_positive_integer`, `ck_depreciation_items_installment_positive` | Un bien dos veces en la corrida; cuota no positiva o con decimales |
+| `uq_asset_year_values_asset_id_fiscal_year_id`, `ck_asset_year_values_values_non_negative`, `ck_asset_year_values_values_pyg_integer` | Dos valores del mismo bien y ejercicio; valores negativos o con decimales (D-066) |
+| `uq_cost_centers_organization_id_code`, `ck_cost_centers_code_format`, `ck_cost_centers_name_not_blank` | Código repetido o con caracteres no permitidos; nombre vacío |
+| `ck_recurring_templates_day_of_month_range`, `ck_recurring_templates_dates_ordered`, `ck_recurring_templates_status_valid`, `ck_recurring_templates_description_not_blank` | Día fuera de 1 a 31; fin antes del inicio; estado fuera de catálogo |
+| `ck_recurring_template_lines_*`, `uq_recurring_template_lines_template_id_line_no` | Las mismas reglas de línea que un asiento (debe xor haber, enteros, moneda extranjera completa) |
+| `uq_recurring_generations_entry_id`, `uq_recurring_generations_live` (parcial `WHERE entry_status IN ('draft','posted')`) | Dos generaciones vivas de la misma plantilla en el mismo período (D-061) |
+| `ix_fixed_assets_org_status`, `ix_depreciation_items_asset` | Índices: bienes por estado; cuotas por bien |
+
+### Triggers (3B)
+Mismo esquema que en la 0003 (`SQLSTATE 23000`, nombre estable en `CONSTRAINT`, traducción en `accounting/common.py`). La 0004 reemplaza `journal_entries_guard` y `journal_lines_guard` con `CREATE OR REPLACE` (conserva todo lo de la 0003) y la bajada restaura exactamente la versión de la 0003. Pruebas con SQL directo en `tests/test_accounting_db_triggers_3b.py`; se verificó que cada una falla si se quita su regla.
+
+| Trigger (tabla) | Nombre del rechazo | Qué impide |
+|---|---|---|
+| `journal_entries_guard` v0004 | `trg_journal_entries_reversal_invalid` | Ahora se revierten también `depreciation`, `disposal` y `recurring` (no `reversal` ni `closing`) |
+| | `trg_journal_entries_reversal_mismatch` | Además de cuentas e importes invertidos, el mismo centro de costos en cada línea (D-078) |
+| | `trg_journal_entries_cost_center_required` | Con `settings.cost_centers_required`, contabilizar un `manual`, `finance` o `recurring` con una línea de ingreso o gasto sin centro |
+| | `trg_journal_entries_depreciation_mismatch` | Contabilizar una depreciación cuyo debe no es la suma de su detalle por bien (o sin corrida) |
+| | `trg_journal_entries_disposal_orphan` | Contabilizar una baja que no es la de ningún bien |
+| `journal_lines_guard` v0004 | `trg_journal_lines_cost_center_account` | Centro de costos en una línea de cuenta que no es de ingreso ni de gasto (BR-ACC-16) |
+| | `trg_journal_lines_cost_center_archived` | Centro archivado, salvo en una reversión |
+| `journal_entries_sync_links` (`journal_entries`, AFTER UPDATE OF status) | — | Copia el estado de un asiento `depreciation` o `recurring` en `entry_status` de su corrida o generación (D-069) |
+| `depreciation_runs_guard`, `recurring_generations_guard` (`entry_links_guard()`) | `trg_<tabla>_entry_invalid` | Crear la corrida o la generación con un asiento que no es un borrador de su tipo |
+| | `trg_<tabla>_period_mismatch` | Asiento con fecha fuera del período o de otro ejercicio |
+| | `trg_<tabla>_immutable` | Cambiar algo que no sea `entry_status`, que además se relee siempre del asiento (no se puede falsear) |
+| `depreciation_items_guard` (INSERT/UPDATE/DELETE) | `trg_depreciation_items_immutable`, `trg_depreciation_items_entry_not_draft` | Modificar o borrar el detalle; agregarlo con la corrida fuera de borrador |
+| `fixed_assets_guard` (UPDATE) | `trg_fixed_assets_depreciated` | Cambiar costo, residuales, vidas, inicio, regla o categoría de un bien con depreciaciones vivas (D-071) |
+| `asset_year_values_immutable` (`reject_update()`) | `trg_asset_year_values_immutable` | Modificar los valores guardados al cierre |
+| `*_no_delete` (categorías, bienes, corridas, valores por ejercicio, centros, plantillas, generaciones), `*_no_truncate` (las ocho tablas) | `trg_<tabla>_no_delete` | Borrar o `TRUNCATE`. Las líneas de plantilla sí se reemplazan al editarla |
+
+### Rendimiento (3B)
+Medido en la prueba `slow` (PostgreSQL 18 en Docker, mediana de 5 tras 1 de calentamiento): corrida de depreciación con 2.000 bienes ~0,4 s (requisito < 1 s); XLSX del diario con 20.000 líneas ~2,1 s (requisito < 3 s).
+
+### Datos y bajada (migración `0004`)
+Sin datos iniciales: las categorías se cargan por la API. La bajada falla con un mensaje claro si hay asientos `depreciation`, `disposal` o `recurring`, o líneas con centro de costos (D-080); si no, borra las tablas y columnas de la 3B, restaura `journal_entries_guard` y `journal_lines_guard` de la 0003 y el `CHECK` de `kind`, y borra `uq_periods_id_organization_id`.
+
 ## Modelo objetivo (fases 4 a 7)
 
 Se implementa por fases; cada tabla nace con su migración, su prueba y su pantalla. Lo que sigue es el diseño de referencia y **se revisará** en cada fase. Finanzas (fase 2) y el núcleo contable (fase 3) ya están implementados (secciones anteriores): en el diagrama aparecen solo como punto de enganche.

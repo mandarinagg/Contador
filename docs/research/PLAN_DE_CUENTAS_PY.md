@@ -64,10 +64,10 @@
 ## 3. Propuesta
 
 - **Archivo:** `plan_de_cuentas_propuesto.yaml`.
-- **Tamaño:** 159 cuentas en total.
-  - 110 son imputables, es decir que reciben asientos.
-  - 141 tienen código y nombre idénticos al modelo de la RG 49/2014. Lo verifiqué contra el XLS oficial.
-  - 18 se agregaron como propuesta y están marcadas con `origen: propuesta`.
+- **Tamaño:** 173 cuentas en total (159 en la versión del núcleo; 14 más desde la fase 3B, ver §3.4).
+  - 122 son imputables, es decir que reciben asientos.
+  - 142 tienen código y nombre idénticos al modelo de la RG 49/2014. Lo verifiqué contra el XLS oficial.
+  - 31 se agregaron como propuesta y están marcadas con `origen: propuesta`.
 
 ### 3.1 Criterios
 
@@ -89,6 +89,7 @@
 7. **El campo `tipo` admite cinco valores.** Los costos (grupo 5) van como `gasto`.
    - En el grupo 14 (previsiones), la desafectación (`14.01`) es `ingreso` y la constitución (`14.02`) es `gasto`.
    - La diferencia de cambio aparece dos veces, como en el modelo: ganancia en `8.05` y pérdida en `13.04`.
+8. **Activo fijo por clase de bien (fase 3B).** El terreno, que no se deprecia, va separado de las construcciones; cada clase de bien con vida útil propia tiene su cuenta de activo y su subcuenta de depreciación acumulada bajo `1.02.04.99`, para que el saldo por clase cuadre con el cuadro de depreciación (RG 77/2020). Las cuentas nuevas sin código del modelo van en los códigos libres `1.02.04.xx` que el XLS reserva para «nuevas cuentas a incluir».
 
 ### 3.2 Estructura resumida
 
@@ -123,6 +124,20 @@
 | 2.01.03.02.01 a .03 | Sueldos, aportes IPS y aguinaldo a pagar | Solo con empleados |
 | 4.01.01.01 / .02 | Ventas gravadas IVA 10% / 5% | DJ del IVA por tasa |
 | 11.19 | Suscripciones de software y servicios digitales | Gasto habitual |
+| 1.02.04.01.01 / .02 | Terrenos / Construcciones y mejoras | El terreno no se deprecia (fase 3B) |
+| 1.02.04.09 | Envases retornables | Categoría del art. 31 (Decreto 6105/2021); código libre |
+| 1.02.04.10 | Otros bienes de propiedad, planta y equipo | Categoría residual del art. 31; código libre |
+| 1.02.04.99.01 a .10 | (-) Depreciación acumulada por clase de bien | Una regularizadora por cuenta de activo (salvo el terreno) |
+
+### 3.4 Retoques de la fase 3B (2026-11-24)
+
+Pedidos por `docs/specs/FASE3B_CONTABILIDAD.md` §6, a partir de `docs/research/DEPRECIACION_PY.md` §8. Las organizaciones que ya cargaron el plan no se tocan: el plan se carga una sola vez.
+
+- **`1.02.04.04 MAQUINARIAS`: agregada con `origen: rg49_2014`.** Verificado el 2026-11-24 contra el XLS oficial de anexos (URL de §2.1, archivo de 128.000 bytes guardado por última vez el 26-04-2016): la hoja `1_Balance General` trae, en la fila 112, «1.02.04.04 | MAQUINARIAS», entre «1.02.04.03 MUEBLES, ÚTILES Y ENSERES» y «1.02.04.05 EQUIPOS». El XLS también lista `1.02.04.07 BIENES FUERA DE OPERACIÓN`, `1.02.04.97 BIENES INCORPORADOS AL AMPARO DE LA LEY N° 60/90` y `1.02.04.98 BIENES EN ARRENDAMIENTO FINANCIERO`, que siguen omitidas (no aplican a esta EAS), y la fila `1.02.04.xx (nuevas cuentas a incluir)`.
+- **`1.02.04.01 INMUEBLES` pasa a agrupadora** con `1.02.04.01.01 TERRENOS` y `1.02.04.01.02 CONSTRUCCIONES Y MEJORAS` (propuesta).
+- **`1.02.04.99 (-) DEPRECIACIÓN ACUMULADA` pasa a agrupadora** con una subcuenta por clase de bien: `.01` construcciones y mejoras, `.02` rodados, `.03` muebles, útiles y enseres, `.04` maquinarias, `.05` equipos, `.06` herramientas, `.08` mejoras en predio ajeno, `.09` envases retornables y `.10` otros bienes. El sufijo repite el de la cuenta de activo.
+- **`1.02.04.09 ENVASES RETORNABLES` y `1.02.04.10 OTROS BIENES DE PROPIEDAD, PLANTA Y EQUIPO`** (propuesta) para las dos categorías candidatas que no tenían cuenta.
+- Las categorías candidatas (`categorias_activo_fijo_candidatas.yaml`) apuntan ahora a estas cuentas: ninguna queda sin cuenta de activo, y solo `terrenos` queda sin cuenta de depreciación acumulada (no se deprecia).
 
 ## 4. Preguntas para el contador sobre el plan
 
@@ -130,5 +145,5 @@
 2. **Actividad real de la EAS:** ¿vende bienes, servicios o ambos? Eso define si hacen falta inventarios y costo de mercaderías, o solo costo de servicios.
 3. **Reserva legal:** ¿es obligatoria para la EAS, por aplicación supletoria de las normas de sociedades anónimas (Ley 6480, art. 42)? ¿Con qué porcentaje? No lo investigué.
 4. **Moneda extranjera:** ¿habrá cuentas en dólares? Si las hay, aplica la NIF 23 y se necesita registrar la diferencia de cambio.
-5. **Depreciación:** ¿qué tasas o vidas útiles fiscales aplica? El Cuadro de Revalúo y Depreciación (Anexo 6) y el Decreto 3182 no se analizaron para esto.
+5. **Depreciación:** las vidas útiles y los valores residuales fiscales están investigados en `DEPRECIACION_PY.md` (Decreto 3182, art. 31) y el cuadro vigente es el Anexo de la RG 77/2020, no el Anexo 6 de la RG 49/2014. Falta que el contador valide las 34 categorías y las subcuentas por clase de bien de §3.4.
 6. **Gastos de constitución de la EAS:** ¿se activan en `1.02.06.01` y se amortizan, o van a gastos del ejercicio?

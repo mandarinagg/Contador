@@ -47,10 +47,10 @@ def test_packaged_chart_is_identical_to_research_yaml() -> None:
     research = _yaml()
     assert research["meta"] == proposed_chart.META
     assert research["cuentas"] == list(proposed_chart.CUENTAS)
-    assert len(proposed_chart.CUENTAS) == 159
+    assert len(proposed_chart.CUENTAS) == 173
 
 
-def test_load_proposed_creates_159_accounts_with_hierarchy_and_kinds(
+def test_load_proposed_creates_173_accounts_with_hierarchy_and_kinds(
     client: TestClient, owner_token: str
 ) -> None:
     headers = auth_header(owner_token)
@@ -58,7 +58,7 @@ def test_load_proposed_creates_159_accounts_with_hierarchy_and_kinds(
     assert before["chart_status"] == "none" and before["accounts"] == []
 
     created = load_chart(client, owner_token)
-    assert len(created) == 159
+    assert len(created) == 173
     by_id = {a["id"]: a for a in created.values()}
     for row in _yaml()["cuentas"]:
         account = created[row["codigo"]]
@@ -80,14 +80,14 @@ def test_load_proposed_creates_159_accounts_with_hierarchy_and_kinds(
     assert corriente["code"] == "1.01"
     assert [c["code"] for c in corriente["children"]][:2] == ["1.01.01", "1.01.02"]
     flat = ok(client.get(f"{ACC}/chart", params={"flat": "true"}, headers=headers))
-    assert len(flat["accounts"]) == 159 and all(a["children"] is None for a in flat["accounts"])
+    assert len(flat["accounts"]) == 173 and all(a["children"] is None for a in flat["accounts"])
 
     created_audit = [
         e
         for e in audit_entries(client, owner_token, "accounting.ledger_account")
         if e["action"] == "accounting.ledger_account.created"
     ]
-    assert len(created_audit) == 159
+    assert len(created_audit) == 173
     assert audit_entries(client, owner_token, "accounting.chart")[0]["after"]["chart_status"] == (
         "pending"
     )
@@ -97,7 +97,7 @@ def test_proposed_chart_is_not_loaded_twice(client: TestClient, owner_token: str
     load_chart(client, owner_token)
     res = client.post(f"{ACC}/chart/load-proposed", headers=auth_header(owner_token))
     assert res.status_code == 409 and error_code(res) == "CHART_NOT_EMPTY"
-    assert len(chart_by_code(client, owner_token)) == 159
+    assert len(chart_by_code(client, owner_token)) == 173
 
 
 def test_used_account_does_not_change_code_or_nature(client: TestClient, owner_token: str) -> None:
@@ -310,7 +310,7 @@ def test_chart_balances_sum_their_subtree(client: TestClient, owner_token: str) 
         owner_token,
         accounts,
         "2026-02-11",
-        [("15.01", 500, 0), ("1.02.04.99", 0, 500)],
+        [("15.01", 500, 0), ("1.02.04.99.03", 0, 500)],
     )
     chart = ok(
         client.get(
@@ -327,7 +327,7 @@ def test_chart_balances_sum_their_subtree(client: TestClient, owner_token: str) 
     balances = {a["code"]: a["balance"] for a in chart["accounts"]}
     assert balances[CAJA] == "4000" and balances[BANCOS] == "3000"
     assert balances[GRUPO_DISPONIBILIDADES] == "7000"
-    assert balances["1.02.04.99"] == "-500" and balances["1"] == "6500"
+    assert balances["1.02.04.99.03"] == "-500" and balances["1"] == "6500"
     assert balances["3"] == "7000" and balances["15"] == "500"
     in_use = {a["code"] for a in chart["accounts"] if a["in_use"]}
-    assert in_use == {CAJA, BANCOS, CAPITAL, "15.01", "1.02.04.99"}
+    assert in_use == {CAJA, BANCOS, CAPITAL, "15.01", "1.02.04.99.03"}

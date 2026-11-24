@@ -26,9 +26,10 @@
 #   validation_status             pending hasta que lo valide el contador
 #
 # Notas generales:
-# - El plan propuesto tiene UNA sola cuenta de depreciación acumulada para todo el activo fijo (1.02.04.99).
-#   Si se quiere saldo por categoría, hay que agregar subcuentas debajo de 1.02.04.99 (el modelo RG 49/2014 permite
-#   agregar cuentas). Es una decisión de diseño, no de la norma.
+# - Cuentas: las del plan propuesto retocado en la fase 3B (FASE3B_CONTABILIDAD.md §6): 1.02.04.04 MAQUINARIAS
+#   (del modelo RG 49/2014), terreno y construcciones separados bajo 1.02.04.01, 1.02.04.09 y 1.02.04.10 en
+#   códigos libres, y una subcuenta de depreciación acumulada por clase de bien bajo 1.02.04.99. Las
+#   subcuentas son una decisión de diseño, no de la norma.
 # - Los activos biológicos (ganado y plantaciones) del art. 31 no se incluyen: esta EAS no los tiene.
 # - Cada bien se rige por las normas vigentes al momento de su adquisición (Decreto 3182, art. 30). Las filas
 #   reflejan la redacción vigente desde el 14-10-2021. La única diferencia que encontré con el texto de 2019 es la
@@ -49,7 +50,7 @@ categorias:
     valor_residual_pct: 10
     metodo: "lineal"
     cuenta_activo: "1.02.04.03"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.03"
     cuenta_gasto: "15.01"
     nota: "Clasificar un bien como equipo general (5 años), informática (2 años) o útil/enser (2 años) es criterio del contador (D-DEP-14)."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -65,7 +66,7 @@ categorias:
     valor_residual_pct: 10
     metodo: "lineal"
     cuenta_activo: "1.02.04.03"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.03"
     cuenta_gasto: "15.01"
     nota: "Poco probable en una EAS de servicios; se incluye porque está en la norma."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -81,7 +82,7 @@ categorias:
     valor_residual_pct: 10
     metodo: "lineal"
     cuenta_activo: "1.02.04.03"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.03"
     cuenta_gasto: "15.01"
     nota: "Actividad rural; probablemente no aplica a esta EAS."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -97,7 +98,7 @@ categorias:
     valor_residual_pct: 10
     metodo: "lineal"
     cuenta_activo: "1.02.04.03"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.03"
     cuenta_gasto: "15.01"
     nota: "Ver D-DEP-3 (bienes de bajo valor) y D-DEP-14 (clasificación)."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -112,10 +113,10 @@ categorias:
     vida_util_anios: 3
     valor_residual_pct: 10
     metodo: "lineal"
-    cuenta_activo: null
-    cuenta_depreciacion_acumulada: null
+    cuenta_activo: "1.02.04.09"
+    cuenta_depreciacion_acumulada: "1.02.04.99.09"
     cuenta_gasto: "15.01"
-    nota: "Categoría agregada por el Decreto 6105/2021 (no estaba en el texto original de 2019). El plan propuesto no tiene una cuenta adecuada; si hiciera falta, agregar una subcuenta bajo 1.02.04. Probablemente no aplica a esta EAS."
+    nota: "Categoría agregada por el Decreto 6105/2021 (no estaba en el texto original de 2019). Cuenta propuesta 1.02.04.09 ENVASES RETORNABLES (código libre del rango 1.02.04.xx del modelo). Probablemente no aplica a esta EAS."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
     referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
     cita: "v) Envases retornables: 3 años. Valor Residual: 10%."
@@ -128,10 +129,10 @@ categorias:
     vida_util_anios: 10
     valor_residual_pct: 20
     metodo: "lineal"
-    cuenta_activo: null
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_activo: "1.02.04.04"
+    cuenta_depreciacion_acumulada: "1.02.04.99.04"
     cuenta_gasto: "15.01"
-    nota: "El modelo RG 49/2014 tiene 1.02.04.04 MAQUINARIAS, pero el plan propuesto la omitió. Sugerencia: agregarla con el mismo código del modelo y usarla aquí."
+    nota: "Cuenta 1.02.04.04 MAQUINARIAS: figura en el XLS oficial de anexos de la RG 49/2014 (hoja 1_Balance General) y se agregó al plan propuesto con su código del modelo."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
     referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
     cita: "i) Maquinarias e implementos: 10 años. Valor Residual: 20%."
@@ -145,7 +146,7 @@ categorias:
     valor_residual_pct: 10
     metodo: "lineal"
     cuenta_activo: "1.02.04.06"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.06"
     cuenta_gasto: "15.01"
     nota: "El plan propuesto separa Herramientas (1.02.04.06) y Equipos (1.02.04.05, agrupadora). Un equipo que no sea de informática no tiene cuenta imputable propia."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -161,7 +162,7 @@ categorias:
     valor_residual_pct: 10
     metodo: "lineal"
     cuenta_activo: "1.02.04.05.01"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.05"
     cuenta_gasto: "15.01"
     nota: "En el Decreto 3182/2019 original la cifra queda parcialmente tapada por una firma en el escaneo (se lee 2 años). El Decreto 6105/2021 la republica legible: 2 años. El software no está aquí (ver software_licencias)."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -177,7 +178,7 @@ categorias:
     valor_residual_pct: 20
     metodo: "lineal"
     cuenta_activo: "1.02.04.02"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.02"
     cuenta_gasto: "15.01"
     nota: "Duda sobre qué es vehículo utilitario (10 años) frente a automotor común (5 años): D-DEP-13."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -193,7 +194,7 @@ categorias:
     valor_residual_pct: 10
     metodo: "lineal"
     cuenta_activo: "1.02.04.02"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.02"
     cuenta_gasto: "15.01"
     nota: null
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -209,7 +210,7 @@ categorias:
     valor_residual_pct: 20
     metodo: "lineal"
     cuenta_activo: "1.02.04.02"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.02"
     cuenta_gasto: "15.01"
     nota: "La norma no define utilitarios (D-DEP-13)."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -225,7 +226,7 @@ categorias:
     valor_residual_pct: 20
     metodo: "lineal"
     cuenta_activo: "1.02.04.02"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.02"
     cuenta_gasto: "15.01"
     nota: null
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -241,7 +242,7 @@ categorias:
     valor_residual_pct: 20
     metodo: "lineal"
     cuenta_activo: "1.02.04.02"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.02"
     cuenta_gasto: "15.01"
     nota: "Improbable en esta EAS."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -257,7 +258,7 @@ categorias:
     valor_residual_pct: 10
     metodo: "lineal"
     cuenta_activo: "1.02.04.02"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.02"
     cuenta_gasto: "15.01"
     nota: "Improbable en esta EAS."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -273,7 +274,7 @@ categorias:
     valor_residual_pct: 20
     metodo: "lineal"
     cuenta_activo: "1.02.04.02"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.02"
     cuenta_gasto: "15.01"
     nota: "Improbable en esta EAS."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -289,7 +290,7 @@ categorias:
     valor_residual_pct: 20
     metodo: "lineal"
     cuenta_activo: "1.02.04.02"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.02"
     cuenta_gasto: "15.01"
     nota: "Improbable en esta EAS."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -305,7 +306,7 @@ categorias:
     valor_residual_pct: 10
     metodo: "lineal"
     cuenta_activo: "1.02.04.02"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.02"
     cuenta_gasto: "15.01"
     nota: "Improbable en esta EAS."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -321,7 +322,7 @@ categorias:
     valor_residual_pct: 20
     metodo: "lineal"
     cuenta_activo: "1.02.04.02"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.02"
     cuenta_gasto: "15.01"
     nota: "Improbable en esta EAS."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -337,7 +338,7 @@ categorias:
     valor_residual_pct: 20
     metodo: "lineal"
     cuenta_activo: "1.02.04.02"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.02"
     cuenta_gasto: "15.01"
     nota: "Improbable en esta EAS."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -352,10 +353,10 @@ categorias:
     vida_util_anios: 30
     valor_residual_pct: 20
     metodo: "lineal"
-    cuenta_activo: "1.02.04.01"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_activo: "1.02.04.01.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99.01"
     cuenta_gasto: "15.01"
-    nota: "El plan propuesto tiene una sola cuenta Inmuebles (1.02.04.01) para terreno y construcción. El terreno no se deprecia, así que la aplicación debe separarlos (por subcuenta o por campo). Si el precio no los distingue, el Decreto 3182, art. 24, usa la valuación fiscal del impuesto inmobiliario."
+    nota: "El plan propuesto separa el terreno (1.02.04.01.01, no se deprecia) de las construcciones (1.02.04.01.02). Si el precio no los distingue, el Decreto 3182, art. 24, usa la valuación fiscal del impuesto inmobiliario."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
     referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
     cita: "i) Construcciones y mejoras de inmuebles urbanos y rurales, excluido el terreno y los comprendidos en los enunciados siguientes: Vida útil 30 años. Valor Residual: 20%."
@@ -368,7 +369,7 @@ categorias:
     vida_util_anios: null
     valor_residual_pct: null
     metodo: "no_depreciable"
-    cuenta_activo: "1.02.04.01"
+    cuenta_activo: "1.02.04.01.01"
     cuenta_depreciacion_acumulada: null
     cuenta_gasto: null
     nota: "No encontré una frase que diga expresamente que el terreno no se deprecia; se infiere de que el art. 31 lo excluye de la tabla. Ver D-DEP-12."
@@ -384,8 +385,8 @@ categorias:
     vida_util_anios: 20
     valor_residual_pct: 20
     metodo: "lineal"
-    cuenta_activo: "1.02.04.01"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_activo: "1.02.04.01.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99.01"
     cuenta_gasto: "15.01"
     nota: "Un depósito o galpón propio de la EAS caería aquí y no en la fila de 30 años."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -400,8 +401,8 @@ categorias:
     vida_util_anios: 5
     valor_residual_pct: 10
     metodo: "lineal"
-    cuenta_activo: "1.02.04.01"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_activo: "1.02.04.01.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99.01"
     cuenta_gasto: "15.01"
     nota: "Actividad rural; probablemente no aplica."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -416,8 +417,8 @@ categorias:
     vida_util_anios: 15
     valor_residual_pct: 20
     metodo: "lineal"
-    cuenta_activo: "1.02.04.01"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_activo: "1.02.04.01.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99.01"
     cuenta_gasto: "15.01"
     nota: "Actividad rural; probablemente no aplica."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -432,8 +433,8 @@ categorias:
     vida_util_anios: 10
     valor_residual_pct: 20
     metodo: "lineal"
-    cuenta_activo: "1.02.04.01"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_activo: "1.02.04.01.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99.01"
     cuenta_gasto: "15.01"
     nota: "Actividad rural; probablemente no aplica."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -449,7 +450,7 @@ categorias:
     valor_residual_pct: 0
     metodo: "lineal"
     cuenta_activo: "1.02.04.08"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.08"
     cuenta_gasto: "15.01"
     nota: "Si el contrato fija un plazo menor, ese plazo es la vida útil. Cuenta del modelo RG 49/2014: Mejoras en predio ajeno."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -465,7 +466,7 @@ categorias:
     valor_residual_pct: 0
     metodo: "lineal"
     cuenta_activo: "1.02.04.08"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_depreciacion_acumulada: "1.02.04.99.08"
     cuenta_gasto: "15.01"
     nota: "Si el contrato de alquiler fija un plazo menor, ese plazo es la vida útil. Caso relevante para una EAS que alquila su oficina."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -480,10 +481,10 @@ categorias:
     vida_util_anios: 10
     valor_residual_pct: 10
     metodo: "lineal"
-    cuenta_activo: "1.02.04.01"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_activo: "1.02.04.01.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99.01"
     cuenta_gasto: "15.01"
-    nota: "Sin cuenta específica en el plan propuesto; se propone Inmuebles por cercanía. Validar."
+    nota: "Sin cuenta específica en el plan propuesto; se propone Construcciones y mejoras (1.02.04.01.02) por cercanía. Validar."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
     referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
     cita: "viii) Instalaciones de electrificación: Vida útil 10 años. Valor residual: 10%."
@@ -496,8 +497,8 @@ categorias:
     vida_util_anios: 15
     valor_residual_pct: 20
     metodo: "lineal"
-    cuenta_activo: "1.02.04.01"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_activo: "1.02.04.01.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99.01"
     cuenta_gasto: "15.01"
     nota: "Actividad rural; probablemente no aplica."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
@@ -512,10 +513,10 @@ categorias:
     vida_util_anios: 10
     valor_residual_pct: 20
     metodo: "lineal"
-    cuenta_activo: "1.02.04.01"
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_activo: "1.02.04.01.02"
+    cuenta_depreciacion_acumulada: "1.02.04.99.01"
     cuenta_gasto: "15.01"
-    nota: "Sin cuenta específica en el plan propuesto. Si están en un local alquilado, ver más bien mejoras_en_propiedad_de_terceros."
+    nota: "Sin cuenta específica en el plan propuesto; se propone Construcciones y mejoras (1.02.04.01.02). Si están en un local alquilado, ver más bien mejoras_en_propiedad_de_terceros."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
     referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
     cita: "x) Instalaciones eléctricas, sistemas de prevención de incendios, mamparas y otros, incorporados como parte de construcciones y mejoras de inmuebles: Vida útil 10 años. Valor residual: 20%."
@@ -528,10 +529,10 @@ categorias:
     vida_util_anios: 5
     valor_residual_pct: 20
     metodo: "lineal"
-    cuenta_activo: null
-    cuenta_depreciacion_acumulada: "1.02.04.99"
+    cuenta_activo: "1.02.04.10"
+    cuenta_depreciacion_acumulada: "1.02.04.99.10"
     cuenta_gasto: "15.01"
-    nota: "Categoría residual. El plan propuesto no tiene una cuenta de otros bienes de PPE. Es dudoso si aplica a todo el activo fijo no listado o solo al grupo Construcciones (D-DEP-15)."
+    nota: "Categoría residual. Cuenta propuesta 1.02.04.10 OTROS BIENES DE PROPIEDAD, PLANTA Y EQUIPO (código libre del rango 1.02.04.xx del modelo). Es dudoso si aplica a todo el activo fijo no listado o solo al grupo Construcciones (D-DEP-15)."
     fuente_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+6105-2021.pdf/d46a54b7-ab0d-e762-8a98-204d2a921ce9?t=1681415771708.pdf"
     referencia_legal: "Decreto N° 3182/2019, Anexo, art. 31 (redacción del Decreto N° 6105/2021, art. 1°, de 14-10-2021); Ley N° 6380/2019, art. 11 y art. 15 num. 15"
     cita: "xi) Los restantes bienes no contemplados en los incisos precedentes. Vida útil 5 años. Valor residual: 20%."

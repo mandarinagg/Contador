@@ -8,9 +8,10 @@ el plan. La contabilidad es de la organización activa (D-035).
 import uuid
 from datetime import date
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import AuthContext, DbSession, require
@@ -20,6 +21,7 @@ from app.modules.accounting import (
     chart,
     closing,
     entries,
+    exports,
     finance_link,
     periods,
     reports,
@@ -28,6 +30,7 @@ from app.modules.accounting.balances import ZERO
 from app.modules.accounting.common import pyg
 from app.modules.accounting.models import (
     AccountingSettings,
+    CostCenter,
     FiscalYear,
     JournalEntry,
     JournalLine,
@@ -37,6 +40,7 @@ from app.modules.accounting.schemas import (
     BalanceSheetOut,
     ChartOut,
     ChartValidate,
+    CostCenterColumnOut,
     EntryIn,
     EntryKind,
     EntryLineOut,
@@ -62,6 +66,7 @@ from app.modules.accounting.schemas import (
     TrialRowOut,
 )
 from app.modules.finance.money import format_amount
+from app.modules.identity.models import User
 
 router = APIRouter(prefix="/accounting", tags=["accounting"])
 
@@ -73,6 +78,8 @@ ReportLimit = Annotated[int, Query(ge=1, le=1000)]
 Before = Annotated[uuid.UUID | None, Query()]
 From = Annotated[date, Query(alias="from")]
 To = Annotated[date, Query(alias="to")]
+# D-063: `?format=xlsx` devuelve el reporte como planilla.
+Format = Annotated[Literal["json", "xlsx"], Query(alias="format")]
 
 
 # --- Conversión a la salida (importes siempre como string) ------------------------------
@@ -93,7 +100,26 @@ def _settings_out(settings: AccountingSettings | None) -> SettingsOut:
         chart_validated_reference=settings.chart_validated_reference,
         chart_validated_at=settings.chart_validated_at,
         retained_earnings_account_id=settings.retained_earnings_account_id,
+        asset_disposal_account_id=settings.asset_disposal_account_id,
+        cost_centers_required=settings.cost_centers_required,
+        default_asset_start_rule=settings.default_asset_start_rule,
     )
+
+
+def _xlsx(content: bytes, filename: str) -> Response:
+    return Response(
+        content=content,
+        media_type=exports.XLSX_MEDIA_TYPE,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def user_names(db: Session, user_ids: set[uuid.UUID]) -> dict[uuid.UUID, str]:
+    """Nombre visible de los usuarios (P-10): solo `full_name`, nada más del usuario."""
+    if not user_ids:
+        return {}
+    rows = db.execute(select(User.id, User.full_name).where(User.id.in_(user_ids)))
+    return {user_id: name for user_id, name in rows}
 
 
 def _account_out(
@@ -160,7 +186,9 @@ def _fiscal_year_out(db: Session, years: list[FiscalYear]) -> list[FiscalYearOut
     ]
 
 
-def _line_out(line: JournalLine, account: LedgerAccount) -> EntryLineOut:
+def _line_out(
+    line: JournalLine, account: LedgerAccount, centers: dict[uuid.UUID, CostCenter]
+) -> EntryLineOut:
     return EntryLineOut(
         id=line.id,
         line_no=line.line_no,
@@ -177,6 +205,10 @@ def _line_out(line: JournalLine, account: LedgerAccount) -> EntryLineOut:
             else None
         ),
         fx_rate=format(line.fx_rate.normalize(), "f") if line.fx_rate is not None else None,
+        cost_center_id=line.cost_center_id,
+        cost_center_code=(
+            centers[line.cost_center_id].code if line.cost_center_id is not None else None
+        ),
     )
 
 
@@ -193,6 +225,21 @@ def _entries_out(
         )
         if with_lines
         else {}
+    )
+    center_ids = {
+        line.cost_center_id
+        for ls in lines.values()
+        for line in ls
+        if line.cost_center_id is not None
+    }
+    centers = (
+        {c.id: c for c in db.scalars(select(CostCenter).where(CostCenter.id.in_(center_ids)))}
+        if center_ids
+        else {}
+    )
+    names = user_names(
+        db,
+        {e.created_by for e in items} | {e.posted_by for e in items if e.posted_by is not None},
     )
     result = []
     for entry in items:
@@ -215,14 +262,19 @@ def _entries_out(
                 total_credit=pyg(credit),
                 balanced=debit == credit and debit > 0,
                 created_by=entry.created_by,
+                created_by_name=names.get(entry.created_by),
                 created_at=entry.created_at,
                 posted_by=entry.posted_by,
+                posted_by_name=names.get(entry.posted_by) if entry.posted_by else None,
                 posted_at=entry.posted_at,
                 discarded_by=entry.discarded_by,
                 discarded_at=entry.discarded_at,
                 discard_reason=entry.discard_reason,
                 lines=(
-                    [_line_out(line, accounts[line.account_id]) for line in lines[entry.id]]
+                    [
+                        _line_out(line, accounts[line.account_id], centers)
+                        for line in lines[entry.id]
+                    ]
                     if with_lines
                     else None
                 ),
@@ -235,7 +287,9 @@ def _entry_out(db: Session, organization_id: uuid.UUID, entry: JournalEntry) -> 
     return _entries_out(db, organization_id, [entry], with_lines=True)[0]
 
 
-def _statement_out(node: chart.Node) -> StatementNodeOut:
+def _statement_out(
+    node: chart.Node, columns: dict[uuid.UUID, list[Decimal]] | None = None
+) -> StatementNodeOut:
     return StatementNodeOut(
         account_id=node.account.id,
         code=node.account.code,
@@ -243,7 +297,10 @@ def _statement_out(node: chart.Node) -> StatementNodeOut:
         kind=node.account.kind,
         is_postable=node.account.is_postable,
         amount=pyg(node.amount),
-        children=[_statement_out(c) for c in node.children],
+        children=[_statement_out(c, columns) for c in node.children],
+        column_amounts=(
+            [pyg(a) for a in columns.get(node.account.id, [])] if columns is not None else None
+        ),
     )
 
 
@@ -321,9 +378,10 @@ def get_settings(auth: Reader, db: DbSession) -> SettingsOut:
 
 @router.put("/settings", response_model=SettingsOut)
 def update_settings(body: SettingsUpdate, auth: Poster, db: DbSession) -> SettingsOut:
-    """Cuenta de resultados del ejercicio para la refundición (patrimonio, imputable)."""
-    settings = chart.set_retained_earnings(
-        db, auth.organization_id, auth.user_id, body.retained_earnings_account_id
+    """Cambia solo los campos que llegan: cuenta de resultados del cierre (patrimonio), cuenta
+    de la baja de bienes (ingreso o gasto), centros obligatorios e inicio por defecto."""
+    settings = chart.update_settings(
+        db, auth.organization_id, auth.user_id, body.model_dump(exclude_unset=True)
     )
     return _settings_out(settings)
 
@@ -493,8 +551,19 @@ def journal_report(
     date_to: To,
     limit: ReportLimit = 200,
     after: Annotated[uuid.UUID | None, Query()] = None,
-) -> JournalReportOut:
-    """Libro diario por fecha y número. Cursor: `after` = id del último asiento recibido."""
+    fmt: Format = "json",
+) -> JournalReportOut | Response:
+    """Libro diario por fecha y número. Cursor: `after` = id del último asiento recibido.
+    Con `?format=xlsx`, el diario completo (sin paginar)."""
+    if fmt == "xlsx":
+        content = exports.journal_xlsx(
+            db,
+            auth.organization_id,
+            date_from,
+            date_to,
+            chart.chart_status(db, auth.organization_id),
+        )
+        return _xlsx(content, f"libro-diario-{date_from}-{date_to}.xlsx")
     page = reports.journal(db, auth.organization_id, date_from, date_to, limit=limit, after=after)
     return JournalReportOut(
         chart_status=chart.chart_status(db, auth.organization_id),
@@ -516,8 +585,20 @@ def ledger_report(
     date_to: To,
     limit: ReportLimit = 200,
     after: Annotated[uuid.UUID | None, Query()] = None,
-) -> LedgerReportOut:
-    """Libro mayor. Cursor: `after` = `line_id` del último movimiento recibido."""
+    fmt: Format = "json",
+) -> LedgerReportOut | Response:
+    """Libro mayor. Cursor: `after` = `line_id` del último movimiento recibido. Con
+    `?format=xlsx`, el mayor completo (sin paginar)."""
+    if fmt == "xlsx":
+        content = exports.ledger_xlsx(
+            db,
+            auth.organization_id,
+            account_id,
+            date_from,
+            date_to,
+            chart.chart_status(db, auth.organization_id),
+        )
+        return _xlsx(content, f"libro-mayor-{date_from}-{date_to}.xlsx")
     report = reports.ledger(
         db, auth.organization_id, account_id, date_from, date_to, limit=limit, after=after
     )
@@ -551,13 +632,31 @@ def ledger_report(
 
 @router.get("/reports/trial-balance", response_model=TrialBalanceOut)
 def trial_balance_report(
-    auth: Reader, db: DbSession, date_from: From, date_to: To
-) -> TrialBalanceOut:
+    auth: Reader, db: DbSession, date_from: From, date_to: To, fmt: Format = "json"
+) -> TrialBalanceOut | Response:
+    """Sumas y saldos con saldos iniciales (D-062) y finales."""
+    if fmt == "xlsx":
+        content = exports.trial_balance_xlsx(
+            db,
+            auth.organization_id,
+            date_from,
+            date_to,
+            chart.chart_status(db, auth.organization_id),
+        )
+        return _xlsx(content, f"balance-de-comprobacion-{date_from}-{date_to}.xlsx")
     rows = reports.trial_balance(db, auth.organization_id, date_from, date_to)
-    total_debit = sum((r.debit for r in rows), ZERO)
-    total_credit = sum((r.credit for r in rows), ZERO)
-    total_debit_balance = sum((r.debit_balance for r in rows), ZERO)
-    total_credit_balance = sum((r.credit_balance for r in rows), ZERO)
+
+    def total(name: str) -> Decimal:
+        return sum((getattr(r, name) for r in rows), ZERO)
+
+    total_debit = total("debit")
+    total_credit = total("credit")
+    total_debit_balance = total("debit_balance")
+    total_credit_balance = total("credit_balance")
+    totals = {
+        name: total(name)
+        for name in ("opening_debit", "opening_credit", "closing_debit", "closing_credit")
+    }
     return TrialBalanceOut(
         chart_status=chart.chart_status(db, auth.organization_id),
         date_from=date_from,
@@ -568,25 +667,41 @@ def trial_balance_report(
                 code=r.account.code,
                 name=r.account.name,
                 kind=r.account.kind,
+                opening_debit=pyg(r.opening_debit),
+                opening_credit=pyg(r.opening_credit),
                 debit=pyg(r.debit),
                 credit=pyg(r.credit),
                 debit_balance=pyg(r.debit_balance),
                 credit_balance=pyg(r.credit_balance),
+                closing_debit=pyg(r.closing_debit),
+                closing_credit=pyg(r.closing_credit),
             )
             for r in rows
         ],
+        total_opening_debit=pyg(totals["opening_debit"]),
+        total_opening_credit=pyg(totals["opening_credit"]),
         total_debit=pyg(total_debit),
         total_credit=pyg(total_credit),
         total_debit_balance=pyg(total_debit_balance),
         total_credit_balance=pyg(total_credit_balance),
-        balanced=total_debit == total_credit and total_debit_balance == total_credit_balance,
+        total_closing_debit=pyg(totals["closing_debit"]),
+        total_closing_credit=pyg(totals["closing_credit"]),
+        balanced=total_debit == total_credit
+        and total_debit_balance == total_credit_balance
+        and totals["opening_debit"] == totals["opening_credit"]
+        and totals["closing_debit"] == totals["closing_credit"],
     )
 
 
 @router.get("/reports/balance-sheet", response_model=BalanceSheetOut)
 def balance_sheet_report(
-    auth: Reader, db: DbSession, at: Annotated[date, Query()]
-) -> BalanceSheetOut:
+    auth: Reader, db: DbSession, at: Annotated[date, Query()], fmt: Format = "json"
+) -> BalanceSheetOut | Response:
+    if fmt == "xlsx":
+        content = exports.balance_sheet_xlsx(
+            db, auth.organization_id, at, chart.chart_status(db, auth.organization_id)
+        )
+        return _xlsx(content, f"balance-general-{at}.xlsx")
     sheet = reports.balance_sheet(db, auth.organization_id, at)
     return BalanceSheetOut(
         chart_status=chart.chart_status(db, auth.organization_id),
@@ -605,15 +720,49 @@ def balance_sheet_report(
 
 @router.get("/reports/income-statement", response_model=IncomeStatementOut)
 def income_statement_report(
-    auth: Reader, db: DbSession, date_from: From, date_to: To
-) -> IncomeStatementOut:
-    statement = reports.income_statement(db, auth.organization_id, date_from, date_to)
+    auth: Reader,
+    db: DbSession,
+    date_from: From,
+    date_to: To,
+    by_cost_center: bool = False,
+    fmt: Format = "json",
+) -> IncomeStatementOut | Response:
+    """Con `?by_cost_center=true`, una columna por centro de costos y una "sin centro"."""
+    if fmt == "xlsx":
+        content = exports.income_statement_xlsx(
+            db,
+            auth.organization_id,
+            date_from,
+            date_to,
+            chart.chart_status(db, auth.organization_id),
+            by_cost_center=by_cost_center,
+        )
+        return _xlsx(content, f"estado-de-resultados-{date_from}-{date_to}.xlsx")
+    statement = reports.income_statement(
+        db, auth.organization_id, date_from, date_to, by_cost_center=by_cost_center
+    )
+    columns = statement.column_amounts if statement.columns is not None else None
     return IncomeStatementOut(
         chart_status=chart.chart_status(db, auth.organization_id),
         date_from=date_from,
         date_to=date_to,
-        accounts=[_statement_out(n) for n in statement.nodes],
+        accounts=[_statement_out(n, columns) for n in statement.nodes],
         total_income=pyg(statement.total_income),
         total_expense=pyg(statement.total_expense),
         result=pyg(statement.result),
+        cost_center_columns=(
+            [
+                CostCenterColumnOut(
+                    cost_center_id=c.center.id if c.center is not None else None,
+                    code=c.center.code if c.center is not None else None,
+                    name=c.center.name if c.center is not None else "Sin centro",
+                    total_income=pyg(c.total_income),
+                    total_expense=pyg(c.total_expense),
+                    result=pyg(c.result),
+                )
+                for c in statement.columns
+            ]
+            if statement.columns is not None
+            else None
+        ),
     )

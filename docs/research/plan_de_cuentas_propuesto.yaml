@@ -301,9 +301,26 @@ cuentas:
     nombre: "INMUEBLES"
     tipo: activo
     naturaleza: deudora
-    imputable: true
+    imputable: false
     padre: "1.02.04"
     origen: rg49_2014
+    nota: "Agrupadora: el terreno no se deprecia y se separa de las construcciones (Decreto 3182, arts. 24 y 31)."
+  - codigo: "1.02.04.01.01"
+    nombre: "TERRENOS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.04.01"
+    origen: propuesta
+    nota: "No se deprecia (se infiere del art. 31 del Decreto 3182, que excluye el terreno)."
+  - codigo: "1.02.04.01.02"
+    nombre: "CONSTRUCCIONES Y MEJORAS"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.04.01"
+    origen: propuesta
+    nota: "Edificios, galpones e instalaciones incorporadas al inmueble propio."
   - codigo: "1.02.04.02"
     nombre: "RODADOS /TRANSPORTES"
     tipo: activo
@@ -313,6 +330,13 @@ cuentas:
     origen: rg49_2014
   - codigo: "1.02.04.03"
     nombre: "MUEBLES, ÚTILES Y ENSERES"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.04"
+    origen: rg49_2014
+  - codigo: "1.02.04.04"
+    nombre: "MAQUINARIAS"
     tipo: activo
     naturaleza: deudora
     imputable: true
@@ -346,14 +370,102 @@ cuentas:
     imputable: true
     padre: "1.02.04"
     origen: rg49_2014
+  - codigo: "1.02.04.09"
+    nombre: "ENVASES RETORNABLES"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.04"
+    origen: propuesta
+    nota: "Categoría agregada por el Decreto 6105/2021 (art. 31). Código libre del rango 1.02.04.xx del modelo."
+  - codigo: "1.02.04.10"
+    nombre: "OTROS BIENES DE PROPIEDAD, PLANTA Y EQUIPO"
+    tipo: activo
+    naturaleza: deudora
+    imputable: true
+    padre: "1.02.04"
+    origen: propuesta
+    nota: "Bienes no comprendidos en las cuentas anteriores. Código libre del rango 1.02.04.xx del modelo."
   - codigo: "1.02.04.99"
     nombre: "(-) DEPRECIACIÓN ACUMULADA"
     tipo: activo
     naturaleza: acreedora
-    imputable: true
+    imputable: false
     padre: "1.02.04"
     origen: rg49_2014
-    nota: "Cuenta regularizadora del activo. Tasas fiscales de depreciación: no investigadas."
+    nota: "Agrupadora de las regularizadoras del activo, una por clase de bien. Vidas útiles y valores residuales: docs/research/DEPRECIACION_PY.md."
+  - codigo: "1.02.04.99.01"
+    nombre: "(-) DEPRECIACIÓN ACUMULADA DE CONSTRUCCIONES Y MEJORAS"
+    tipo: activo
+    naturaleza: acreedora
+    imputable: true
+    padre: "1.02.04.99"
+    origen: propuesta
+    nota: "Cuenta regularizadora del activo."
+  - codigo: "1.02.04.99.02"
+    nombre: "(-) DEPRECIACIÓN ACUMULADA DE RODADOS /TRANSPORTES"
+    tipo: activo
+    naturaleza: acreedora
+    imputable: true
+    padre: "1.02.04.99"
+    origen: propuesta
+    nota: "Cuenta regularizadora del activo."
+  - codigo: "1.02.04.99.03"
+    nombre: "(-) DEPRECIACIÓN ACUMULADA DE MUEBLES, ÚTILES Y ENSERES"
+    tipo: activo
+    naturaleza: acreedora
+    imputable: true
+    padre: "1.02.04.99"
+    origen: propuesta
+    nota: "Cuenta regularizadora del activo."
+  - codigo: "1.02.04.99.04"
+    nombre: "(-) DEPRECIACIÓN ACUMULADA DE MAQUINARIAS"
+    tipo: activo
+    naturaleza: acreedora
+    imputable: true
+    padre: "1.02.04.99"
+    origen: propuesta
+    nota: "Cuenta regularizadora del activo."
+  - codigo: "1.02.04.99.05"
+    nombre: "(-) DEPRECIACIÓN ACUMULADA DE EQUIPOS"
+    tipo: activo
+    naturaleza: acreedora
+    imputable: true
+    padre: "1.02.04.99"
+    origen: propuesta
+    nota: "Cuenta regularizadora del activo."
+  - codigo: "1.02.04.99.06"
+    nombre: "(-) DEPRECIACIÓN ACUMULADA DE HERRAMIENTAS"
+    tipo: activo
+    naturaleza: acreedora
+    imputable: true
+    padre: "1.02.04.99"
+    origen: propuesta
+    nota: "Cuenta regularizadora del activo."
+  - codigo: "1.02.04.99.08"
+    nombre: "(-) DEPRECIACIÓN ACUMULADA DE MEJORAS EN PREDIO AJENO"
+    tipo: activo
+    naturaleza: acreedora
+    imputable: true
+    padre: "1.02.04.99"
+    origen: propuesta
+    nota: "Cuenta regularizadora del activo."
+  - codigo: "1.02.04.99.09"
+    nombre: "(-) DEPRECIACIÓN ACUMULADA DE ENVASES RETORNABLES"
+    tipo: activo
+    naturaleza: acreedora
+    imputable: true
+    padre: "1.02.04.99"
+    origen: propuesta
+    nota: "Cuenta regularizadora del activo."
+  - codigo: "1.02.04.99.10"
+    nombre: "(-) DEPRECIACIÓN ACUMULADA DE OTROS BIENES DE PROPIEDAD, PLANTA Y EQUIPO"
+    tipo: activo
+    naturaleza: acreedora
+    imputable: true
+    padre: "1.02.04.99"
+    origen: propuesta
+    nota: "Cuenta regularizadora del activo."
   - codigo: "1.02.06"
     nombre: "CARGOS DIFERIDOS"
     tipo: activo

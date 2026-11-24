@@ -11,6 +11,15 @@
 
 Candados, siempre en este orden: fila del ejercicio (`FOR UPDATE`) y después la del
 asiento. El cierre de períodos y del ejercicio toma el mismo candado del ejercicio.
+
+Fase 3B:
+- las líneas de ingreso y gasto pueden llevar centro de costos (D-060), obligatorio al
+  contabilizar con `settings.cost_centers_required` (salvo en los asientos que genera el
+  sistema: refundición, depreciación, baja y reversiones);
+- los asientos de depreciación, baja y recurrentes también se revierten (D-058, D-059,
+  D-061). Los de depreciación y baja no se editan a mano: se descartan y se vuelven a
+  generar. Al contabilizar, descartar o revertir uno de ellos se ajustan, en la misma
+  transacción, la corrida o el bien (`depreciation.py`).
 """
 
 import uuid
@@ -24,8 +33,8 @@ from sqlalchemy import ColumnElement, delete, func, or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError, Conflict, NotFound
-from app.modules.accounting import periods
-from app.modules.accounting.balances import ZERO
+from app.modules.accounting import depreciation, periods
+from app.modules.accounting.balances import RESULT_KINDS, ZERO
 from app.modules.accounting.common import (
     apply_changes,
     flush_translated,
@@ -36,7 +45,14 @@ from app.modules.accounting.common import (
     record,
     snapshot,
 )
-from app.modules.accounting.models import FiscalYear, JournalEntry, JournalLine, LedgerAccount
+from app.modules.accounting.models import (
+    AccountingSettings,
+    CostCenter,
+    FiscalYear,
+    JournalEntry,
+    JournalLine,
+    LedgerAccount,
+)
 from app.modules.finance.models import Transaction
 from app.modules.finance.money import AmountError, check_amount
 from app.modules.finance.service import escape_like
@@ -51,8 +67,13 @@ LINE_FIELDS = (
     "fx_currency",
     "fx_amount",
     "fx_rate",
+    "cost_center_id",
 )
-REVERSIBLE_KINDS = ("manual", "finance")
+REVERSIBLE_KINDS = ("manual", "finance", "depreciation", "disposal", "recurring")
+# Los genera el sistema con su detalle: no se editan a mano (se descartan y se regeneran).
+GENERATED_KINDS = ("closing", "depreciation", "disposal")
+# Con centros obligatorios, estos tipos los exigen en las líneas de resultado (D-060).
+COST_CENTER_KINDS = ("manual", "finance", "recurring")
 
 
 @dataclass(frozen=True)
@@ -64,6 +85,7 @@ class LineData:
     fx_currency: str | None = None
     fx_amount: Decimal | None = None
     fx_rate: Decimal | None = None
+    cost_center_id: uuid.UUID | None = None
 
 
 def entry_not_found() -> NotFound:
@@ -184,6 +206,7 @@ def validated_lines(
                 fx_currency=fx_currency,
                 fx_amount=fx_amount,
                 fx_rate=fx_rate,
+                cost_center_id=raw.get("cost_center_id"),
             )
         )
     accounts = account_map(db, organization_id, {line.account_id for line in lines})
@@ -207,7 +230,52 @@ def validated_lines(
             details={"lines": bad},
             status_code=422,
         )
+    _check_cost_centers(db, organization_id, lines, accounts)
     return lines
+
+
+def _check_cost_centers(
+    db: Session,
+    organization_id: uuid.UUID,
+    lines: list[LineData],
+    accounts: dict[uuid.UUID, LedgerAccount],
+) -> None:
+    """Centro de costos (D-060): de la organización, sin archivar, solo en ingreso o gasto."""
+    ids = {line.cost_center_id for line in lines if line.cost_center_id is not None}
+    if not ids:
+        return
+    centers = {
+        c.id: c
+        for c in db.scalars(
+            select(CostCenter).where(
+                CostCenter.organization_id == organization_id, CostCenter.id.in_(ids)
+            )
+        )
+    }
+    for index, line in enumerate(lines, start=1):
+        if line.cost_center_id is None:
+            continue
+        center = centers.get(line.cost_center_id)
+        if center is None:
+            raise AppError(
+                "COST_CENTER_NOT_FOUND",
+                f"Línea {index}: el centro de costos no existe.",
+                status_code=422,
+            )
+        if center.archived_at is not None:
+            raise AppError(
+                "COST_CENTER_ARCHIVED",
+                f"Línea {index}: el centro de costos {center.code} está archivado.",
+                status_code=422,
+            )
+        account = accounts[line.account_id]
+        if account.kind not in RESULT_KINDS:
+            raise AppError(
+                "COST_CENTER_NOT_ALLOWED",
+                f"Línea {index}: el centro de costos va solo en cuentas de ingreso o de gasto "
+                f"({account.code} {account.name} no lo es).",
+                status_code=422,
+            )
 
 
 def _insert_lines(db: Session, entry: JournalEntry, lines: list[LineData]) -> None:
@@ -224,6 +292,7 @@ def _insert_lines(db: Session, entry: JournalEntry, lines: list[LineData]) -> No
                 fx_currency=line.fx_currency,
                 fx_amount=line.fx_amount,
                 fx_rate=line.fx_rate,
+                cost_center_id=line.cost_center_id,
             )
         )
 
@@ -239,6 +308,7 @@ def _lines_snapshot(lines: list[LineData]) -> list[dict[str, Any]]:
             "fx_currency": line.fx_currency,
             "fx_amount": jsonable(line.fx_amount),
             "fx_rate": jsonable(line.fx_rate),
+            "cost_center_id": jsonable(line.cost_center_id),
         }
         for n, line in enumerate(lines, start=1)
     ]
@@ -254,6 +324,7 @@ def _stored_lines(db: Session, entry_id: uuid.UUID) -> list[LineData]:
             fx_currency=line.fx_currency,
             fx_amount=line.fx_amount,
             fx_rate=line.fx_rate,
+            cost_center_id=line.cost_center_id,
         )
         for line in lines_of(db, [entry_id]).get(entry_id, [])
     ]
@@ -334,6 +405,12 @@ def update_draft(
             "ENTRY_NOT_DRAFT",
             "Solo se edita un borrador: un asiento contabilizado se corrige con una reversión.",
         )
+    if entry.kind in GENERATED_KINDS:
+        raise Conflict(
+            "ENTRY_NOT_EDITABLE",
+            "Este borrador lo generó el sistema con su detalle (depreciación o baja): no se "
+            "edita a mano. Descartalo y volvé a generarlo.",
+        )
     year = _open_year_for(db, organization_id, data["entry_date"])
     lines = validated_lines(db, organization_id, data["lines"])
     old_lines = _stored_lines(db, entry.id)
@@ -385,6 +462,8 @@ def discard_draft(
         },
     )
     flush_translated(db)
+    if entry.kind == "disposal":
+        depreciation.disposal_discarded(db, entry, actor_id)
     record(
         db,
         organization_id,
@@ -458,6 +537,31 @@ def _check_postable(db: Session, entry: JournalEntry, year: FiscalYear) -> None:
                 "SOURCE_TRANSACTION_VOIDED",
                 "El movimiento de finanzas de origen está anulado: descartá este borrador.",
             )
+    if entry.kind in COST_CENTER_KINDS:
+        settings = db.scalar(
+            select(AccountingSettings).where(
+                AccountingSettings.organization_id == entry.organization_id
+            )
+        )
+        if settings is not None and settings.cost_centers_required:
+            missing = [
+                {"line": line.line_no, "code": accounts[line.account_id].code}
+                for line in lines
+                if accounts[line.account_id].kind in RESULT_KINDS and line.cost_center_id is None
+            ]
+            if missing:
+                raise AppError(
+                    "COST_CENTER_REQUIRED",
+                    "El centro de costos es obligatorio en las líneas de ingreso y de gasto: "
+                    + ", ".join(f"línea {m['line']} ({m['code']})" for m in missing)
+                    + ".",
+                    details={"lines": missing},
+                    status_code=422,
+                )
+    if entry.kind == "depreciation":
+        depreciation.check_run_postable(db, entry)
+    elif entry.kind == "disposal":
+        depreciation.check_disposal_postable(db, entry)
 
 
 def post_locked(
@@ -470,6 +574,8 @@ def post_locked(
     entry.posted_at = now()
     flush_translated(db)
     db.refresh(entry, ["number"])  # lo asignó el trigger
+    if entry.kind == "disposal":
+        depreciation.disposal_posted(db, entry, actor_id)
     record(
         db,
         entry.organization_id,
@@ -527,6 +633,8 @@ def reverse_entry(
             "ENTRY_NOT_REVERSIBLE",
             "Una reversión o una refundición no se revierte: cargá un asiento nuevo.",
         )
+    if original.kind in ("depreciation", "disposal"):
+        depreciation.check_reversible(db, original, on or original.entry_date)
     day = on or original.entry_date
     if day < original.entry_date:
         raise AppError(
@@ -561,6 +669,7 @@ def reverse_entry(
             fx_currency=line.fx_currency,
             fx_amount=line.fx_amount,
             fx_rate=line.fx_rate,
+            cost_center_id=line.cost_center_id,  # D-078: la reversión copia el centro
         )
         for line in _stored_lines(db, original.id)
     ]
@@ -582,6 +691,8 @@ def reverse_entry(
     post_locked(db, reversal, year, actor_id)
     before, after = apply_changes(original, {"status": "reversed"})
     flush_translated(db)
+    if original.kind == "disposal":
+        depreciation.disposal_reversed(db, original, actor_id)
     after.update({"reversal_entry_id": str(reversal.id), "reason": reason})
     record(
         db,

@@ -18,7 +18,10 @@ from app.modules.finance.schemas import AmountIn
 AccountKind = Literal["asset", "liability", "equity", "income", "expense"]
 NormalSide = Literal["debit", "credit"]
 EntryStatus = Literal["draft", "posted", "reversed", "discarded"]
-EntryKind = Literal["manual", "finance", "reversal", "closing"]
+EntryKind = Literal[
+    "manual", "finance", "reversal", "closing", "depreciation", "disposal", "recurring"
+]
+StartRule = Literal["next_month", "next_fiscal_year"]
 FxCurrency = Literal["USD", "BRL", "ARS", "EUR"]
 
 _RATE_TEXT = re.compile(r"^[0-9]{1,12}(\.[0-9]{1,6})?$")
@@ -107,6 +110,11 @@ class SettingsOut(BaseModel):
     chart_validated_reference: str | None
     chart_validated_at: datetime | None
     retained_earnings_account_id: uuid.UUID | None
+    # 3B: cuenta de la baja de bienes (si es null se usa la 17.01), centros obligatorios e
+    # inicio de depreciación por defecto.
+    asset_disposal_account_id: uuid.UUID | None = None
+    cost_centers_required: bool = False
+    default_asset_start_rule: str = "next_month"
 
 
 class ChartOut(SettingsOut):
@@ -120,7 +128,12 @@ class ChartValidate(_Strict):
 
 
 class SettingsUpdate(_Strict):
-    retained_earnings_account_id: uuid.UUID | None
+    """Solo cambian los campos que llegan."""
+
+    retained_earnings_account_id: uuid.UUID | None = None
+    asset_disposal_account_id: uuid.UUID | None = None
+    cost_centers_required: bool | None = None
+    default_asset_start_rule: StartRule | None = None
 
 
 # --- Ejercicios y períodos ------------------------------------------------------------------
@@ -175,6 +188,8 @@ class EntryLineIn(_Strict):
     fx_currency: FxCurrency | None = None
     fx_amount: AmountIn | None = None
     fx_rate: RateIn | None = None
+    # Solo en cuentas de ingreso o gasto (D-060).
+    cost_center_id: uuid.UUID | None = None
 
 
 class EntryIn(_Strict):
@@ -210,6 +225,8 @@ class EntryLineOut(BaseModel):
     fx_currency: str | None
     fx_amount: str | None
     fx_rate: str | None
+    cost_center_id: uuid.UUID | None = None
+    cost_center_code: str | None = None
 
 
 class EntryOut(BaseModel):
@@ -229,8 +246,11 @@ class EntryOut(BaseModel):
     total_credit: str
     balanced: bool
     created_by: uuid.UUID
+    # P-10: nombre visible del usuario (nada más), para quien no puede leer `/users`.
+    created_by_name: str | None = None
     created_at: datetime
     posted_by: uuid.UUID | None
+    posted_by_name: str | None = None
     posted_at: datetime | None
     discarded_by: uuid.UUID | None
     discarded_at: datetime | None
@@ -293,20 +313,31 @@ class TrialRowOut(BaseModel):
     code: str
     name: str
     kind: str
+    # D-062: saldo de todo lo contabilizado antes de `from` (refundición incluida).
+    opening_debit: str
+    opening_credit: str
     debit: str
     credit: str
+    # Saldo del movimiento del rango.
     debit_balance: str
     credit_balance: str
+    # Saldo final: inicial + movimiento del rango.
+    closing_debit: str
+    closing_credit: str
 
 
 class TrialBalanceOut(ReportOut):
     date_from: date
     date_to: date
     rows: list[TrialRowOut]
+    total_opening_debit: str
+    total_opening_credit: str
     total_debit: str
     total_credit: str
     total_debit_balance: str
     total_credit_balance: str
+    total_closing_debit: str
+    total_closing_credit: str
     balanced: bool
 
 
@@ -318,6 +349,8 @@ class StatementNodeOut(BaseModel):
     is_postable: bool
     amount: str
     children: list["StatementNodeOut"]
+    # Solo con `?by_cost_center=true`: el importe en cada columna de `cost_center_columns`.
+    column_amounts: list[str] | None = None
 
 
 class BalanceSheetOut(ReportOut):
@@ -334,6 +367,17 @@ class BalanceSheetOut(ReportOut):
     balanced: bool
 
 
+class CostCenterColumnOut(BaseModel):
+    """Columna del estado de resultados por centro; `cost_center_id` null = sin centro."""
+
+    cost_center_id: uuid.UUID | None
+    code: str | None
+    name: str
+    total_income: str
+    total_expense: str
+    result: str
+
+
 class IncomeStatementOut(ReportOut):
     date_from: date
     date_to: date
@@ -342,3 +386,5 @@ class IncomeStatementOut(ReportOut):
     total_income: str
     total_expense: str
     result: str
+    # Solo con `?by_cost_center=true` (D-060): una columna por centro y la última "sin centro".
+    cost_center_columns: list[CostCenterColumnOut] | None = None

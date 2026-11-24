@@ -1,5 +1,8 @@
 """Migración 0003: sin diferencias con los modelos, reversible y con permisos (spec §5.11).
 
+`TRIGGERS` son los de la 0003; con la 0004 (`head`) se suman los de `TRIGGERS_0004`. La
+reversibilidad propia de la 0004 está en `test_accounting_migration_3b.py`.
+
 Corre sobre una base propia y desechable (`<base de pruebas>_mig`), como la de la 0002.
 """
 
@@ -26,6 +29,29 @@ TRIGGERS = {
     "journal_entries_no_truncate",
     "journal_lines_guard",
     "journal_lines_no_truncate",
+}
+TRIGGERS_0004 = {
+    "journal_entries_sync_links",
+    "depreciation_runs_guard",
+    "recurring_generations_guard",
+    "depreciation_items_guard",
+    "fixed_assets_guard",
+    "asset_year_values_immutable",
+    "asset_categories_no_delete",
+    "fixed_assets_no_delete",
+    "depreciation_runs_no_delete",
+    "asset_year_values_no_delete",
+    "cost_centers_no_delete",
+    "recurring_templates_no_delete",
+    "recurring_generations_no_delete",
+    "asset_categories_no_truncate",
+    "fixed_assets_no_truncate",
+    "depreciation_runs_no_truncate",
+    "depreciation_items_no_truncate",
+    "asset_year_values_no_truncate",
+    "cost_centers_no_truncate",
+    "recurring_templates_no_truncate",
+    "recurring_generations_no_truncate",
 }
 
 
@@ -83,7 +109,7 @@ def test_upgrade_check_downgrade_upgrade(migration_db: tuple[Config, Engine]) ->
     assert _role_permissions(engine) == expected
     # El catálogo de la base coincide con el del código (todas las fases).
     assert _catalog(engine) == {p.value: d for p, d in PERMISSION_DESCRIPTIONS.items()}
-    assert _accounting_triggers(engine) == TRIGGERS
+    assert _accounting_triggers(engine) == TRIGGERS | TRIGGERS_0004
     assert _finance_columns(engine) == {
         "accounts.ledger_account_id",
         "categories.ledger_account_id",
@@ -130,4 +156,4 @@ def test_upgrade_check_downgrade_upgrade(migration_db: tuple[Config, Engine]) ->
     command.upgrade(cfg, "head")
     command.check(cfg)
     assert _role_permissions(engine) == expected
-    assert _accounting_triggers(engine) == TRIGGERS
+    assert _accounting_triggers(engine) == TRIGGERS | TRIGGERS_0004
