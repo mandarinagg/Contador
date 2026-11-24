@@ -61,6 +61,7 @@ ignore = [
 "tests/*" = ["S105", "S106"]
 "migrations/*" = ["E501"]
 "app/modules/accounting/proposed_chart.py" = ["E501"]  # generado desde el YAML
+"app/modules/accounting/proposed_asset_categories.py" = ["E501"]  # generado desde el YAML
 
 [tool.mypy]
 python_version = "3.12"

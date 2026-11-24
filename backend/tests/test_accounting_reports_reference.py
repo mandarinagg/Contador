@@ -35,7 +35,7 @@ CODES = [
     "1.01.01.04.01",  # banco
     "1.01.03.01",  # deudores por ventas
     "1.02.04.03",  # muebles
-    "1.02.04.99",  # (-) depreciación acumulada: regularizadora, naturaleza acreedora
+    "1.02.04.99.03",  # (-) depreciación acumulada: regularizadora, naturaleza acreedora
     "2.01.01.01",  # proveedores
     "2.01.02.01",  # préstamos
     "3.01.01.01",  # capital
@@ -216,16 +216,34 @@ def _check_trial_balance_matches_reference(
 ) -> None:
     start, end = date.fromisoformat(date_from), date.fromisoformat(date_to)
     sums = _sums([ln for ln in book["counted"] if start <= ln.day <= end])
+    # D-062: saldo inicial = todo lo contabilizado antes de `from`, con la refundición.
+    before = _sums([ln for ln in book["counted"] if ln.day < start])
+    opening = {c: d - cr for c, (d, cr) in before.items()}
     report = _get(client, book, "/reports/trial-balance", **{"from": date_from, "to": date_to})
     got = {r["code"]: (Decimal(r["debit"]), Decimal(r["credit"])) for r in report["rows"]}
-    assert got == {c: v for c, v in sums.items() if v != (ZERO, ZERO)}
+    expected_codes = {c for c, v in sums.items() if v != (ZERO, ZERO)} | {
+        c for c, o in opening.items() if o != 0
+    }
+    assert set(got) == expected_codes
+    assert got == {c: sums.get(c, (ZERO, ZERO)) for c in expected_codes}
     assert report["total_debit"] == report["total_credit"]
     assert report["total_debit_balance"] == report["total_credit_balance"]
+    assert report["total_opening_debit"] == report["total_opening_credit"]
+    assert report["total_closing_debit"] == report["total_closing_credit"]
     assert report["balanced"] is True
     for row in report["rows"]:
         diff = Decimal(row["debit"]) - Decimal(row["credit"])
         assert Decimal(row["debit_balance"]) == max(diff, ZERO)
         assert Decimal(row["credit_balance"]) == max(-diff, ZERO)
+        start_balance = opening.get(row["code"], ZERO)
+        assert Decimal(row["opening_debit"]) == max(start_balance, ZERO)
+        assert Decimal(row["opening_credit"]) == max(-start_balance, ZERO)
+        final = start_balance + diff
+        assert Decimal(row["closing_debit"]) == max(final, ZERO)
+        assert Decimal(row["closing_credit"]) == max(-final, ZERO)
+        # Después de la refundición, las cuentas de resultado arrancan en cero.
+        if start == date(2026, 1, 1) and book["kinds"][row["code"]] in ("income", "expense"):
+            assert row["opening_debit"] == row["opening_credit"] == "0"
     assert [r["code"] for r in report["rows"]] == sorted(
         got, key=lambda c: [int(p) for p in c.split(".")]
     )
@@ -327,6 +345,7 @@ TRIAL_RANGES = [
     ("2025-01-01", "2026-12-31"),
     ("2025-12-31", "2026-01-01"),
     ("2025-03-10", "2025-03-10"),
+    ("2026-02-01", "2026-06-30"),
 ]
 SHEET_DATES = ["2025-06-30", "2025-12-30", "2025-12-31", "2026-03-31", "2026-12-31"]
 INCOME_RANGES = [
@@ -340,7 +359,7 @@ LEDGER_RANGES = [
     ("2026-01-01", "2026-06-30"),
     ("2025-05-01", "2026-12-31"),
 ]
-LEDGER_CODES = ["1.01.01.04.01", "1.02.04.99", "4.01.01.01"]
+LEDGER_CODES = ["1.01.01.04.01", "1.02.04.99.03", "4.01.01.01"]
 
 
 # Un solo conjunto de datos por prueba (cargarlo cuesta segundos): cada prueba recorre sus

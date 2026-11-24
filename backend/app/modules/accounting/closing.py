@@ -4,6 +4,9 @@ Exige: todos los períodos cerrados, ningún borrador en el ejercicio y la cuent
 resultados configurada (patrimonio, imputable). Genera y contabiliza la refundición, que
 deja en cero cada cuenta de ingreso y gasto con saldo contra la cuenta de resultados, y
 marca el ejercicio cerrado, que no se reabre en esta tanda.
+
+Fase 3B: además exige la depreciación contabilizada de todos los meses del ejercicio con
+cuotas, y guarda en la misma transacción los valores por bien del ejercicio (D-066).
 """
 
 import uuid
@@ -12,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError, Conflict
-from app.modules.accounting import chart, entries, periods
+from app.modules.accounting import asset_schedule, chart, depreciation, entries, periods
 from app.modules.accounting.balances import RESULT_KINDS, ZERO, account_sums
 from app.modules.accounting.common import apply_changes, flush_translated, now, pyg, record
 from app.modules.accounting.models import FiscalYear, JournalEntry, LedgerAccount, Period
@@ -49,6 +52,7 @@ def close_fiscal_year(
             f"El ejercicio tiene {len(drafts)} borrador(es): contabilizalos o descartalos.",
             details={"drafts": drafts},
         )
+    depreciation.check_year_depreciated(db, year)
     settings = chart.get_settings(db, organization_id)
     target_id = settings.retained_earnings_account_id if settings is not None else None
     if target_id is None:
@@ -122,6 +126,7 @@ def close_fiscal_year(
         )
         entries.post_locked(db, closing, year, actor_id)
 
+    asset_values = asset_schedule.write_year_values(db, year)
     before, after = apply_changes(
         year,
         {
@@ -136,6 +141,7 @@ def close_fiscal_year(
         {
             "result": pyg(result),
             "closing_entry_number": closing.number if closing is not None else None,
+            "asset_year_values": asset_values,
         }
     )
     record(

@@ -143,6 +143,58 @@ _TRIGGER_ERRORS: Mapping[str, tuple[str, str, int]] = {
         "El ejercicio se superpone con otro existente.",
         409,
     ),
+    # Fase 3B (migración 0004).
+    "trg_journal_lines_cost_center_account": (
+        "COST_CENTER_NOT_ALLOWED",
+        "El centro de costos va solo en líneas de cuentas de ingreso o de gasto.",
+        422,
+    ),
+    "trg_journal_lines_cost_center_archived": (
+        "COST_CENTER_ARCHIVED",
+        "El centro de costos está archivado.",
+        422,
+    ),
+    "trg_journal_entries_cost_center_required": (
+        "COST_CENTER_REQUIRED",
+        "Las líneas de ingreso y de gasto llevan centro de costos (es obligatorio).",
+        422,
+    ),
+    "trg_journal_entries_depreciation_mismatch": (
+        "DEPRECIATION_RUN_MISMATCH",
+        "La corrida de depreciación no coincide con su detalle por bien.",
+        409,
+    ),
+    "trg_journal_entries_disposal_orphan": (
+        "DISPOSAL_WITHOUT_ASSET",
+        "El asiento de baja no corresponde a ningún bien.",
+        409,
+    ),
+    "trg_fixed_assets_depreciated": (
+        "ASSET_HAS_DEPRECIATION",
+        "El bien tiene depreciaciones: no cambian su costo, residual, vida útil, inicio ni "
+        "categoría.",
+        409,
+    ),
+    "uq_depreciation_runs_live_period": (
+        "DEPRECIATION_RUN_EXISTS",
+        "El período ya tiene una corrida de depreciación viva (borrador o contabilizada).",
+        409,
+    ),
+    "uq_recurring_generations_live": (
+        "RECURRING_ALREADY_GENERATED",
+        "La plantilla ya tiene un asiento vivo en ese período.",
+        409,
+    ),
+    "uq_cost_centers_organization_id_code": (
+        "COST_CENTER_CODE_TAKEN",
+        "Ya existe un centro de costos con ese código.",
+        409,
+    ),
+    "uq_asset_categories_organization_id_code": (
+        "ASSET_CATEGORY_CODE_TAKEN",
+        "Ya existe una categoría con ese código.",
+        409,
+    ),
 }
 
 

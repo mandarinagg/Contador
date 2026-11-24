@@ -77,3 +77,36 @@ def account_sums(
     if exclude_closing:
         query = query.where(JournalEntry.kind != "closing")
     return {account_id: Sums(debit, credit) for account_id, debit, credit in db.execute(query)}
+
+
+def account_sums_by_center(
+    db: Session,
+    organization_id: uuid.UUID,
+    *,
+    date_from: date,
+    date_to: date,
+    exclude_closing: bool = False,
+) -> dict[uuid.UUID | None, dict[uuid.UUID, Sums]]:
+    """Como `account_sums`, separado por centro de costos (`None` = sin centro, D-060)."""
+    query = (
+        select(
+            JournalLine.cost_center_id,
+            JournalLine.account_id,
+            func.sum(JournalLine.debit),
+            func.sum(JournalLine.credit),
+        )
+        .join(JournalEntry, JournalEntry.id == JournalLine.entry_id)
+        .where(
+            JournalEntry.organization_id == organization_id,
+            JournalEntry.status.in_(COUNTED_STATUSES),
+            JournalEntry.entry_date >= date_from,
+            JournalEntry.entry_date <= date_to,
+        )
+        .group_by(JournalLine.cost_center_id, JournalLine.account_id)
+    )
+    if exclude_closing:
+        query = query.where(JournalEntry.kind != "closing")
+    result: dict[uuid.UUID | None, dict[uuid.UUID, Sums]] = {}
+    for center_id, account_id, debit, credit in db.execute(query):
+        result.setdefault(center_id, {})[account_id] = Sums(debit, credit)
+    return result
