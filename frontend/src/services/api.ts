@@ -93,6 +93,7 @@ export async function api<T>(method: Method, path: string, body?: unknown): Prom
 export const get = <T>(path: string) => api<T>('GET', path)
 export const post = <T>(path: string, body?: unknown) => api<T>('POST', path, body ?? {})
 export const patch = <T>(path: string, body: unknown) => api<T>('PATCH', path, body)
+export const put = <T>(path: string, body: unknown) => api<T>('PUT', path, body)
 export const postForm = <T>(path: string, form: FormData) => api<T>('POST', path, form)
 
 /** Arma un query string omitiendo los valores vacíos: `qs({a: 1, b: ''})` → `?a=1`. */

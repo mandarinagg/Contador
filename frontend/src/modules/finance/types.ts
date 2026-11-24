@@ -3,6 +3,8 @@
  * Todo importe es `string` decimal (D-026): nunca `number`.
  */
 
+import type { EntryRef } from '../accounting/types'
+
 export type ContextKind = 'business' | 'personal'
 export type AccountKind = 'cash' | 'checking' | 'savings' | 'credit_card' | 'digital_wallet' | 'other'
 export type CategoryKind = 'income' | 'expense'
@@ -29,6 +31,8 @@ export interface Account {
   opening_balance: string
   opening_date: string
   balance: string
+  /** Cuenta contable del banco o la caja (solo en el contexto empresarial, D-041). */
+  ledger_account_id?: string | null
   archived_at: string | null
   created_at: string
 }
@@ -39,6 +43,8 @@ export interface Category {
   name: string
   kind: CategoryKind
   parent_id: string | null
+  /** Cuenta contable de resultado (solo en el contexto empresarial, D-041). */
+  ledger_account_id?: string | null
   archived_at: string | null
   created_at: string
 }
@@ -75,6 +81,8 @@ export interface Transaction {
   void_reason: string | null
   created_by: string
   created_at: string
+  /** Asiento vivo (o el último revertido) del movimiento; solo en el contexto empresarial. */
+  journal_entry?: EntryRef | null
 }
 
 export interface TransferResult {

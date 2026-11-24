@@ -10,7 +10,8 @@
 | 1 — Fundación | ✅ Funcional en navegador |
 | 1B — Instalador Windows 11 | 🟡 CI verde en Windows real (lanzador, copias, instalador instalado, abierto, cerrado y desinstalado). Falta instalarlo en la PC del propietario |
 | 2 — Finanzas empresa/personal | 🟡 Backend y interfaz hechos; probado de punta a punta en navegador (ver tabla). Falta validarlo con extractos reales del propietario |
-| 3 a 8 | ⏳ No iniciadas |
+| 3 — Contabilidad (núcleo) | 🟡 Backend e interfaz hechos; probado de punta a punta en navegador (ver tabla). El plan de cuentas sigue sin validar por un contador |
+| 4 a 8 | ⏳ No iniciadas |
 
 **Destino definido por el propietario:** una PC con Windows 11, uso en una sola máquina (D-016). Desarrollo en esta PC Linux; instaladores generados en GitHub Actions.
 
@@ -33,8 +34,15 @@
 | Finanzas: importar extracto CSV (duplicados, errores, decisión por fila, duplicados nuevos al confirmar) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ + E2E | ✅ |
 | Finanzas: resumen por moneda y consolidado por contexto | ✅ | ✅ | n/a | n/a | ✅ | ✅ + E2E | ✅ |
 | Finanzas: categorías, contrapartes, edición, categoría rápida, transferencia entre monedas, XLSX, `IMPORT_STALE` | ✅ | ✅ | ✅ | ✅ | ✅ | unitarias + prueba manual (sin E2E) | ✅ |
+| Contabilidad: plan propuesto, aviso «sin validar», búsqueda, cuenta de resultados, validación con nombre y matrícula | ✅ | ✅ | ✅ | ✅ | ✅ (Administrador no valida) | ✅ + E2E | ✅ |
+| Contabilidad: ejercicio con 12 períodos; cierre de período (bloquea con borradores), reapertura con motivo | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ + E2E | ✅ |
+| Contabilidad: asiento manual (desbalanceado no se contabiliza), contabilización con número, reversión, descarte | ✅ | ✅ | ✅ | ✅ | ✅ (Administrador no contabiliza; Consulta solo lee) | ✅ + E2E | ✅ |
+| Contabilidad: asiento propuesto desde un movimiento de la empresa (cuentas contables configuradas al proponer, dólares con redondeo elegido), movimiento bloqueado al contabilizar | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ + E2E | ✅ |
+| Contabilidad: libro diario, mayor, balance de comprobación, balance general, estado de resultados | ✅ | ✅ | n/a | n/a | ✅ | ✅ + E2E | ✅ |
+| Contabilidad: cierre del ejercicio con refundición, subcuentas, archivo de cuentas | ✅ | ✅ | ✅ | ✅ | ✅ | backend + prueba manual (sin E2E) | ✅ |
 
 ## Pruebas ejecutadas (2026-11-24)
+- Interfaz de contabilidad: Vitest 90/90 (36 nuevas); `tsc -b` y build OK (414 kB JS inicial; contabilidad en fragmentos aparte); oxlint sin advertencias nuevas; E2E 27/27 (10 + 8 + 9 de `contabilidad.spec.ts`), dos corridas seguidas en verde (52 y 62 s). Cierre del ejercicio con refundición probado a mano.
 - Interfaz de finanzas: Vitest 53/53; `tsc -b` y build OK (409 kB JS inicial; finanzas en fragmentos aparte); oxlint sin advertencias nuevas; E2E 18/18 (10 de `flujos.spec.ts` + 8 de `finanzas.spec.ts`), dos corridas seguidas en verde (50 y 58 s). La prueba de privacidad (tres usuarios) va con `test.slow()`: con la PC cargada superaba los 30 s por defecto.
 - Backend: 87/87 pytest (86 + 1 `slow`; incluye las 3 nuevas de extractos reales); resumen anual con 100.000 movimientos en ~48 ms con la máquina libre y 153-289 ms cargada (límite 300; D-033). Importaciones simultáneas sin duplicados (D-034).
 - Lanzador en Linux (PostgreSQL 18 de Ubuntu + backend empaquetado): `first_run_restart_and_recovery` y `daily_backup_retention_and_restore` OK; `cargo fmt` y `clippy -D warnings` sin errores.
@@ -60,6 +68,8 @@
 | P-3 | ~~Script E2E fuera del repo~~ | **Resuelto**: `frontend/e2e/` con `@playwright/test` y job `e2e` en el CI |
 | P-4 | 2 advertencias de oxlint (`only-export-components`) | Hooks junto a sus providers; solo afecta la recarga en caliente |
 | P-6 | La política de contraseñas del frontend cuenta como "símbolo" las letras con tilde | El backend es quien decide (Unicode); solo cambia el aviso previo |
+| P-9 | La API no tiene `GET /finance/contexts/{cid}/transactions/{id}` | El enlace «movimiento de origen» de un asiento abre el detalle buscando el movimiento en la lista (hasta 20 páginas de 50, sin anulados salvo que se pida) |
+| P-10 | Los asientos traen el id de quien creó/contabilizó, no el nombre | Se resuelve con `/users`, que el rol Consulta no puede leer: ve «otro usuario» |
 
 ## Decisiones tomadas en esta sesión
 D-001 a D-034 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requiere tu confirmación.**
@@ -75,7 +85,7 @@ D-001 a D-034 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 8. Revisar los hallazgos R-10 y R-11 de `DISCOVERY.md` (repositorio git en la carpeta personal con `.git-credentials`).
 
 ## Para retomar (traspaso, 2026-11-24)
-**Estado de `main`:** fases 0-1 completas; fase 2 (finanzas) integrada, con backend, interfaz y rendimiento. Todo verde en Linux y en Windows. Fase 3 en curso: el backend lo está haciendo un agente en un worktree (`docs/specs/FASE3_CONTABILIDAD.md`).
+**Estado de `main`:** fases 0-1 completas; fase 2 (finanzas) integrada, con backend, interfaz y rendimiento. Todo verde en Linux y en Windows. Fase 3 (núcleo): backend e interfaz hechos (`docs/specs/FASE3_CONTABILIDAD.md`); falta que el contador valide el plan de cuentas.
 
 **Lo primero:**
 1. **CI de Windows: ✅ todo verde desde `7c98639`** (ejecución 45390713831). Pasan el lanzador, las copias, el Administrador de credenciales, el instalador NSIS y su prueba completa en Windows real.

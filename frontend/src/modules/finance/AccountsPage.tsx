@@ -11,6 +11,8 @@ import { errorMessage, useAmountField } from './forms'
 import { financeKeys, useAccounts, useFinance } from './data'
 import { ACCOUNT_KIND_LABELS, formatBookDate, todayIso } from './labels'
 import type { Account, AccountKind, Transaction } from './types'
+import { type LedgerMapping, useLedgerMapping } from '../accounting/entryRefs'
+import { LedgerAccountField, LedgerAccountTag } from '../accounting/financeBridge'
 
 interface FormState {
   name: string
@@ -21,8 +23,10 @@ interface FormState {
   opening_date: string
 }
 
-function AccountForm({ account, onDone }: { account?: Account; onDone: () => void }) {
+function AccountForm({ account, mapping, onDone }: { account?: Account; mapping: LedgerMapping; onDone: () => void }) {
   const { cid } = useFinance()
+  const [ledgerId, setLedgerId] = useState(account?.ledger_account_id ?? '')
+  const ledgerChanged = mapping.canEdit && ledgerId !== (account?.ledger_account_id ?? '')
   const qc = useQueryClient()
   const toast = useToast()
   const [form, setForm] = useState<FormState>(() => ({
@@ -47,7 +51,7 @@ function AccountForm({ account, onDone }: { account?: Account; onDone: () => voi
   const locked = Boolean(account) && (used.data?.length ?? 1) > 0
 
   const save = useMutation({
-    mutationFn: (openingBalance: string) => {
+    mutationFn: async (openingBalance: string) => {
       const body: Record<string, unknown> = {
         name: form.name,
         kind: form.kind,
@@ -56,10 +60,14 @@ function AccountForm({ account, onDone }: { account?: Account; onDone: () => voi
         opening_date: form.opening_date,
       }
       if (!account) {
-        return post<Account>(`/finance/contexts/${cid}/accounts`, { ...body, currency: form.currency, opening_balance: openingBalance })
+        const created = await post<Account>(`/finance/contexts/${cid}/accounts`, { ...body, currency: form.currency, opening_balance: openingBalance })
+        // La cuenta contable solo se asigna al editar (la API no la recibe al crear).
+        if (!ledgerChanged) return created
+        return patch<Account>(`/finance/contexts/${cid}/accounts/${created.id}`, { ledger_account_id: ledgerId })
       }
       if (form.currency !== account.currency) body.currency = form.currency
       if (openingBalance !== account.opening_balance) body.opening_balance = openingBalance
+      if (ledgerChanged) body.ledger_account_id = ledgerId || null
       return patch<Account>(`/finance/contexts/${cid}/accounts/${account.id}`, body)
     },
     onSuccess: (a) => {
@@ -83,7 +91,7 @@ function AccountForm({ account, onDone }: { account?: Account; onDone: () => voi
 
   return (
     <form onSubmit={onSubmit} className="grid grid-cols-2 gap-x-4 gap-y-4" noValidate>
-      {error && error.status !== 422 && (
+      {error && (error.status !== 422 || Object.keys(fe).length === 0) && (
         <div className="col-span-2">
           <Notice tone="bad" title={error.message}>
             {error.code === 'ACCOUNT_HAS_TRANSACTIONS' &&
@@ -146,6 +154,15 @@ function AccountForm({ account, onDone }: { account?: Account; onDone: () => voi
       <Field label="Fecha del saldo inicial" error={fe.opening_date}>
         {(p) => <Input {...p} type="date" value={form.opening_date} onChange={(e) => setForm({ ...form, opening_date: e.target.value })} />}
       </Field>
+      <div className="col-span-2">
+        <LedgerAccountField
+          mapping={mapping}
+          kinds={['asset', 'liability']}
+          value={ledgerId}
+          onChange={setLedgerId}
+          hint="Para proponer asientos desde los movimientos: activo para bancos y cajas, pasivo para tarjetas de crédito."
+        />
+      </div>
       {locked && (
         <p className="col-span-2 rounded-sm bg-sunken px-3 py-2 text-sm text-ink-2">
           La moneda y el saldo inicial no se pueden cambiar porque la cuenta ya tiene movimientos (incluso anulados): todos los
@@ -165,10 +182,11 @@ function AccountForm({ account, onDone }: { account?: Account; onDone: () => voi
 }
 
 export function AccountsPage() {
-  const { cid, canWrite, readOnlyReason } = useFinance()
+  const { cid, canWrite, readOnlyReason, context } = useFinance()
   const qc = useQueryClient()
   const toast = useToast()
   const accounts = useAccounts(cid)
+  const mapping = useLedgerMapping(context.kind === 'business')
   const [showArchived, setShowArchived] = useState(false)
   const [editing, setEditing] = useState<Account | 'new' | null>(null)
 
@@ -254,6 +272,11 @@ export function AccountsPage() {
                       <p className="text-sm text-ink-2">
                         {[a.institution, a.number_last4 && `terminada en ${a.number_last4}`].filter(Boolean).join(', ') || a.currency}
                       </p>
+                      {mapping.show && (
+                        <p className="mt-0.5">
+                          <LedgerAccountTag mapping={mapping} id={a.ledger_account_id} />
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-ink-2">{ACCOUNT_KIND_LABELS[a.kind]}</td>
                     <td className="px-4 py-3 text-sm text-ink-2">
@@ -298,7 +321,12 @@ export function AccountsPage() {
         )}
       </Sheet>
       <Modal open={editing !== null} title={editing === 'new' ? 'Nueva cuenta' : 'Editar cuenta'} onClose={() => setEditing(null)}>
-        {editing !== null && <AccountForm key={editing === 'new' ? 'new' : editing.id} account={editing === 'new' ? undefined : editing} onDone={() => setEditing(null)} />}
+        {editing !== null && <AccountForm
+            key={editing === 'new' ? 'new' : editing.id}
+            account={editing === 'new' ? undefined : editing}
+            mapping={mapping}
+            onDone={() => setEditing(null)}
+          />}
       </Modal>
     </>
   )

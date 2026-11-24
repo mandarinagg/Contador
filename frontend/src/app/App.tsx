@@ -101,6 +101,16 @@ const finance = {
   counterparties: () => import('../modules/finance/CounterpartiesPage').then((m) => ({ Component: m.CounterpartiesPage })),
 }
 
+/** Contabilidad (fase 3), también en fragmentos aparte. El acceso: `accounting.read` (todos los roles). */
+const accounting = {
+  layout: () => import('../modules/accounting/AccountingLayout').then((m) => ({ Component: m.AccountingLayout })),
+  chart: () => import('../modules/accounting/ChartPage').then((m) => ({ Component: m.ChartPage })),
+  years: () => import('../modules/accounting/FiscalYearsPage').then((m) => ({ Component: m.FiscalYearsPage })),
+  entries: () => import('../modules/accounting/EntriesPage').then((m) => ({ Component: m.EntriesPage })),
+  entry: () => import('../modules/accounting/EntryPage').then((m) => ({ Component: m.EntryPage })),
+  reports: () => import('../modules/accounting/reports/ReportsPage').then((m) => ({ Component: m.ReportsPage })),
+}
+
 const router = createBrowserRouter([
   { element: <Gate need="setup" />, children: [{ path: '/configuracion-inicial', element: <SetupPage /> }] },
   { element: <Gate need="anonymous" />, children: [{ path: '/login', element: <LoginPage /> }] },
@@ -131,6 +141,29 @@ const router = createBrowserRouter([
               { path: 'importar', lazy: finance.imports },
               { path: 'categorias', lazy: finance.categories },
               { path: 'contrapartes', lazy: finance.counterparties },
+            ],
+          },
+          {
+            path: '/contabilidad',
+            element: (
+              <RequirePermission permission="accounting.read">
+                <Outlet />
+              </RequirePermission>
+            ),
+            children: [
+              {
+                lazy: accounting.layout,
+                children: [
+                  { index: true, element: <Navigate to="/contabilidad/plan" replace /> },
+                  { path: 'plan', lazy: accounting.chart },
+                  { path: 'ejercicios', lazy: accounting.years },
+                  { path: 'asientos', lazy: accounting.entries },
+                  { path: 'asientos/nuevo', lazy: accounting.entry },
+                  { path: 'asientos/:id', lazy: accounting.entry },
+                  { path: 'reportes', element: <Navigate to="/contabilidad/reportes/diario" replace /> },
+                  { path: 'reportes/:report', lazy: accounting.reports },
+                ],
+              },
             ],
           },
           { path: '*', element: <EmptyState title="Página inexistente">La dirección no corresponde a ninguna sección.</EmptyState> },
