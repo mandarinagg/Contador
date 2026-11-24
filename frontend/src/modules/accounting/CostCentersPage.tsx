@@ -2,7 +2,7 @@
  * Centros de costos (D-060): código, nombre y archivo, un solo nivel. Se usan en las líneas de
  * ingreso y gasto de los asientos; la configuración puede exigirlos al contabilizar.
  */
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Archive, ArchiveRestore, Pencil, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router'
@@ -12,7 +12,7 @@ import { cx } from '../../lib/cx'
 import { patch, post, put, qs } from '../../services/api'
 import { ApiErrorNotice, Check, TableSkeleton, Th } from '../finance/components'
 import { todayIso } from '../finance/labels'
-import { useAccountingPerms, useAccountingSettings, useCostCenters, useInvalidateAccounting } from './data'
+import { accountingKeys, useAccountingPerms, useAccountingSettings, useCostCenters, useInvalidateAccounting } from './data'
 import type { AccountingSettings } from './types'
 import type { CostCenter } from './types3b'
 import { centerFormErrors } from './costCenters'
@@ -71,9 +71,14 @@ function RequiredSetting() {
   const settings = useAccountingSettings()
   const toast = useToast()
   const invalidate = useInvalidateAccounting()
+  const queryClient = useQueryClient()
+  // Valor elegido mientras se guarda: la casilla no vuelve al anterior hasta que responde la API.
+  const [choice, setChoice] = useState<boolean | null>(null)
   const save = useMutation({
     mutationFn: (value: boolean) => put<AccountingSettings>('/accounting/settings', { cost_centers_required: value }),
+    onSettled: () => setChoice(null),
     onSuccess: (s) => {
+      queryClient.setQueryData(accountingKeys.settings(), s)
       invalidate()
       toast('ok', s.cost_centers_required ? 'Desde ahora, el centro es obligatorio en ingresos y gastos al contabilizar.' : 'El centro de costos vuelve a ser opcional.')
     },
@@ -90,7 +95,15 @@ function RequiredSetting() {
       </div>
       {settings.isPending ? null : perms.canPost ? (
         <>
-          <Check label="Exigir centro de costos en ingresos y gastos" checked={required} disabled={save.isPending} onChange={(v) => save.mutate(v)} />
+          <Check
+            label="Exigir centro de costos en ingresos y gastos"
+            checked={choice ?? required}
+            disabled={save.isPending}
+            onChange={(v) => {
+              setChoice(v)
+              save.mutate(v)
+            }}
+          />
           {save.error ? <ApiErrorNotice error={save.error} /> : null}
         </>
       ) : (

@@ -344,6 +344,27 @@ test('permisos: el Administrador prepara borradores pero no contabiliza ni valid
   await expect(page.getByRole('button', { name: 'Revertir' })).toHaveCount(0)
 })
 
+test('plan de cuentas: se agrega una subcuenta y se archiva (antes de validar el plan)', async ({ page }) => {
+  await signIn(page, OWNER.email, PASSWORD)
+  await open(page, 'Plan de cuentas')
+  const search = page.getByRole('searchbox', { name: 'Buscar cuenta' })
+  await search.fill('1.01.01.04')
+  await page.getByRole('button', { name: /^Agregar subcuenta a 1\.01\.01\.04 BANCOS$/ }).click()
+  let dialog = page.getByRole('dialog', { name: 'Nueva subcuenta' })
+  await dialog.getByLabel('Código').fill('09')
+  await dialog.getByLabel('Nombre').fill('BANCO - CUENTA E2E')
+  await dialog.getByRole('button', { name: 'Crear cuenta' }).click()
+  await toast(page, 'Cuenta 1.01.01.04.09 BANCO - CUENTA E2E creada.')
+
+  // Sin movimientos ni saldo: se archiva y deja de ofrecerse, pero sigue en el plan.
+  await search.fill('1.01.01.04.09')
+  await page.getByRole('button', { name: 'Archivar 1.01.01.04.09 BANCO - CUENTA E2E' }).click()
+  dialog = page.getByRole('dialog', { name: 'Archivar cuenta' })
+  await dialog.getByRole('button', { name: 'Archivar cuenta' }).click()
+  await toast(page, 'Cuenta 1.01.01.04.09 archivada.')
+  await expect(page.getByRole('button', { name: 'Desarchivar 1.01.01.04.09 BANCO - CUENTA E2E' })).toBeAttached()
+})
+
 test('validación del plan: el contador lo marca como validado con nombre y matrícula', async ({ page }) => {
   await signIn(page, ACCOUNTANT.email, PASSWORD)
   await open(page, 'Plan de cuentas')
@@ -357,4 +378,42 @@ test('validación del plan: el contador lo marca como validado con nombre y matr
   await expect(page.getByText(/Lo validó Contadora Externa, matrícula MAT-1234/)).toBeVisible()
   await open(page, 'Libros y balances')
   await expect(page.getByText('Plan de cuentas sin validar por un contador')).toHaveCount(0)
+})
+
+test('cierre del ejercicio 2025: con los 12 meses cerrados se contabiliza la refundición', async ({ page }) => {
+  test.slow()
+  await signIn(page, ACCOUNTANT.email, PASSWORD)
+  await open(page, 'Ejercicios y períodos')
+  await page.getByRole('button', { name: 'Nuevo ejercicio' }).click()
+  let dialog = page.getByRole('dialog')
+  await dialog.getByRole('textbox', { name: 'Año' }).fill('2025')
+  await dialog.getByRole('button', { name: 'Crear ejercicio' }).click()
+  await toast(page, 'Ejercicio 2025 creado con 12 períodos mensuales.')
+
+  // Un ingreso de 2025: al cerrar, la refundición lo lleva a 3.03.02 y 2026 arranca con ese saldo.
+  await open(page, 'Asientos')
+  await page.getByRole('link', { name: 'Nuevo asiento' }).first().click()
+  await page.getByLabel('Fecha', { exact: true }).fill('2025-06-15')
+  await page.getByLabel('Descripción', { exact: true }).fill('Servicios de 2025 e2e')
+  await pickAccount(page, 1, '1.01.01.04.01')
+  await page.getByLabel('Debe de la línea 1', { exact: true }).fill('1.000.000')
+  await pickAccount(page, 2, '4.09')
+  await page.getByLabel('Haber de la línea 2', { exact: true }).fill('1.000.000')
+  await page.getByRole('button', { name: 'Contabilizar' }).click()
+  await toast(page, 'Asiento N° 1 contabilizado.')
+
+  await open(page, 'Ejercicios y períodos')
+  const sheet2025 = page.locator('section').filter({ has: page.getByRole('heading', { level: 2, name: /Ejercicio 2025/ }) })
+  for (const month of ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']) {
+    await sheet2025.getByRole('button', { name: `Cerrar ${month}` }).click()
+    await expect(sheet2025.getByRole('button', { name: `Reabrir ${month}` })).toBeVisible()
+  }
+  await sheet2025.getByRole('button', { name: 'Cerrar el ejercicio' }).click()
+  dialog = page.getByRole('dialog', { name: 'Cerrar el ejercicio' })
+  await dialog.getByRole('button', { name: 'Cerrar el ejercicio definitivamente' }).click()
+  await toast(page, 'Ejercicio 2025 cerrado: se contabilizó la refundición.')
+  await sheet2025.getByRole('link', { name: 'Ver el asiento de refundición' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Asiento N° 2' })).toBeVisible()
+  await expect(page.getByText('Refundición', { exact: false }).first()).toBeVisible()
+  await expect(page.getByRole('row').filter({ hasText: '3.03.02' })).toContainText('1.000.000')
 })

@@ -11,7 +11,7 @@
 | 1B — Instalador Windows 11 | 🟡 CI verde en Windows real (lanzador, copias, instalador instalado, abierto, cerrado y desinstalado). Falta instalarlo en la PC del propietario |
 | 2 — Finanzas empresa/personal | 🟡 Backend y interfaz hechos; probado de punta a punta en navegador (ver tabla). Falta validarlo con extractos reales del propietario |
 | 3 — Contabilidad (núcleo) | 🟡 Backend e interfaz hechos; probado de punta a punta en navegador (ver tabla). El plan de cuentas sigue sin validar por un contador |
-| 3B — Activos fijos, centros, recurrentes, XLSX | 🟡 Backend hecho (`docs/specs/FASE3B_CONTABILIDAD.md`, D-068 a D-081). Falta la interfaz. Vidas útiles, residuales y cuadro fiscal `pending` hasta que los valide el contador |
+| 3B — Activos fijos, centros, recurrentes, XLSX | 🟡 Backend e interfaz hechos; probado de punta a punta en navegador (ver tabla). Vidas útiles, residuales y cuadro fiscal `pending` hasta que los valide el contador; descarga de Excel en la app de escritorio sin probar |
 | 4 a 8 | ⏳ No iniciadas |
 
 **Destino definido por el propietario:** una PC con Windows 11, uso en una sola máquina (D-016). Desarrollo en esta PC Linux; instaladores generados en GitHub Actions.
@@ -40,9 +40,23 @@
 | Contabilidad: asiento manual (desbalanceado no se contabiliza), contabilización con número, reversión, descarte | ✅ | ✅ | ✅ | ✅ | ✅ (Administrador no contabiliza; Consulta solo lee) | ✅ + E2E | ✅ |
 | Contabilidad: asiento propuesto desde un movimiento de la empresa (cuentas contables configuradas al proponer, dólares con redondeo elegido), movimiento bloqueado al contabilizar | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ + E2E | ✅ |
 | Contabilidad: libro diario, mayor, balance de comprobación, balance general, estado de resultados | ✅ | ✅ | n/a | n/a | ✅ | ✅ + E2E | ✅ |
-| Contabilidad: cierre del ejercicio con refundición, subcuentas, archivo de cuentas | ✅ | ✅ | ✅ | ✅ | ✅ | backend + prueba manual (sin E2E) | ✅ |
+| Contabilidad: cierre del ejercicio con refundición, subcuentas, archivo de cuentas | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ + E2E | ✅ |
+| Activos fijos: 34 categorías propuestas sin validar, completar, validar (solo `accounting.post`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ + E2E | ✅ |
+| Activos fijos: alta de bienes (fiscal/contable, aviso pre 14-10-2021), plan de cuotas | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ + E2E | ✅ |
+| Activos fijos: depreciación del mes (409 por mes salteado), contabilización, baja con acta | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ + E2E | ✅ |
+| Activos fijos: cuadro de depreciación (RG 77/2020) conciliado con el balance | ✅ | ✅ | n/a | n/a | ✅ | ✅ + E2E | ✅ |
+| Activos fijos: edición de bienes y categorías, archivo, configuración por defecto | ✅ | ✅ | ✅ | ✅ | ✅ | unitarias + prueba manual (sin E2E) | ✅ |
+| Activos fijos: aviso del 422 por categoría incompleta al calcular la depreciación | ✅ | ✅ | n/a | ✅ | ✅ | sin E2E ni prueba manual (el alta ya rechaza categorías incompletas) | ✅ |
+| Centros de costos: alta, solo en líneas de resultado, obligatorios si se configura, resultados por centro | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ + E2E | ✅ |
+| Centros de costos: edición y archivo | ✅ | ✅ | ✅ | ✅ | ✅ | unitarias + prueba manual (sin E2E) | ✅ |
+| Asientos recurrentes: plantilla, aviso del mes, generación sin duplicar | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ + E2E | ✅ |
+| Asientos recurrentes: edición, pausa y reactivación | ✅ | ✅ | ✅ | ✅ | ✅ | prueba manual (sin E2E) | ✅ |
+| Balance de comprobación con saldo inicial (refundición del ejercicio anterior) | ✅ | ✅ | n/a | n/a | ✅ | ✅ + E2E | ✅ |
+| Exportar a Excel (navegador) e imprimir / PDF | ✅ | ✅ | n/a | n/a | ✅ | ✅ + E2E (comprobación y cuadro; el resto, a mano) | ✅ |
+| Exportar a Excel en la app de escritorio (Tauri) | 🟡 | ✅ | n/a | n/a | ✅ | sin probar | ✅ |
 
 ## Pruebas ejecutadas (2026-11-24)
+- Interfaz 3B: Vitest 124/124 (34 nuevas); `tsc -b` y build OK; oxlint con las mismas 2 advertencias; E2E 38/38 (10 + 8 + 11 de `contabilidad.spec.ts` + 9 de `contabilidad-3b.spec.ts`), dos corridas seguidas en verde (~75 s cada una).
 - Backend 3B (rama del agente): 239/239 pytest (4 `slow`); ruff, `ruff format` y mypy estricto sin errores; `alembic check` limpio; `downgrade 0003` → `upgrade head` con datos OK. Las 22 reglas nuevas de la base se quitaron una por una y su prueba falló cada vez. Backend empaquetado (PyInstaller, Linux): migró una base nueva a la 0004, cargó las 34 categorías y exportó XLSX. Corrida de 2.000 bienes ~0,4 s; XLSX del diario con 20.000 líneas ~2,1 s.
 - Interfaz de contabilidad: Vitest 90/90 (36 nuevas); `tsc -b` y build OK (414 kB JS inicial; contabilidad en fragmentos aparte); oxlint sin advertencias nuevas; E2E 27/27 (10 + 8 + 9 de `contabilidad.spec.ts`), dos corridas seguidas en verde (52 y 62 s). Cierre del ejercicio con refundición probado a mano.
 - Interfaz de finanzas: Vitest 53/53; `tsc -b` y build OK (409 kB JS inicial; finanzas en fragmentos aparte); oxlint sin advertencias nuevas; E2E 18/18 (10 de `flujos.spec.ts` + 8 de `finanzas.spec.ts`), dos corridas seguidas en verde (50 y 58 s). La prueba de privacidad (tres usuarios) va con `test.slow()`: con la PC cargada superaba los 30 s por defecto.
@@ -70,8 +84,8 @@
 | P-3 | ~~Script E2E fuera del repo~~ | **Resuelto**: `frontend/e2e/` con `@playwright/test` y job `e2e` en el CI |
 | P-4 | 2 advertencias de oxlint (`only-export-components`) | Hooks junto a sus providers; solo afecta la recarga en caliente |
 | P-6 | La política de contraseñas del frontend cuenta como "símbolo" las letras con tilde | El backend es quien decide (Unicode); solo cambia el aviso previo |
-| P-9 | ~~La API no tiene `GET /finance/contexts/{cid}/transactions/{id}`~~ | **Resuelto en la API**: existe, con las reglas de acceso del listado y los anulados incluidos (`test_finance_transaction_detail.py`). Falta que la interfaz lo use en lugar de buscar en la lista |
-| P-10 | ~~Los asientos traen el id de quien creó/contabilizó, no el nombre~~ | **Resuelto en la API**: `created_by_name` y `posted_by_name` en los asientos y el libro diario, sin otro dato del usuario (`test_accounting_entry_user_names.py`). Falta que la interfaz los muestre en lugar de leer `/users` |
+| P-9 | ~~La API no tiene `GET /finance/contexts/{cid}/transactions/{id}`~~ | **Resuelto**: en la API (`test_finance_transaction_detail.py`) y en la interfaz, que lee el movimiento de origen por id aunque los filtros de la lista lo excluyan (E2E en `contabilidad-3b.spec.ts`) |
+| P-10 | ~~Los asientos traen el id de quien creó/contabilizó, no el nombre~~ | **Resuelto**: en la API (`test_accounting_entry_user_names.py`) y en la interfaz (asiento y libro diario, sin leer `/users`) |
 
 ## Decisiones tomadas en esta sesión
 D-001 a D-034 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requiere tu confirmación.**
@@ -87,7 +101,7 @@ D-001 a D-034 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 8. Revisar los hallazgos R-10 y R-11 de `DISCOVERY.md` (repositorio git en la carpeta personal con `.git-credentials`).
 
 ## Para retomar (traspaso, 2026-11-24)
-**Estado de `main`:** fases 0-1 completas; fase 2 (finanzas) integrada, con backend, interfaz y rendimiento. Todo verde en Linux y en Windows. Fase 3 (núcleo): backend e interfaz hechos (`docs/specs/FASE3_CONTABILIDAD.md`); falta que el contador valide el plan de cuentas.
+**Estado de `main`:** fases 0-1 completas; fase 2 (finanzas) integrada, con backend, interfaz y rendimiento. Todo verde en Linux y en Windows. Fase 3 (núcleo) y 3B (activos fijos, centros, recurrentes, XLSX): backend e interfaz hechos (`docs/specs/FASE3_CONTABILIDAD.md`, `docs/specs/FASE3B_CONTABILIDAD.md`); falta que el contador valide el plan de cuentas y las vidas útiles.
 
 **Lo primero:**
 1. **CI de Windows: ✅ todo verde desde `7c98639`** (ejecución 45390713831). Pasan el lanzador, las copias, el Administrador de credenciales, el instalador NSIS y su prueba completa en Windows real.

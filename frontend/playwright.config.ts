@@ -32,6 +32,13 @@ export default defineConfig({
       dependencies: ['finanzas'],
       use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 860 } },
     },
+    {
+      // La fase 3B parte del plan validado, del 2025 cerrado y de los asientos de contabilidad.spec.ts.
+      name: 'contabilidad-3b',
+      testMatch: 'contabilidad-3b.spec.ts',
+      dependencies: ['contabilidad'],
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 860 }, acceptDownloads: true },
+    },
   ],
   webServer: [
     {
