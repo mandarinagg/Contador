@@ -163,6 +163,8 @@ Desarrollo en Linux; uso real en **una PC con Windows 11** (D-016). Los instalad
 5. Cuando `/system/health` responde, carga la interfaz. Si algo falla, muestra el motivo y la ruta del log (`%LOCALAPPDATA%\ContadorAI\logs`).
 6. Al cerrar la app: detiene el backend y luego PostgreSQL (`pg_ctl stop -m fast`).
 
-**Verificación continua:** el job `backend-windows` de `.github/workflows/ci.yml` ya reproduce los pasos 2-4 en Windows real (initdb, pg_ctl, backend empaquetado, configuración inicial, ingreso, verificación de auditoría) en cada push.
+Implementado en `desktop/src-tauri/src/stack.rs` (D-022). Registros en `%LOCALAPPDATA%\ContadorAI\logs` (`backend.log`, `postgresql.log`, `initdb.log`, `pg_ctl.log`; el anterior queda como `.log.1`).
+
+**Verificación continua (job `windows` del CI, Windows real):** prueba del lanzador con binarios reales (primer arranque, reinicio con datos, falta de contraseña, carpeta ajena), Administrador de credenciales, y luego el instalador NSIS: instalación silenciosa, primer arranque, cierre forzado (el backend muere con la app), reapertura reutilizando PostgreSQL, cierre normal (todo detenido) y desinstalación sin pérdida de datos.
 
 Linux (`.deb`, AppImage) queda como opción secundaria con el mismo diseño.

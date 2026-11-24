@@ -23,19 +23,39 @@ const queryClient = new QueryClient({
   },
 })
 
+/** Hasta 3 minutos: el lanzador espera lo mismo antes de declarar un error. */
+const STARTUP_RETRIES = 180
+
+function isStarting(err: unknown): boolean {
+  return err instanceof ApiError && err.code === 'NETWORK'
+}
+
 function FullPage({ children }: { children: ReactNode }) {
   return <div className="grid h-full place-items-center">{children}</div>
 }
 
 /** Decide a dónde ir según el estado: sin configurar → setup; sin sesión → login. */
 function Gate({ need }: { need: 'setup' | 'anonymous' | 'session' }) {
-  const setup = useQuery({ queryKey: ['setup'], queryFn: () => get<{ needs_setup: boolean }>('/system/setup') })
+  const setup = useQuery({
+    queryKey: ['setup'],
+    queryFn: () => get<{ needs_setup: boolean }>('/system/setup'),
+    // En la app instalada la API tarda unos segundos en arrancar (más la primera vez,
+    // cuando se crea la base): mientras no haya conexión, se sigue esperando.
+    retry: (count, err) => (isStarting(err) ? count < STARTUP_RETRIES : count < 2),
+    retryDelay: (count, err) => (isStarting(err) ? 1000 : Math.min(1000 * 2 ** count, 8000)),
+  })
   const { me, loading } = useSession()
 
   if (setup.isPending || loading) {
     return (
       <FullPage>
-        <Skeleton className="h-4 w-40" />
+        {setup.failureCount > 0 && isStarting(setup.failureReason) ? (
+          <p role="status" className="text-sm text-ink-2">
+            Iniciando Contador AI…
+          </p>
+        ) : (
+          <Skeleton className="h-4 w-40" />
+        )}
       </FullPage>
     )
   }
@@ -43,8 +63,8 @@ function Gate({ need }: { need: 'setup' | 'anonymous' | 'session' }) {
     return (
       <FullPage>
         <EmptyState title="El servicio local no responde">
-          {setup.error instanceof ApiError ? setup.error.message : ''} Verificá que el backend esté en ejecución y volvé a abrir la
-          aplicación.
+          {setup.error instanceof ApiError ? setup.error.message : ''} Cerrá y volvé a abrir la aplicación. Si se repite, el
+          motivo queda registrado en la carpeta de datos de Contador AI, subcarpeta logs.
         </EmptyState>
       </FullPage>
     )

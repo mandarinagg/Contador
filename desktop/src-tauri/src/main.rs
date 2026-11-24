@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-  contador_desktop_lib::run();
+    contador_desktop_lib::run();
 }

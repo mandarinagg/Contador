@@ -67,10 +67,18 @@ Luego, con el backend en marcha:
 
 ```bash
 cd desktop && npm install && npm run dev      # ventana de escritorio
-npm run build                                  # instaladores .deb/.rpm/AppImage
+npm run build                                  # .deb/AppImage (el instalador de Windows lo genera el CI)
 ```
 
-En Windows: Visual Studio Build Tools (C++), WebView2 (incluido en Windows 11) y Rust; los instaladores NSIS/MSI se generan en Windows.
+## Instalar en Windows 11
+
+El instalador lo genera GitHub Actions en cada push a `main` (job `windows`, que además lo instala y prueba en Windows real):
+
+1. GitHub → **Actions** → la última ejecución verde de **CI** → artefacto **contador-ai-windows-instalador** (o `gh run download -n contador-ai-windows-instalador`).
+2. Descomprimir y ejecutar `Contador AI_x.y.z_x64-setup.exe`. No pide permisos de administrador.
+3. Sin firma de código, Windows muestra "Windows protegió su PC" → **Más información** → **Ejecutar de todas formas**.
+
+Trae todo adentro (interfaz, backend y PostgreSQL 18.7): no hay que instalar nada más. Los datos quedan en `%LOCALAPPDATA%\ContadorAI` (con sus registros en `logs\`) y **desinstalar no los borra**. Para actualizar, instalar la versión nueva encima.
 
 ## Estructura
 

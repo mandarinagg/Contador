@@ -1,7 +1,8 @@
 # CI de CONTADOR AI.
 # - test: pruebas, lint y tipos de backend y frontend (Linux, PostgreSQL 18 real).
-# - backend-windows: empaqueta el backend para Windows y lo prueba contra PostgreSQL
-#   portable (la misma combinación que usará la app instalada en Windows 11).
+# - secrets: el repositorio es público; gitleaks revisa todo el historial.
+# - windows: backend empaquetado + PostgreSQL portable + lanzador + instalador NSIS,
+#   probado de punta a punta en Windows real (lo mismo que se instala en Windows 11).
 name: CI
 
 on:
@@ -84,7 +85,9 @@ jobs:
           npm test
           npm run build
 
-  backend-windows:
+  windows:
+    # Todo lo que llega a la PC con Windows 11: backend empaquetado, PostgreSQL portable,
+    # lanzador (Rust) e instalador NSIS, probado de punta a punta en Windows real.
     needs: test
     runs-on: windows-latest
     defaults:
@@ -95,6 +98,22 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            desktop/package-lock.json
+      - name: Rust (cache)
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            desktop/src-tauri/target
+          key: cargo-windows-${{ hashFiles('desktop/src-tauri/Cargo.lock') }}
+          restore-keys: cargo-windows-
 
       - name: Empaquetar backend (PyInstaller)
         working-directory: backend
@@ -106,63 +125,105 @@ jobs:
       - name: PostgreSQL portable (cache)
         uses: actions/cache@v6
         with:
-          path: pgsql
-          key: ${{ env.PG_WINDOWS_ZIP }}-trimmed
+          path: build/pgsql
+          key: ${{ env.PG_WINDOWS_ZIP }}-trimmed-v2
 
       - name: PostgreSQL portable (descarga y recorte)
         run: |
-          if (-not (Test-Path pgsql\bin\postgres.exe)) {
-            Invoke-WebRequest "https://get.enterprisedb.com/postgresql/$env:PG_WINDOWS_ZIP" -OutFile pg.zip
-            Expand-Archive pg.zip -DestinationPath .
-            Remove-Item pg.zip
-            # Solo hace falta el servidor: fuera pgAdmin, documentación y StackBuilder.
-            Remove-Item -Recurse -Force "pgsql\pgAdmin 4", pgsql\doc, pgsql\StackBuilder -ErrorAction SilentlyContinue
-          }
-          pgsql\bin\postgres.exe --version
-          "Tamaño de pgsql: {0:N0} MB" -f ((Get-ChildItem pgsql -Recurse | Measure-Object Length -Sum).Sum / 1MB)
-
-      - name: Prueba de humo en Windows (PostgreSQL portable + backend empaquetado)
-        run: |
-          $tmp = $env:RUNNER_TEMP
-          $data = Join-Path $tmp "pgdata"
-          $pw = "contador_ci"
-          [IO.File]::WriteAllText((Join-Path $tmp "pw.txt"), $pw)  # sin salto de línea
-          pgsql\bin\initdb.exe -D $data -U contador --pwfile="$tmp\pw.txt" --auth=scram-sha-256 -E UTF8 --locale=C
-          pgsql\bin\pg_ctl.exe -D $data -o "-p 55440 -c listen_addresses=127.0.0.1" -l "$tmp\pg.log" -w start
-          $env:PGPASSWORD = $pw
-          pgsql\bin\createdb.exe -h 127.0.0.1 -p 55440 -U contador contador
-
-          $env:CONTADOR_ENV = "production"
-          $env:CONTADOR_DATABASE_URL = "postgresql+psycopg://contador:$pw@127.0.0.1:55440/contador"
-          $api = Start-Process backend\dist\contador-backend\contador-backend.exe -PassThru -NoNewWindow `
-            -RedirectStandardOutput "$tmp\api.log" -RedirectStandardError "$tmp\api.err"
-          try {
-            $base = "http://127.0.0.1:8765/api/v1"
-            $ok = $false
-            for ($i = 0; $i -lt 60; $i++) {
-              try { Invoke-RestMethod "$base/system/health" | Out-Null; $ok = $true; break } catch { Start-Sleep 1 }
+          if (-not (Test-Path build\pgsql\bin\postgres.exe)) {
+            New-Item -ItemType Directory -Force build | Out-Null
+            Invoke-WebRequest "https://get.enterprisedb.com/postgresql/$env:PG_WINDOWS_ZIP" -OutFile build\pg.zip
+            tar -xf build\pg.zip -C build
+            Remove-Item build\pg.zip
+            # Solo el servidor y sus herramientas: fuera pgAdmin, documentación, StackBuilder,
+            # cabeceras, símbolos de depuración y bibliotecas de enlace (.lib).
+            foreach ($d in "pgAdmin 4", "doc", "StackBuilder", "include", "symbols") {
+              Remove-Item -Recurse -Force "build\pgsql\$d" -ErrorAction SilentlyContinue
             }
-            if (-not $ok) { Get-Content "$tmp\api.log", "$tmp\api.err"; throw "El backend no respondió" }
-
-            $setup = @{
-              organization = @{ legal_name = "Prueba CI EAS"; legal_form = "EAS" }
-              owner = @{ full_name = "Prueba CI"; email = "ci@example.com"; password = "Clave-Segura-2026" }
-            } | ConvertTo-Json
-            Invoke-RestMethod "$base/system/setup" -Method Post -ContentType "application/json" -Body $setup | Out-Null
-            $login = Invoke-RestMethod "$base/auth/login" -Method Post -ContentType "application/json" `
-              -Body (@{ email = "ci@example.com"; password = "Clave-Segura-2026" } | ConvertTo-Json)
-            $verify = Invoke-RestMethod "$base/audit/verify" -Headers @{ Authorization = "Bearer $($login.token)" }
-            if (-not $verify.valid) { throw "La cadena de auditoría no es válida" }
-            Get-Content "$tmp\api.log" -TotalCount 3
-            "Prueba de humo OK: migración, configuración inicial, ingreso y auditoría en Windows"
-          } finally {
-            Stop-Process -Id $api.Id -Force -ErrorAction SilentlyContinue
-            pgsql\bin\pg_ctl.exe -D $data -m fast stop
+            Get-ChildItem build\pgsql -Recurse -Include *.lib, *.pdb | Remove-Item -Force
+          }
+          build\pgsql\bin\postgres.exe --version
+          Get-ChildItem build\pgsql -Directory | ForEach-Object {
+            "{0,-10} {1,6:N0} MB" -f $_.Name, ((Get-ChildItem $_.FullName -Recurse -File | Measure-Object Length -Sum).Sum / 1MB)
           }
 
-      - name: Publicar backend empaquetado
+      - name: Lanzador — formato y lint
+        working-directory: desktop/src-tauri
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+
+      - name: Lanzador — prueba con binarios reales y Administrador de credenciales
+        working-directory: desktop/src-tauri
+        run: |
+          $env:CONTADOR_TEST_PGSQL_BIN = Resolve-Path ..\..\build\pgsql\bin
+          $env:CONTADOR_TEST_BACKEND_EXE = Resolve-Path ..\..\backend\dist\contador-backend\contador-backend.exe
+          cargo test -- --ignored --test-threads=1
+
+      - name: Instalador NSIS
+        run: |
+          npm ci --prefix frontend
+          npm ci --prefix desktop
+          npm --prefix desktop run build
+          $exe = Get-ChildItem desktop\src-tauri\target\release\bundle\nsis\*.exe
+          "Instalador: {0} ({1:N0} MB)" -f $exe.Name, ($exe.Length / 1MB)
+
+      - name: Publicar instalador
         uses: actions/upload-artifact@v7
         with:
-          name: contador-backend-windows
-          path: backend/dist/contador-backend
-          retention-days: 14
+          name: contador-ai-windows-instalador
+          path: desktop/src-tauri/target/release/bundle/nsis/*.exe
+          retention-days: 30
+
+      - name: Prueba del instalador (instalar, abrir, cerrar, reabrir, desinstalar)
+        run: |
+          $installer = (Get-ChildItem desktop\src-tauri\target\release\bundle\nsis\*.exe).FullName
+          Start-Process $installer -ArgumentList "/S" -Wait
+          $backend = Get-ChildItem $env:LOCALAPPDATA -Recurse -Depth 3 -Filter contador-backend.exe | Select-Object -First 1
+          if (-not $backend) { throw "El instalador no copió el backend" }
+          $dir = $backend.Directory.Parent.FullName
+          "Instalado en: $dir"
+          if (-not (Test-Path "$dir\pgsql\bin\postgres.exe")) { throw "El instalador no copió PostgreSQL" }
+          $app = Get-ChildItem $dir -Filter *.exe | Where-Object { $_.Name -notmatch "^uninstall" } | Select-Object -First 1
+          $data = Join-Path $env:LOCALAPPDATA "ContadorAI"
+          $health = "http://127.0.0.1:8765/api/v1/system/health"
+          function Wait-Health([int]$seconds) {
+            for ($i = 0; $i -lt $seconds; $i++) {
+              try { Invoke-RestMethod $health | Out-Null; return } catch { Start-Sleep 1 }
+            }
+            Get-ChildItem "$data\logs" -ErrorAction SilentlyContinue | ForEach-Object { "== $($_.Name)"; Get-Content $_.FullName -Tail 30 }
+            throw "La API no respondió en $seconds s"
+          }
+          function Port-Open { try { Invoke-RestMethod $health | Out-Null; $true } catch { $false } }
+
+          # 1. Primer arranque: crea la base en %LOCALAPPDATA%\ContadorAI y levanta todo.
+          $p = Start-Process $app.FullName -PassThru
+          Wait-Health 180
+          if (-not (Test-Path "$data\pgdata\PG_VERSION")) { throw "No se creó la base en $data" }
+          "Primer arranque OK"
+
+          # 2. Cierre forzado (como un corte): el backend debe morir con la app (job object).
+          Stop-Process -Id $p.Id -Force
+          Start-Sleep 3
+          if (Port-Open) { throw "El backend siguió vivo después de matar la app" }
+          "Cierre forzado OK: el backend murió con la app"
+
+          # 3. Reapertura: reutiliza el PostgreSQL que quedó en marcha.
+          $p = Start-Process $app.FullName -PassThru
+          Wait-Health 120
+          "Reapertura OK"
+
+          # 4. Cierre normal: detiene backend y PostgreSQL.
+          $p.CloseMainWindow() | Out-Null
+          if (-not $p.WaitForExit(60000)) { throw "La app no se cerró" }
+          Start-Sleep 2
+          if (Port-Open) { throw "El backend siguió vivo después de cerrar la app" }
+          & "$dir\pgsql\bin\pg_ctl.exe" status -D "$data\pgdata"
+          if ($LASTEXITCODE -ne 3) { throw "PostgreSQL siguió en marcha después de cerrar la app" }
+          "Cierre normal OK: backend y PostgreSQL detenidos"
+
+          # 5. Desinstalar no borra la contabilidad.
+          Start-Process "$dir\uninstall.exe" -ArgumentList "/S" -Wait
+          Start-Sleep 3
+          if (-not (Test-Path "$data\pgdata\PG_VERSION")) { throw "La desinstalación borró los datos" }
+          "Desinstalación OK: los datos siguen en $data"

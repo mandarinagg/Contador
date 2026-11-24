@@ -40,3 +40,6 @@ backups/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Binarios descargados para empaquetar (PostgreSQL portable)
+/build/

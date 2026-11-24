@@ -61,3 +61,9 @@ Formato: contexto → decisión → alternativas → consecuencias. Estado: **Ac
 
 ## D-020 — PostgreSQL portable de EDB
 **Aceptada.** Se empaquetan los binarios oficiales para Windows de EDB (`postgresql-18.7-1-windows-x64-binaries.zip`, la misma versión que en desarrollo), recortados a `bin`, `lib` y `share` (sin pgAdmin, documentación ni StackBuilder). Datos en `%LOCALAPPDATA%\ContadorAI\pgdata`, solo `127.0.0.1`, autenticación `scram-sha-256` con contraseña aleatoria guardada en el Administrador de credenciales de Windows.
+
+## D-021 — Datos fuera de la carpeta del identificador
+**Aceptada.** La base vive en `%LOCALAPPDATA%\ContadorAI` y no en `%LOCALAPPDATA%\py.contadorai.desktop`: el desinstalador de Tauri ofrece "borrar datos de la aplicación" sobre la carpeta del identificador, y la contabilidad no debe poder borrarse con un clic al desinstalar. El CI verifica que desinstalar deja los datos.
+
+## D-022 — Lanzador en Rust (`desktop/src-tauri/src/stack.rs`)
+**Aceptada.** Sin dependencias de red extra (HTTP mínimo sobre `TcpStream` para el chequeo de salud). Reglas: nunca borra una carpeta de datos existente (la creación inicial ocurre en `pgdata.init` y se renombra al terminar); contraseña aleatoria de 256 bits en el Administrador de credenciales (`ContadorAI` / `postgresql`); PostgreSQL solo TCP en `127.0.0.1:55440`, sin sockets Unix, `scram-sha-256`, ICU `es-PY` para ordenar en español; backend atado a la app con un *job object* de Windows (muere con ella aunque la app falle); si PostgreSQL quedó en marcha tras un cierre brusco, se reutiliza; una sola instancia de la app. Fuera de Windows (solo desarrollo) la contraseña va a un archivo `0600`.

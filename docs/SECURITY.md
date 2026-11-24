@@ -54,6 +54,7 @@
 
 ## Pendientes
 
+- **Implementado (D-022):** PostgreSQL solo en `127.0.0.1`, sin sockets Unix, `scram-sha-256`, contraseña aleatoria de 256 bits en el Administrador de credenciales; el archivo temporal de contraseña de `initdb` se borra siempre.
 - Rol de base de datos de mínimo privilegio para la app (sin `ALTER`/`DISABLE TRIGGER`), distinto del dueño de las tablas (fase 8, junto con el PostgreSQL empaquetado).
 - Secreto por proceso entre Tauri y el backend para que otros procesos locales no hablen con la API (fase 8).
 - Copias de seguridad cifradas y prueba de restauración (fase 8).

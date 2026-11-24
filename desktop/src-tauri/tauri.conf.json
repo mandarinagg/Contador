@@ -31,13 +31,10 @@
     "active": true,
     "targets": [
       "deb",
-      "rpm",
-      "appimage",
-      "nsis",
-      "msi"
+      "appimage"
     ],
     "category": "Finance",
-    "shortDescription": "Contabilidad, tributaci\u00f3n y finanzas para Paraguay",
+    "shortDescription": "Contabilidad, tributación y finanzas para Paraguay",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

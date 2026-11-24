@@ -14,7 +14,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). V
 - Plataforma objetivo definida: Windows 11, una sola PC (D-016 a D-020).
 - `python -m app`: el backend aplica migraciones y levanta la API (modo empaquetado).
 - `backend/packaging/contador-backend.spec`: backend como ejecutable con PyInstaller (verificado en Linux).
-- `.github/workflows/ci.yml`: pruebas en Linux y empaquetado + prueba de humo en Windows con PostgreSQL 18.7 portable (sin ejecutar todavía: falta el primer push).
+- `.github/workflows/ci.yml`: revisión de secretos, pruebas en Linux, y en Windows real: lanzador, instalador NSIS y prueba de instalación de punta a punta.
+- Lanzador Rust (`desktop/src-tauri/src/stack.rs`, `secret.rs`): PostgreSQL portable + backend, contraseña en el Administrador de credenciales, una sola instancia, error visible con la ruta del registro (D-021, D-022).
+- La interfaz espera a que la API arranque ("Iniciando Contador AI…") en lugar de mostrar un error.
+- Hook pre-commit con gitleaks; repositorio público (`docs/SECURITY.md`).
 
 ### Agregado — Fase 1 (2026-11-23)
 - Backend FastAPI: configuración por entorno, logging JSON con `request_id`, errores con códigos estables.
