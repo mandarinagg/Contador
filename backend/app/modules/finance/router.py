@@ -385,6 +385,16 @@ def list_transactions(
     return _txs_out(db, ctx, rows)
 
 
+@router.get("/contexts/{cid}/transactions/{transaction_id}", response_model=TransactionOut)
+def get_transaction(
+    cid: uuid.UUID, transaction_id: uuid.UUID, auth: Auth, db: DbSession
+) -> TransactionOut:
+    """Un movimiento, con las reglas de acceso del listado (P-9). Incluye los anulados."""
+    ctx = fs.resolve_context(db, auth, cid, write=False)
+    tx = transactions.get_transaction(db, ctx, transaction_id)
+    return _txs_out(db, ctx, [tx])[0]
+
+
 @router.post(
     "/contexts/{cid}/transactions",
     response_model=TransactionOut,
