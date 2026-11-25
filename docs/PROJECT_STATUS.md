@@ -113,8 +113,8 @@ D-001 a D-119 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 9. **Credenciales de Marangatu** para el bot (D-119), cuando lleguemos a esa fase. Se guardan en el almacén de credenciales de Windows, nunca en el repositorio.
 10. **Confirmar la D-119:** si el bot te pide un clic de aprobación antes del botón final de cada presentación (recomendado) o presenta sin preguntar.
 
-## Para retomar (traspaso, 2026-11-24)
-**Estado de `main`:** fases 0 a 3B y la fase 4 (tributación, backend e interfaz) integradas. Pruebas: backend 322 (pytest contra PostgreSQL real, incluidas las `slow`), Vitest 212, E2E 47 (`flujos`, `finanzas`, `contabilidad`, `contabilidad-3b`, `tributacion`). Migraciones hasta `0005_tributacion`. Último CI (`dda67e4`, corrida 45470092886) verde en los 5 jobs: `secrets`, `test`, `e2e`, `performance` y `windows` (instalador NSIS generado y probado, ya con la tributación).
+## Para retomar (traspaso, 2026-11-25)
+**Estado de `main`:** fases 0 a 3B y la fase 4 (tributación, backend e interfaz) integradas. Pruebas: backend 322 (pytest contra PostgreSQL real, incluidas las `slow`), Vitest 212, E2E 47 (`flujos`, `finanzas`, `contabilidad`, `contabilidad-3b`, `tributacion`). Migraciones hasta `0005_tributacion`. Último CI (`2a64c28`, corrida 45632187166) verde en los 5 jobs; el diario XLSX de 20.000 líneas tarda 0,48 s en el runner (antes 3,0 a 3,1 s): `secrets`, `test`, `e2e`, `performance` y `windows` (instalador NSIS generado y probado, ya con la tributación).
 
 **Fase 4:** menú Impuestos (Resumen fiscal, Calendario, Comprobantes, IVA del mes, Perfil fiscal, Reglas y feriados, Configuración) y avisos en Inicio. Decisiones D-082 a D-116.
 - **Antes de usarlo en serio** (lo hace la herramienta con tu aprobación, D-118): cargar y verificar las reglas en uso y los feriados (Impuestos → Reglas y feriados), declarar y verificar el perfil fiscal con la constancia de RUC, y responder las dudas D-F4-1 a D-F4-14 de `docs/research/TRIBUTACION_FASE4.md`. Probar el archivo de Marangatu con uno o dos comprobantes antes de un mes entero.
