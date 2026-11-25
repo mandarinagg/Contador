@@ -7,4 +7,4 @@ useDefault = true
 [[allowlists]]
 description = "Contraseñas ficticias usadas solo en pruebas contra bases desechables"
 regexTarget = "secret"
-regexes = ['''^Clave-Segura-2026$''', '''^Otra-Clave-Segura-99$''']
+regexes = ['''^Clave-Segura-2026$''', '''^Otra-Clave-Segura-99$''', '''^Clave-Marangatu-E2E-9$''']

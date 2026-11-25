@@ -131,6 +131,7 @@ const tax = {
   voucherEntry: () => import('../modules/tax/VoucherEntryPage').then((m) => ({ Component: m.VoucherEntryPage })),
   vat: () => import('../modules/tax/VatPage').then((m) => ({ Component: m.VatPage })),
   rules: () => import('../modules/tax/RulesPage').then((m) => ({ Component: m.RulesPage })),
+  marangatu: () => import('../modules/tax/MarangatuPage').then((m) => ({ Component: m.MarangatuPage })),
   settings: () => import('../modules/tax/SettingsPage').then((m) => ({ Component: m.TaxSettingsPage })),
 }
 
@@ -222,6 +223,7 @@ const router = createBrowserRouter([
               { path: 'comprobantes/:id', lazy: tax.voucherEntry },
               { path: 'iva', lazy: tax.vat },
               { path: 'reglas', lazy: tax.rules },
+              { path: 'marangatu', lazy: tax.marangatu },
               { path: 'configuracion', lazy: tax.settings },
             ],
           },

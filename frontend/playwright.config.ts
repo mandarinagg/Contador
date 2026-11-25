@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test'
-import { API_PORT, API_URL, BACKEND_DIR, BACKEND_PYTHON, DATABASE_URL, WEB_PORT, WEB_URL } from './e2e/env.ts'
+import { API_PORT, API_URL, BACKEND_DIR, BACKEND_PYTHON, DATABASE_URL, KEYRING_FILE, WEB_PORT, WEB_URL } from './e2e/env.ts'
 
 export default defineConfig({
   testDir: './e2e',
@@ -46,6 +46,13 @@ export default defineConfig({
       dependencies: ['contabilidad-3b'],
       use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 860 }, acceptDownloads: true },
     },
+    {
+      // El bot de Marangatu parte de la empresa con RUC de las anteriores. Sin reconocimiento real.
+      name: 'marangatu',
+      testMatch: 'marangatu.spec.ts',
+      dependencies: ['tributacion'],
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 860 } },
+    },
   ],
   webServer: [
     {
@@ -64,6 +71,9 @@ export default defineConfig({
         CONTADOR_CORS_ORIGINS: WEB_URL,
         CONTADOR_LOG_LEVEL: 'WARNING',
         PYTHONPATH: BACKEND_DIR,
+        // La clave de Marangatu va a un almacén de prueba en archivo, no al del sistema.
+        PYTHON_KEYRING_BACKEND: 'tests.marangatu_fake.keyring_file.FileKeyring',
+        CONTADOR_TEST_KEYRING_FILE: KEYRING_FILE,
       },
     },
     {

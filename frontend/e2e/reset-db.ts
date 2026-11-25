@@ -6,7 +6,8 @@
  * Se ejecuta desde el `webServer` de Playwright, antes de levantar la API.
  */
 import { execFileSync } from 'node:child_process'
-import { BACKEND_DIR, BACKEND_PYTHON, DATABASE_URL, DB_NAME } from './env.ts'
+import { rmSync } from 'node:fs'
+import { BACKEND_DIR, BACKEND_PYTHON, DATABASE_URL, DB_NAME, KEYRING_FILE } from './env.ts'
 
 const SCRIPT = `
 import sys
@@ -24,4 +25,5 @@ with connect(host=url.host, port=url.port, user=url.username, password=url.passw
 `
 
 execFileSync(BACKEND_PYTHON, ['-c', SCRIPT, DATABASE_URL], { cwd: BACKEND_DIR, stdio: 'inherit' })
+rmSync(KEYRING_FILE, { force: true })
 console.log(`Base E2E ${DB_NAME} recreada vacía.`)

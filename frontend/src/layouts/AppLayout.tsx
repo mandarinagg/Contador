@@ -1,4 +1,4 @@
-import { ArrowLeftRight, BadgePercent, BookCheck, Boxes, Building2, CalendarDays, CalendarRange, Contact, FileBadge2, FileUp, Gauge, Home, Landmark, LayoutDashboard, ListTree, LogOut, Network, NotebookPen, ReceiptText, Repeat, Scale, ScrollText, Settings2, Tags, UserRound, Users } from 'lucide-react'
+import { ArrowLeftRight, Bot, BadgePercent, BookCheck, Boxes, Building2, CalendarDays, CalendarRange, Contact, FileBadge2, FileUp, Gauge, Home, Landmark, LayoutDashboard, ListTree, LogOut, Network, NotebookPen, ReceiptText, Repeat, Scale, ScrollText, Settings2, Tags, UserRound, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { NavLink, Outlet, useMatch } from 'react-router'
 import { cx } from '../lib/cx'
@@ -85,6 +85,7 @@ function useTaxNav(): NavItem[] {
     { to: '/impuestos/iva', label: 'IVA del mes', icon: <BadgePercent size={16} />, permission: 'tax.read' },
     { to: '/impuestos/perfil', label: 'Perfil fiscal', icon: <FileBadge2 size={16} />, permission: 'tax.read' },
     { to: '/impuestos/reglas', label: 'Reglas y feriados', icon: <BookCheck size={16} />, permission: 'tax.read' },
+    { to: '/impuestos/marangatu', label: 'Marangatu', icon: <Bot size={16} />, permission: 'tax.read' },
     { to: '/impuestos/configuracion', label: 'Configuración', icon: <Settings2 size={16} />, permission: 'tax.read' },
   ]
 }
