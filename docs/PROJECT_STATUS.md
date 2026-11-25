@@ -120,14 +120,34 @@ D-001 a D-126 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 
 **Fase 4:** menú Impuestos (Resumen fiscal, Calendario, Comprobantes, IVA del mes, Perfil fiscal, Reglas y feriados, Configuración) y avisos en Inicio. Decisiones D-082 a D-116.
 - **Antes de usarlo en serio** (lo hace la herramienta con tu aprobación, D-118): cargar y verificar las reglas en uso y los feriados (Impuestos → Reglas y feriados), declarar y verificar el perfil fiscal con la constancia de RUC, y responder las dudas D-F4-1 a D-F4-14 de `docs/research/TRIBUTACION_FASE4.md`. Probar el archivo de Marangatu con uno o dos comprobantes antes de un mes entero.
-- Abierto: sábados como inhábiles (D-F4-11); redondeo del IVA por comprobante (D-F4-7); casillas 33/36/39 y 164 del F120 vacías hasta saber del prorrateo (D-F4-14); la nota de débito electrónica no controla el tipo del CDC (D-107).
+- Abierto: la regla escrita del redondeo de la mitad (lo que queda de D-F4-7); el aviso de vencimientos con la fecha fija sin correr, hasta D-F4-12 (feriados); casillas 33/36/39 y 164 del F120 vacías hasta saber del prorrateo (D-F4-14); la nota de débito electrónica no controla el tipo del CDC (D-107).
 - ~~**CI `performance` intermitente**~~ **Resuelto (D-117, 2026-11-25):** el diario en XLSX usa el escritor propio (`accounting/fast_xlsx.py`). En esta PC bajó de 2,2 s a 0,6 s; en el runner tardaba de 3,0 a 3,1 s contra un límite de 3 s.
 - Windows no distingue mayúsculas: dos archivos como `VoucherForm.tsx` y `voucherForm.ts` rompen el build del instalador. El job `secrets` del CI ya lo rechaza en Linux.
 - Sin E2E (probado solo con pruebas unitarias y del backend): presentar, pagar y reabrir obligaciones; anular y proponer el asiento de un comprobante; descarga del archivo de Marangatu; deprecar reglas; excepciones de vencimiento.
 
 **Lo primero:**
 1. El propietario prueba el instalador NSIS (artefacto `contador-ai-windows-instalador` del último CI verde, vence a los 30 días) en su PC con Windows 11: P-8 (usuario con tildes o ñ) y P-12 (descarga de Excel dentro de la app).
-2. **Rol del contador → la herramienta (D-118).** El mecanismo ya está hecho (D-120, 2026-11-25): ninguna pantalla pide nombre ni matrícula. Quien verifica es CONTADOR AI, contra la fuente oficial, y tu clic queda en la auditoría. En Impuestos → Reglas y feriados, «Verificar las N con fuente oficial» verifica de una vez las reglas con la fuente oficial leída (37 de 39) y lista las otras 2 con el motivo. **Falta el contenido:** la herramienta verifica contra la fuente oficial el plan de cuentas (173 cuentas, `docs/research/PLAN_DE_CUENTAS_PY.md`), las 34 categorías de activo fijo, las dudas D-DEP de `docs/research/DEPRECIACION_PY.md` y, en la fase 4, las reglas, el perfil y las dudas D-F4. Hay que investigar si alguna presentación exige por ley la firma de un contador matriculado (la baja de bienes ya pide el acta de un contador o de un auditor, Decreto 3182, art. 58). **Bloque 1 hecho (D-121, 2026-11-25):** IDU y beneficiarios finales verificables; D-5 resuelta. Quedan sin fuente leída 2 reglas (dígito verificador del RUC y patente municipal) y falta leer la RG 110/2013. **Bloque 2 hecho (D-122):** el IVA del Formulario 120 se calcula con la tasa sobre la suma de las bases; resueltas D-F4-3, 4, 5, 6, 7 y 11. Quedan D-F4-1 (se prueba en Marangatu), 2, 8, 9, 10, 12, 13 y 14. **Bloque 3 hecho en lo que se puede leer (D-123):** las 17 dudas D-DEP quedan clasificadas; 7 solo las resolvería una consulta vinculante a la DNIT. **Plan de cuentas verificado (D-124):** las 173 cuentas contra el XLS oficial, sin problemas; CONTADOR AI ahora controla el plan de la base antes de validarlo. **D-125:** una vida útil o un residual fiscal fuera de la categoría exige el número de la autorización de la DNIT.
+2. **Verificación de CONTADOR AI (D-118, D-120 a D-125): hecha en lo que se puede leer.**
+   - Hecho:
+     - las reglas con fuente leída, que son 37 de 39 (D-121, D-122);
+     - el IVA del F120 con la tasa sobre la suma de las bases;
+     - las 17 dudas D-DEP clasificadas (D-123);
+     - el plan de cuentas contra el XLS oficial de la RG 49/2014, con control al validar (D-124);
+     - la vida útil fuera de la tabla, que exige la autorización de la DNIT (D-125).
+   - Queda abierto:
+     - `RUC-DV-MODULO11` (la DNIT no publica el algoritmo);
+     - `PATENTE-MUNICIPAL` (falta el municipio);
+     - D-3 (falta el estatuto de la EAS);
+     - D-F4-1 (se prueba en Marangatu), 2, 8, 9, 10, 12, 13 y 14;
+     - 7 dudas D-DEP que solo resuelve una consulta vinculante;
+     - la RG 110/2013 y la RG 04/2007, que no se pudieron leer.
+   - Firma de contador: el único caso confirmado es la baja de bienes (Decreto 3182, art. 58).
+3. **Datos que tiene que pasar el propietario (los dejó para después):**
+   - el estatuto de la EAS (D-3);
+   - el municipio, para la patente;
+   - la constancia de RUC, para verificar el perfil fiscal;
+   - las credenciales del SIFEN;
+   - **si el bot de Marangatu paga o solo informa el importe y genera la boleta** (por defecto no paga).
 
 **Después:**
 - **Bot de Marangatu (D-119, D-126):** investigación en `docs/research/BOT_MARANGATU.md` y diseño en `docs/specs/BOT_MARANGATU.md`.
@@ -145,4 +165,14 @@ D-001 a D-126 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 **Entorno local:** Postgres de desarrollo en el proyecto docker `contador` (127.0.0.1:55433). Para probar el lanzador sin `sudo` se usan los binarios de PostgreSQL 18 de Ubuntu (`apt download` + `dpkg-deb -x`, con `LD_LIBRARY_PATH`) y las variables `CONTADOR_TEST_PGSQL_BIN` y `CONTADOR_TEST_BACKEND_EXE`. E2E en paralelo con otra corrida: `CONTADOR_E2E_DB_NAME`, `CONTADOR_E2E_API_PORT` y `CONTADOR_E2E_WEB_PORT`.
 
 ## Próximo objetivo recomendado
-Instalar en la PC real del propietario (cierra la fase 1B). En el código: verificar a fondo el contenido contra las fuentes oficiales (reglas, plan, categorías, dudas D-F4 y D-DEP; D-118) y después diseñar el bot de Marangatu (D-119).
+- **Construir el B1 del bot de Marangatu** (`docs/specs/BOT_MARANGATU.md` §10):
+  - el módulo `marangatu`, con sus tablas y su migración;
+  - las credenciales con `keyring`;
+  - el trabajador con Playwright (Edge del sistema en Windows);
+  - el motor del catálogo de pantallas;
+  - el registro solo para agregar, con cadena de hashes;
+  - el interruptor general;
+  - el portal simulado;
+  - el modo reconocimiento.
+- **Hacer el reconocimiento real con el propietario en su PC.** Hace falta para escribir el catálogo: hoy no se conocen las pantallas por dentro.
+- **Instalar en la PC real del propietario** (cierra la fase 1B). Sirve para el reconocimiento.
