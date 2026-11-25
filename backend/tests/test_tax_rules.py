@@ -253,7 +253,9 @@ def test_rule_without_official_source_read_is_not_verifiable(
     """Una regla sin la fuente oficial leída sigue `pending` (D-120, prompt maestro §8)."""
     setup_tax(client, owner_token, monkeypatch, profile=False)
     weak = [r for r in rules_by_code(client, owner_token).values() if not r["verifiable"]]
-    assert weak and all(r["confidence"] != "oficial_leida" for r in weak)
+    assert all(r["confidence"] != "oficial_leida" for r in weak)
+    # Tras la verificación del 2026-11-25 (D-121) solo quedan dos sin fuente oficial leída.
+    assert {r["code"] for r in weak} == {"PATENTE-MUNICIPAL", "RUC-DV-MODULO11"}
     res = client.post(
         f"{TAX}/rules/{weak[0]['id']}/verify", json={}, headers=auth_header(owner_token)
     )

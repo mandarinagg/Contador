@@ -315,48 +315,66 @@ rules:
     notes: null
 
   - code: IDU-RETENCION
+    version: 2
     description: >
-      La EAS retiene el IDU al distribuir utilidades (obligación 726, Formulario 526 generado
-      por el sistema). Retiene al pagar o al último día del mes en que nace la obligación, lo que
-      ocurra primero. Las utilidades se consideran distribuidas según la asamblea o, sin obligación
-      de asamblea y sin plazo estatutario, en el 4.º mes posterior al cierre.
+      La EAS retiene el IDU cuando las utilidades quedan a disposición del accionista (obligación
+      726, Formulario 526 que arma Marangatu). La retención opera al nacer la obligación y el
+      comprobante se emite hasta el último día de ese mes o el día del pago, lo que ocurra primero.
+      La proforma se confirma dentro de los 12 primeros días corridos del mes siguiente y se paga
+      hasta el día 13 (si es inhábil, el primer día hábil siguiente). Las utilidades nacen cuando
+      la asamblea dispone su distribución; en las entidades sin obligación de asamblea, en el
+      plazo del estatuto o, si no lo fija, en el 4.º mes posterior al cierre.
     parameters:
       obligation_code: 726
       form: "526"
       periodicity: monthly_when_applicable
-      proforma_confirm_by_day: null
-      payment_by_day: null
+      proforma_confirm_by_day: 12
+      payment_by_day: 13
+      non_business_day_shift: next_business_day
       deemed_distribution_month_after_close: 4
     valid_from: "2020-01-01"
     valid_to: null
-    published_at: "2019-09-25"
-    source_url: "https://www.dnit.gov.py/documents/20123/302950/IDU+Cartilla+Informativa+03.09.24.pdf/25eeb741-b627-f2f0-f798-a9188a1a0f26?t=1725388488324.pdf"
-    legal_reference: "Ley N° 6380/2019, arts. 41 a 44; Decreto N° 3110/2019 (citado); RG N° 31/2019 (citada)"
-    consulted_at: "2026-11-24"
+    published_at: "2019-12-27"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-31-2019"
+    legal_reference: "Ley N° 6380/2019, arts. 40 a 44; Decreto N° 3110/2019, Anexo, arts. 3 y 6; RG N° 31/2019, arts. 8, 9 y 11"
+    consulted_at: "2026-11-25"
     validation_status: pending
     reviewed_by: null
-    confidence: oficial_citada_por_terceros
+    confidence: oficial_leida
     notes: >
-      Los días de confirmación y pago quedan en null a propósito. La RG 38/2020, art. 5°, dice
-      días 6 y 7, y la cartilla IDU 2024 dice 12 y 13 (D-5). Duda D-3: cuándo se entienden
-      distribuidas las utilidades en una EAS unipersonal.
+      Leídos el 2026-11-25 en la DNIT: Ley 6380, art. 44 (nacimiento de la obligación); Decreto
+      3110, Anexo, arts. 3 y 6 (PDF escaneado); RG 31/2019, arts. 8 y 9 (confirmar hasta el día
+      12, pagar hasta el 13). Resuelve D-5: la RG 38/2020, art. 5, excluye a las EGDUR y las remite
+      a la RG 31/2019; el calendario oficial de mayo de 2026 dice lo mismo (12 y 13). La EAS es
+      EGDUR por el art. 3, num. 9, del Anexo (sociedades creadas después de la Ley 6380): lectura
+      propia, el decreto no nombra a la EAS. Sigue abierta D-3: el mes en que nacen las utilidades
+      de esta EAS depende de su estatuto.
 
   - code: IDU-DJI
-    description: "DJI del IDU (obligación 954), en el 6.º mes después del cierre, según el calendario DJI."
+    version: 2
+    description: >
+      DJI del IDU (obligación 954): dentro del 6.º mes posterior al cierre del ejercicio, el día que
+      fija el calendario de DJI por terminación del RUC. Se presenta aunque la obligación 954 no
+      esté dada de alta en el RUC.
     parameters:
       obligation_code: 954
       periodicity: annual
       due: {months_after_fiscal_close: 6, day_rule: CAL-PERPETUO-DJI}
-    valid_from: null
+      required_even_if_obligation_not_registered: true
+    valid_from: "2020-11-05"
     valid_to: null
-    published_at: null
-    source_url: "https://www.dnit.gov.py/documents/20123/302950/IDU+Cartilla+Informativa+03.09.24.pdf/25eeb741-b627-f2f0-f798-a9188a1a0f26?t=1725388488324.pdf"
-    legal_reference: "RG N° 70/2020, arts. 2°, 4° y 5° (citada en la cartilla IDU)"
-    consulted_at: "2026-11-24"
+    published_at: "2020-11-05"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-70-20"
+    legal_reference: "RG N° 70/2020, arts. 2° y 4°; RG N° 38/2020, art. 6° (calendario de DJI)"
+    consulted_at: "2026-11-25"
     validation_status: pending
     reviewed_by: null
-    confidence: oficial_citada_por_terceros
-    notes: "No leí la RG 70/2020."
+    confidence: oficial_leida
+    notes: >
+      Leída el 2026-11-25. Art. 2: «dentro del sexto mes posterior al cierre del ejercicio
+      fiscal», con el calendario de DJI del art. 6 de la RG 38/2020. Art. 4: aunque no tenga dada
+      de alta la obligación 954. El formulario prevé no distribuir (art. 3, inc. h), pero la RG no
+      dice con esas palabras que se presente sin utilidades.
 
   # ---------------------------------------------------------------- SIFEN
   - code: SIFEN-PJ-NUEVA
@@ -525,18 +543,34 @@ rules:
     notes: "No investigado. Depende del municipio."
 
   - code: BENEFICIARIOS-FINALES
-    description: "Actualización del registro de beneficiarios finales de la EAS."
-    parameters: {}
-    valid_from: null
+    version: 2
+    description: >
+      Actualización de los registros administrativos de personas y estructuras jurídicas y de
+      beneficiarios finales (DGPEJBF, Ministerio de Economía y Finanzas, no la DNIT): anual, a más
+      tardar el 30 de junio de cada año; cada cambio, dentro de los 15 días hábiles; la inscripción
+      inicial, dentro de los 45 días hábiles posteriores a la constitución.
+    parameters:
+      authority: DGPEJBF
+      annual_update_due: {month: 6, day: 30}
+      change_notice_business_days: 15
+      initial_registration_business_days: 45
+    valid_from: "2021-01-01"
     valid_to: null
     published_at: null
-    source_url: "https://eas.mic.gov.py/files/TR%C3%81MITES-POSTERIORES-DE-EAS-A-TRAVES-DE-LA-PLATAFORMA%20-4-.pdf"
-    legal_reference: "Ley N° 6446/2019 (no leída)"
-    consulted_at: "2026-11-24"
+    source_url: "https://www.bacn.gov.py/archivos/9116/DECRETO3241%20_%20Ley%206446.pdf"
+    legal_reference: "Ley N° 6446/2019, arts. 2, 3, 5 y 7; Decreto N° 3241/2020, art. 10"
+    consulted_at: "2026-11-25"
     validation_status: pending
     reviewed_by: null
-    confidence: no_encontrada
-    notes: "La guía del MIC menciona el trámite. No encontré la periodicidad ni el plazo en una norma leída."
+    confidence: oficial_leida
+    notes: >
+      Leídos el 2026-11-25: Ley 6446 (texto en bacn.gov.py) y Decreto 3241, art. 10: «deberán ser
+      actualizados anualmente a más tardar al 30 de junio de cada año correspondiente, a partir del
+      Ejercicio Fiscal 2021». La Res. DGPEJBF 2/2023 fijó por única vez un calendario de julio de
+      2023 por terminación del RUC y perdió vigencia (art. 2). El Dictamen DGPEJBF 24/2025: un
+      cambio comunicado entre enero y el 30 de junio vale como actualización anual. La ley alcanza
+      a las sociedades «reguladas por el Código Civil paraguayo y leyes especiales» (art. 2): la EAS
+      entra por ahí (lectura propia). Fecha de publicación del decreto no legible en el escaneo.
 
   # ================================================================ FASE 4 (agregadas el 2026-11-24)
   # Detalle, citas y dudas: docs/research/TRIBUTACION_FASE4.md

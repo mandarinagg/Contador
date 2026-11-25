@@ -99,7 +99,7 @@
 | P-10 | ~~Los asientos traen el id de quien creó/contabilizó, no el nombre~~ | **Resuelto**: en la API (`test_accounting_entry_user_names.py`) y en la interfaz (asiento y libro diario, sin leer `/users`) |
 
 ## Decisiones tomadas en esta sesión
-D-001 a D-120 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requiere tu confirmación.**
+D-001 a D-121 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requiere tu confirmación.**
 
 ## Información requerida del propietario
 1. **Confirmar D-007**: reutilizar el núcleo SIFEN como servicio Node (recomendado) en lugar de portarlo a Python.
@@ -112,6 +112,8 @@ D-001 a D-120 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 8. Revisar los hallazgos R-10 y R-11 de `DISCOVERY.md` (repositorio git en la carpeta personal con `.git-credentials`).
 9. **Credenciales de Marangatu** para el bot (D-119), cuando lleguemos a esa fase. Se guardan en el almacén de credenciales de Windows, nunca en el repositorio.
 10. ~~Confirmar la D-119~~ **Decidido (2026-11-25):** el bot presenta solo, sin pedir aprobación, con las 12 condiciones de la D-119 (ante la duda no presenta y avisa). Falta confirmar si el bot también paga (por ahora no).
+11. **Estatuto de la EAS** (D-3): el plazo que fija para poner las utilidades a disposición. De eso depende cuándo nace la retención del IDU.
+12. **Municipio de la EAS**, para la patente municipal.
 
 ## Para retomar (traspaso, 2026-11-25)
 **Estado de `main`:** fases 0 a 3B y la fase 4 (tributación, backend e interfaz) integradas. Pruebas: backend 325 (pytest contra PostgreSQL real, incluidas las `slow`), Vitest 212, E2E 47 (`flujos`, `finanzas`, `contabilidad`, `contabilidad-3b`, `tributacion`). Migraciones hasta `0005_tributacion`. Último CI (`503f8c3`, corrida 45659236736, con la D-120) verde en los 5 jobs; el diario XLSX de 20.000 líneas tarda 0,48 s en el runner (antes 3,0 a 3,1 s): `secrets`, `test`, `e2e`, `performance` y `windows` (instalador NSIS generado y probado, ya con la tributación).
@@ -125,7 +127,7 @@ D-001 a D-120 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 
 **Lo primero:**
 1. El propietario prueba el instalador NSIS (artefacto `contador-ai-windows-instalador` del último CI verde, vence a los 30 días) en su PC con Windows 11: P-8 (usuario con tildes o ñ) y P-12 (descarga de Excel dentro de la app).
-2. **Rol del contador → la herramienta (D-118).** El mecanismo ya está hecho (D-120, 2026-11-25): ninguna pantalla pide nombre ni matrícula. Quien verifica es CONTADOR AI, contra la fuente oficial, y tu clic queda en la auditoría. En Impuestos → Reglas y feriados, «Verificar las N con fuente oficial» verifica de una vez las reglas con la fuente oficial leída (34 de 39) y lista las otras 5 con el motivo. **Falta el contenido:** la herramienta verifica contra la fuente oficial el plan de cuentas (173 cuentas, `docs/research/PLAN_DE_CUENTAS_PY.md`), las 34 categorías de activo fijo, las dudas D-DEP de `docs/research/DEPRECIACION_PY.md` y, en la fase 4, las reglas, el perfil y las dudas D-F4. Hay que investigar si alguna presentación exige por ley la firma de un contador matriculado (la baja de bienes ya pide el acta de un contador o de un auditor, Decreto 3182, art. 58). Las 5 reglas sin fuente oficial leída necesitan que se lea su fuente.
+2. **Rol del contador → la herramienta (D-118).** El mecanismo ya está hecho (D-120, 2026-11-25): ninguna pantalla pide nombre ni matrícula. Quien verifica es CONTADOR AI, contra la fuente oficial, y tu clic queda en la auditoría. En Impuestos → Reglas y feriados, «Verificar las N con fuente oficial» verifica de una vez las reglas con la fuente oficial leída (34 de 39) y lista las otras 5 con el motivo. **Falta el contenido:** la herramienta verifica contra la fuente oficial el plan de cuentas (173 cuentas, `docs/research/PLAN_DE_CUENTAS_PY.md`), las 34 categorías de activo fijo, las dudas D-DEP de `docs/research/DEPRECIACION_PY.md` y, en la fase 4, las reglas, el perfil y las dudas D-F4. Hay que investigar si alguna presentación exige por ley la firma de un contador matriculado (la baja de bienes ya pide el acta de un contador o de un auditor, Decreto 3182, art. 58). **Bloque 1 hecho (D-121, 2026-11-25):** IDU y beneficiarios finales verificables; D-5 resuelta. Quedan sin fuente leída 2 reglas (dígito verificador del RUC y patente municipal) y falta leer la RG 110/2013. Siguen el bloque 2 (dudas D-F4 de impuestos) y el bloque 3 (dudas D-DEP de depreciación y el plan de cuentas), los dos sin agentes, por decisión del propietario.
 
 **Después:**
 - **Bot de Marangatu (D-119, nuevo objetivo del propietario):** la herramienta revisa si hay algo para presentar, presenta los registros de comprobantes y los documentos, hace las declaraciones juradas y descarga las constancias, con un bot de navegador (Playwright) que hace los clics. Antes: investigar el portal (captcha, segundo factor, condiciones de uso, servicios web oficiales), las credenciales en el almacén de Windows, un modo de ensayo. Presenta solo, sin pedir aprobación, con las 12 condiciones de la D-119.

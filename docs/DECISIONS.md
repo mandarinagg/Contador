@@ -263,3 +263,11 @@ Detalle en `docs/specs/FASE4_TRIBUTACION.md`.
   - **Perfil fiscal:** se verifica contra la constancia de RUC. La persona indica la referencia de la constancia (número o fecha); `verified_license` guarda «Constancia de RUC (DNIT)».
   - Los avisos dicen «sin verificar contra la fuente oficial» en lugar de «sin verificar por un contador».
   - **Límite honesto:** verificar hoy significa que la fuente oficial se leyó y quedó citada en la investigación (`docs/research/`). La revisión a fondo de cada parámetro contra su norma (y las dudas D-F4 y D-DEP) es la segunda parte de la D-118 y sigue pendiente.
+- **D-121 — Verificación de CONTADOR AI, bloque 1.** **Aceptada · 2026-11-25.** Detalle y citas en `docs/research/TRIBUTACION_PY.md` §13.
+  - Se leyeron las fuentes oficiales de `IDU-RETENCION`, `IDU-DJI` y `BENEFICIARIOS-FINALES`, que pasan a versión 2 con `confidence: oficial_leida` y ya se pueden verificar.
+  - En una base que ya tenía cargada la versión 1, la nueva no entra mientras la vieja siga viva, porque las vigencias se pisan: hay que deprecar la versión 1 y volver a cargar las candidatas (D-108).
+  - `IDU-RETENCION` ahora tiene días: confirmar la proforma hasta el día 12 y pagar hasta el 13 (RG 31/2019). Esto **resuelve D-5**.
+  - Siguen `pending` `RUC-DV-MODULO11` (la DNIT no publica el algoritmo) y `PATENTE-MUNICIPAL` (falta el municipio).
+  - Sigue abierta D-3: el IDU depende del estatuto de la EAS.
+  - Firma de contador: la RG 77/2020 y la RG 50/2026 no la piden. La RG 110/2013 no se pudo leer. El único caso confirmado es el Decreto 3182, art. 58.
+

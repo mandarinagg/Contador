@@ -618,7 +618,7 @@ Solo aplica cuando la EAS tenga empleados. El perfil actual dice que serán «a 
 - **¿Qué régimen corresponde a una EAS en su primer ejercicio, sin ejercicio anterior?**
 - **¿Cuál tiene inscripto hoy?** Hay que mirar la constancia de RUC.
 
-**D-3. IDU en una EAS unipersonal.**
+**D-3. IDU en una EAS unipersonal.** Sigue abierta: depende del estatuto de la EAS (§13).
 
 - La Ley 6380, art. 44, dice que en las entidades **sin** obligación de asamblea, si el estatuto no fija plazo, las utilidades se consideran **distribuidas en el cuarto mes** posterior al cierre.
 - **¿Cómo se trata a una EAS unipersonal?** Ley 6480, art. 39: el accionista único aprueba cuentas en acta.
@@ -632,7 +632,7 @@ Solo aplica cuando la EAS tenga empleados. El perfil actual dice que serán «a 
 - El escaneo del Decreto 7402 dice «siempre que el Impuesto liquidado **no** supere los diez millones» y la RG 123/2022 dice «supere». Quizás es un error de lectura del escaneo.
 - **¿Cuál es el texto vigente?**
 
-**D-5. Plazo de las retenciones.**
+**D-5. Plazo de las retenciones.** ✅ **Resuelta el 2026-11-25 (§13):** para el IDU rigen los días 12 y 13 (RG 31/2019, arts. 8 y 9). La RG 38/2020, art. 5, excluye expresamente a las EGDUR.
 
 - La RG 38/2020, art. 5, dice confirmar la proforma en los primeros 6 días y pagar el día 7.
 - La cartilla IDU de 2024 dice 12 días y pagar el día 13.
@@ -744,3 +744,55 @@ Todas abiertas el 2026-11-24.
 | Planillas MTESS | — | <https://www.mtess.gov.py/?page_id=24595> · <https://www.mtess.gov.py/?p=30101> |
 | Ley 7721/2026 (BACN, descartada) | 2026 | <https://www.bacn.gov.py/leyes-paraguayas/13362/ley-n-7721-2026-que-modifica-el-art-culo-3-de-la-ley-n-426-1973-que-establece-la-divisi-n-pol-tica-del-territorio-de-la-rep-blica-en-lo-concerniente-a-los-l-mites-de-los-departamentos-viii-de-las-misiones-y-xii-de-eembuc> |
 | Listado de resoluciones DNIT | — | <https://www.dnit.gov.py/web/portal-institucional/resoluciones> |
+
+---
+
+## 13. Verificación de CONTADOR AI, bloque 1 (2026-11-25)
+
+No hay contador (D-118): la herramienta verifica contra la fuente oficial. Este bloque cubre las 5 reglas que no tenían la fuente oficial leída y si alguna presentación exige la firma de un contador. Textos leídos el 2026-11-25.
+
+### 13.1 IDU: retención (obligación 726) y DJI (obligación 954)
+
+- **Ley 6380/2019, art. 44** (texto en <https://www.dnit.gov.py/web/portal-institucional/w/d-ley-n-6380-19>):
+  - Con obligación de asamblea, las utilidades quedan a disposición «cuando la respectiva asamblea disponga su distribución».
+  - SRL «y demás entidades que no tengan obligación de realizar asamblea»: en el plazo del estatuto. Si el estatuto no lo fija, se entienden «distribuidos en el cuarto mes posterior al cierre del ejercicio fiscal».
+- **Decreto 3110/2019, Anexo** (PDF escaneado: <https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+3110-19.pdf/1a3ec5dc-6bee-0b46-51cd-3a0bbff678bd?t=1681424061694>):
+  - **Art. 3:** son EGDUR las sociedades que enumera y, en el num. 9, «las demás sociedades o entidades privadas con personería jurídica de similar naturaleza […] creadas con posterioridad a la fecha de entrada en vigencia de la Ley». **Lectura propia:** la EAS (Ley 6480/2020) entra por ahí; el decreto no la nombra.
+  - **Art. 6:** la retención opera al nacer la obligación (art. 44). El comprobante se emite desde ese momento «hasta el último día del mes en que operó el nacimiento o en el día del acreditamiento o pago […], lo que ocurra primero».
+- **RG 31/2019** (27-12-2019, <https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-31-2019>):
+  - **Art. 8:** la EGDUR confirma la proforma «dentro de los doce (12) primeros días corridos del mes».
+  - **Art. 9:** si no confirma, se tiene por aceptada. Se paga «hasta el día trece (13) de cada mes», solo por pago electrónico; si es inhábil, el primer día hábil siguiente.
+  - **Art. 11:** Formulario 526, obligación 726.
+- **RG 38/2020, art. 5:** los días 6 y 7 son para las retenciones de IRE, IRP, INR e IVA, y la regla «no será aplicable a las Entidades Generadoras de Dividendos, Utilidades y Rendimientos (EGDUR)», que se rigen por la RG 31/2019. **Resuelve D-5.**
+- **Calendario oficial de mayo de 2026** (<https://www.dnit.gov.py/documents/20123/366526/Vencimiento+Mayo.+2026.pdf/028692f4-bb0f-995d-8cf2-af72db466a95?t=1777986288698>): Formulario 526, «Hasta el día 12 de mayo para la confirmación» y «Plazo para el pago: día 13 de mayo». Coincide.
+- **RG 70/2020** (05-11-2020, <https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-70-20>):
+  - **Art. 2:** la EGDUR presenta la DJI del IDU «dentro del sexto mes posterior al cierre del ejercicio fiscal», con el calendario de DJI del art. 6 de la RG 38/2020.
+  - **Art. 4:** «aun cuando no tenga dada de alta la obligación 954-DJI IDU».
+- **RG 101/2021** (20-10-2021): aclara el IDU crédito, las EJT y el respaldo de la capitalización. No toca los plazos.
+- **Sigue abierta D-3:** en qué mes nacen las utilidades de esta EAS. Depende de su estatuto (plazo para poner utilidades a disposición) y de si se la trata como entidad con obligación de asamblea. **Hace falta el estatuto.**
+
+### 13.2 Beneficiarios finales
+
+- **Ley 6446/2019** (<https://www.bacn.gov.py/leyes-paraguayas/9116/ley-n-6446-crea-el-registro-administrativo-de-personas-y-estructuras-juridicas-y-el-registro-administrativo-de-beneficiarios-finales->):
+  - Art. 2: alcanza a «sociedades, asociaciones, fundaciones y las demás reguladas por el Código Civil paraguayo y leyes especiales». La EAS entra por las leyes especiales (lectura propia).
+  - Arts. 3 y 5: inscripción y beneficiarios finales dentro de los 45 días hábiles posteriores a la constitución.
+  - Art. 7: toda modificación, dentro de los 15 días hábiles.
+- **Decreto 3241/2020, art. 10** (<https://www.bacn.gov.py/archivos/9116/DECRETO3241%20_%20Ley%206446.pdf>): todos los datos «deberán ser actualizados anualmente a más tardar al 30 de junio de cada año correspondiente, a partir del Ejercicio Fiscal 2021».
+- **Res. DGPEJBF 2/2023** (escaneo): calendario por terminación del RUC para julio de 2023, solo para empezar a sancionar. Art. 2: pierde vigencia después de cada vencimiento y quedan «únicamente los plazos legales». No rige hoy.
+- **Dictamen DGPEJBF 24/2025:** una actualización por cambio hecha entre enero y el 30 de junio vale también como actualización anual.
+- **Nota del MEF del 29-06-2026:** confirma el 30 de junio con base en el art. 10 del Decreto 3241.
+- Es un trámite ante la DGPEJBF (Ministerio de Economía), no ante la DNIT: el bot de Marangatu (D-119) no lo cubre.
+
+### 13.3 Lo que sigue sin fuente oficial leída
+
+- **Dígito verificador del RUC (`RUC-DV-MODULO11`):** la DNIT no publica el algoritmo en las normas revisadas. La RG 133/2023 (que modifica la RG 79/2021 del RUC) define las series numéricas del RUC, pero no el dígito verificador. Solo hay fuentes de terceros, que coinciden con la implementación (módulo 11, pesos 2 a 11 de derecha a izquierda, DV = 11 − resto si resto > 1, si no 0) y con los dos ejemplos oficiales del Manual SIFEN. Queda `pending`.
+- **Patente municipal (`PATENTE-MUNICIPAL`):** depende del municipio de la EAS. **Hace falta saber el municipio.** Queda `pending`.
+
+### 13.4 ¿Alguna presentación exige la firma de un contador?
+
+- **RG 77/2020** (estados financieros del IRE General): no menciona firma, contador ni matrícula.
+- **RG DNIT 50/2026** (prórroga de los estados financieros de 2025): tampoco.
+- **RG 110/2013** («obligación de presentar Estados Financieros Clasificados»): **no se pudo leer**; las URLs directas dan 404 y no se encontró en el listado de resoluciones. Queda por leer.
+- **Decreto 3182/2019, art. 58** (ya leído): la baja de un bien del activo fijo pide el acta de un contador o la constancia de un auditor externo. **Es el único caso confirmado hasta ahora.**
+- **Auditoría externa impositiva (RG 53/2020):** solo con ingresos anuales mayores a ₲ 9.201.143.662 (§5.2); la firma el auditor externo.
+
