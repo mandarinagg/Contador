@@ -262,7 +262,7 @@ function MarangatuDialogBody({ year, month, ruc, onClose }: { year: number; mont
     <div className="flex flex-col gap-4">
       <Notice tone="warn" title="Es un borrador: probalo antes">
         {p?.notice ??
-          'Borrador del archivo de importación de Marangatu, sin verificar por un contador. Probá primero con un archivo de uno o dos comprobantes y usá un identificador distinto en cada archivo.'}
+          'Borrador del archivo de importación de Marangatu, sin verificar contra la fuente oficial. Probá primero con un archivo de uno o dos comprobantes y usá un identificador distinto en cada archivo.'}
       </Notice>
 
       <div className="grid grid-cols-[minmax(0,1fr)_9rem_9rem] items-start gap-4">

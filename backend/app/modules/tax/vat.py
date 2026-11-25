@@ -414,7 +414,7 @@ def form_120(
             "164",
             3,
             "IVA crédito proporcional (prorrateo)",
-            "El prorrateo no se calcula (BR-TAX-11): lo determina el contador.",
+            "El prorrateo todavía no se calcula (BR-TAX-11, D-F4-14).",
         ),
         empty("165", 3, "IVA crédito proporcional con exportación", EXPORTERS),
         calc(
@@ -500,7 +500,7 @@ def form_120(
     if scn.exempt > 0:
         warnings.append(
             "Las notas de crédito emitidas tienen una parte exenta que no tiene casilla en el "
-            "Rubro 3: revisala con el contador."
+            "Rubro 3: queda sin declarar hasta resolverlo contra la norma."
         )
     warnings.append(
         "Borrador para copiar a mano en Marangatu: los importes van sin IVA y sin céntimos. "
@@ -617,7 +617,7 @@ def estimate(db: Session, organization_id: uuid.UUID, year: int, month: int) -> 
                 "code": "PRORATION_POSSIBLE",
                 "message": "En el mes hay ventas exentas y compras con crédito fiscal: puede "
                 "corresponder el prorrateo del crédito (Ley 6380, art. 88; Decreto 3107, art. "
-                "18). La app no lo calcula: consultalo con el contador.",
+                "18). La app todavía no lo calcula (D-F4-14).",
             }
         )
         proration_rule = rules.rule_for(db, PRORATION_RULE, first)

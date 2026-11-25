@@ -7,7 +7,7 @@ módulo de Python para que PyInstaller lo incluya sin configuración extra. La p
 compara los dos: si el YAML cambia, la prueba falla hasta regenerar este archivo.
 
 PROPUESTA, NO VALIDADA: Decreto N° 3182/2019, art. 31 (texto del Decreto N° 6105/2021).
-Todas las filas están `pending` hasta que las valide el contador.
+Todas las filas están `pending` hasta que las verifique CONTADOR AI (D-120).
 """
 
 from typing import Any

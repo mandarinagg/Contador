@@ -1,7 +1,8 @@
 /**
- * Reglas y feriados (D-082, D-108, D-114, D-102): las normas que usa la app, a la vista del
- * contador para verificarlas (BR-TAX-12). Tres pestañas: reglas, feriados y excepciones de
- * vencimiento. Todo nace «sin verificar»; verificar es un acto profesional (`tax.verify`).
+ * Reglas y feriados (D-082, D-108, D-114, D-102): las normas que usa la app. Tres pestañas:
+ * reglas, feriados y excepciones de vencimiento. Todo nace «sin verificar». No hay contador
+ * (D-118): verifica CONTADOR AI contra la fuente oficial leída y quien tiene `tax.verify`
+ * aprueba con un clic (D-120). Lo que no tiene la fuente oficial leída sigue sin verificar.
  */
 import { useMutation } from '@tanstack/react-query'
 import { CalendarPlus, Download, ExternalLink, Pencil, ShieldCheck, Trash2 } from 'lucide-react'
@@ -18,7 +19,7 @@ import { formatBookDate } from '../finance/labels'
 import { ReasonForm, RuleStatusBadge, VerifyForm } from './components'
 import { type TaxPerms, useExceptions, useHolidays, useInvalidateTax, useRules, useTaxPerms } from './data'
 import { CONFIDENCE_LABELS, monthTitle, OBLIGATION_LABELS, obligationLabel } from './labels'
-import type { DueDateException, Holiday, Rule, RuleLoadResult } from './types'
+import type { DueDateException, Holiday, Rule, RuleBulkVerifyResult, RuleLoadResult } from './types'
 
 type Tab = 'reglas' | 'feriados' | 'excepciones'
 const TABS: { id: Tab; label: string }[] = [
@@ -76,15 +77,18 @@ function RuleRow({ rule, perms, onVerify, onDeprecate }: { rule: Rule; perms: Ta
         </div>
         {rule.validation_status === 'verified' && (
           <p className="mt-1 text-sm text-ledger">
-            Verificada por {rule.reviewed_by_name} (matrícula {rule.reviewed_reference}){rule.reviewed_at && ` el ${formatBookDate(rule.reviewed_at.slice(0, 10))}`}
+            Verificada por {rule.reviewed_by_name} contra {rule.reviewed_reference}{rule.reviewed_at && ` el ${formatBookDate(rule.reviewed_at.slice(0, 10))}`}
             {rule.review_note && `: ${rule.review_note}`}
           </p>
+        )}
+        {rule.validation_status === 'pending' && rule.unverifiable_reason && (
+          <p className="mt-1 text-sm text-amber">CONTADOR AI no puede verificarla: {rule.unverifiable_reason}</p>
         )}
         {rule.validation_status === 'deprecated' && <p className="mt-1 text-sm text-ink-2">Deprecada: {rule.deprecation_reason}</p>}
       </div>
       {perms.canVerify && rule.validation_status !== 'deprecated' && (
         <div className="flex shrink-0 flex-col items-end gap-2">
-          {rule.validation_status === 'pending' && (
+          {rule.validation_status === 'pending' && rule.verifiable && (
             <Button variant="secondary" onClick={onVerify}>
               <ShieldCheck size={15} aria-hidden />
               Verificar
@@ -108,6 +112,7 @@ function RulesTab({ perms }: { perms: TaxPerms }) {
   const [verifying, setVerifying] = useState<Rule | null>(null)
   const [deprecating, setDeprecating] = useState<Rule | null>(null)
   const [lastLoad, setLastLoad] = useState<RuleLoadResult | null>(null)
+  const [lastBulk, setLastBulk] = useState<RuleBulkVerifyResult | null>(null)
 
   const load = useMutation({
     mutationFn: () => post<RuleLoadResult>('/tax/rules/load-candidates'),
@@ -118,10 +123,20 @@ function RulesTab({ perms }: { perms: TaxPerms }) {
     },
     onError: (e) => toast('bad', errorMessage(e, 'No se pudieron cargar las reglas.')),
   })
+  const bulk = useMutation({
+    mutationFn: () => post<RuleBulkVerifyResult>('/tax/rules/verify-verifiable'),
+    onSuccess: (r) => {
+      invalidate()
+      setLastBulk(r)
+      toast('ok', `${plural(r.verified.length, 'regla verificada', 'reglas verificadas')}; ${plural(r.left_pending.length, 'queda', 'quedan')} sin verificar.`)
+    },
+    onError: (e) => toast('bad', errorMessage(e, 'No se pudieron verificar las reglas.')),
+  })
 
   const all = rules.data ?? []
   const list = all.filter((r) => (!status || r.validation_status === status) && (!usedOnly || r.used_by_calculations))
   const pendingUsed = all.filter((r) => r.used_by_calculations && r.validation_status === 'pending').length
+  const verifiable = all.filter((r) => r.verifiable).length
 
   return (
     <>
@@ -142,18 +157,43 @@ function RulesTab({ perms }: { perms: TaxPerms }) {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <Button variant="secondary" busy={load.isPending} disabled={!perms.canManage} onClick={() => load.mutate()}>
-            <Download size={15} aria-hidden />
-            Cargar reglas candidatas
-          </Button>
-          <ReadOnlyHint reason={perms.manageReason} />
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="secondary" busy={load.isPending} disabled={!perms.canManage} onClick={() => load.mutate()}>
+              <Download size={15} aria-hidden />
+              Cargar reglas candidatas
+            </Button>
+            <Button busy={bulk.isPending} disabled={!perms.canVerify || verifiable === 0} onClick={() => bulk.mutate()}>
+              <ShieldCheck size={15} aria-hidden />
+              {verifiable > 0 ? `Verificar las ${verifiable} con fuente oficial` : 'Verificar con fuente oficial'}
+            </Button>
+          </div>
+          <ReadOnlyHint reason={perms.manageReason || perms.verifyReason} />
         </div>
       </div>
 
       {pendingUsed > 0 && (
         <div className="mb-4">
           <Notice tone="warn" title={`${plural(pendingUsed, 'regla en uso está', 'reglas en uso están')} sin verificar`}>
-            Lo que calcula la app con ellas lleva la marca «sin verificar». {perms.canVerify ? 'Revisá la norma y la fuente de cada una antes de verificarla.' : perms.verifyReason}
+            Lo que calcula la app con ellas lleva la marca «sin verificar».{' '}
+            {perms.canVerify
+              ? 'CONTADOR AI verifica las que tienen la fuente oficial leída; las demás siguen sin verificar hasta que se lea su fuente.'
+              : perms.verifyReason}
+          </Notice>
+        </div>
+      )}
+      {lastBulk && lastBulk.left_pending.length > 0 && (
+        <div className="mb-4">
+          <Notice tone="warn" title={`${plural(lastBulk.left_pending.length, 'regla quedó', 'reglas quedaron')} sin verificar`}>
+            <ul className="mt-1 flex flex-col gap-1">
+              {lastBulk.left_pending.map((r) => (
+                <li key={r.id}>
+                  <span className="font-medium">
+                    {r.code} v{r.version}:
+                  </span>{' '}
+                  {r.reason}
+                </li>
+              ))}
+            </ul>
           </Notice>
         </div>
       )}
@@ -174,7 +214,7 @@ function RulesTab({ perms }: { perms: TaxPerms }) {
           </div>
         ) : all.length === 0 ? (
           <EmptyState title="Todavía no hay reglas cargadas">
-            Sin reglas no hay calendario ni cálculos. Cargá las candidatas de la investigación: nacen «sin verificar» y el contador las revisa una por una.
+            Sin reglas no hay calendario ni cálculos. Cargá las candidatas de la investigación: nacen «sin verificar» y CONTADOR AI verifica las que tienen la fuente oficial leída.
           </EmptyState>
         ) : list.length === 0 ? (
           <EmptyState title="Ninguna regla coincide con el filtro" />
@@ -192,17 +232,17 @@ function RulesTab({ perms }: { perms: TaxPerms }) {
           <VerifyForm
             intro={
               <>
-                Confirmás que la regla coincide con la norma vigente ({verifying.legal_reference ?? 'sin referencia'}). Queda registrado tu nombre y matrícula; lo que calcule con ella deja de
-                marcarse «sin verificar».
+                CONTADOR AI la verifica contra su fuente oficial ({verifying.legal_reference ?? 'sin referencia'}). Tu aprobación queda en la auditoría; lo que calcule con ella deja
+                de marcarse «sin verificar».
               </>
             }
             thirdLabel="Nota (opcional)"
-            thirdHint="Por ejemplo, qué documento consultaste."
+            thirdHint="Por ejemplo, algo que conviene recordar de esta regla."
             thirdRequired={false}
             submit="Verificar regla"
             onCancel={() => setVerifying(null)}
-            onSubmit={async ({ name, license, third }) => {
-              await post(`/tax/rules/${verifying.id}/verify`, { reviewed_by_name: name, reviewed_reference: license, review_note: third || null })
+            onSubmit={async ({ third }) => {
+              await post(`/tax/rules/${verifying.id}/verify`, { review_note: third || null })
               invalidate()
               setVerifying(null)
               toast('ok', `Regla ${verifying.code} verificada.`)
@@ -665,7 +705,7 @@ export function RulesPage() {
     <>
       <PageHeader
         title="Reglas y feriados"
-        description="Las normas con las que la app arma el calendario y los cálculos. Todo nace sin verificar: el contador revisa cada una contra su fuente y la verifica con su nombre y matrícula."
+        description="Las normas con las que la app arma el calendario y los cálculos. Todo nace sin verificar: CONTADOR AI verifica cada una contra su fuente oficial y vos lo aprobás con un clic."
       />
       <div role="tablist" aria-label="Secciones" className="mb-5 flex gap-1 border-b border-line">
         {TABS.map((t) => (

@@ -61,6 +61,8 @@ from app.modules.tax.schemas import (
     ProfileVersionOut,
     ProposeEntryIn,
     ReasonIn,
+    RuleBulkVerifyOut,
+    RuleLeftPending,
     RuleLoadOut,
     RuleOut,
     RuleStatus,
@@ -111,6 +113,9 @@ def _rule_out(rule: RuleVersion) -> RuleOut:
     data = {name: getattr(rule, name) for name in RuleOut.model_fields if hasattr(rule, name)}
     data["used_by_calculations"] = rule_params.schema_for(rule.code) is not None
     data["parameters"] = rule_params.as_text(rule.parameters)
+    reason = rules.unverifiable_reason(rule) if rule.validation_status == "pending" else None
+    data["verifiable"] = rule.validation_status == "pending" and reason is None
+    data["unverifiable_reason"] = reason
     return RuleOut.model_validate(data)
 
 
@@ -148,11 +153,22 @@ def verify_rule(rule_id: uuid.UUID, body: RuleVerifyIn, auth: Verifier, db: DbSe
         auth.organization_id,
         auth.user_id,
         rule_id,
-        reviewed_by_name=body.reviewed_by_name,
-        reviewed_reference=body.reviewed_reference,
         review_note=body.review_note,
     )
     return _rule_out(rule)
+
+
+@router.post("/rules/verify-verifiable", response_model=RuleBulkVerifyOut)
+def verify_verifiable_rules(auth: Verifier, db: DbSession) -> RuleBulkVerifyOut:
+    """CONTADOR AI verifica de una vez las pendientes con fuente oficial leída (D-120)."""
+    result = rules.verify_verifiable(db, auth.organization_id, auth.user_id)
+    return RuleBulkVerifyOut(
+        verified=[f"{r.code} v{r.version}" for r in result.verified],
+        left_pending=[
+            RuleLeftPending(id=r.id, code=r.code, version=r.version, reason=reason)
+            for r, reason in result.left_pending
+        ],
+    )
 
 
 @router.post("/rules/{rule_id}/deprecate", response_model=RuleOut)
@@ -337,8 +353,6 @@ def verify_profile(
         auth.organization_id,
         auth.user_id,
         profile_id,
-        verified_by_name=body.verified_by_name,
-        verified_license=body.verified_license,
         verified_document_reference=body.verified_document_reference,
     )
     return _profile_out(db, auth.organization_id)

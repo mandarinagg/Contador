@@ -49,7 +49,6 @@ from app.modules.accounting.schemas_3b import (
     AssetCategoryOut,
     AssetCategoryUpdate,
     AssetStatus,
-    CategoryValidate,
     CostCenterCreate,
     CostCenterOut,
     CostCenterUpdate,
@@ -157,17 +156,10 @@ def update_asset_category(
 
 @router.post("/asset-categories/{category_id}/validate", response_model=AssetCategoryOut)
 def validate_asset_category(
-    category_id: uuid.UUID, body: CategoryValidate, auth: Poster, db: DbSession
+    category_id: uuid.UUID, auth: Poster, db: DbSession
 ) -> AssetCategoryOut:
-    """La valida un contador (nombre y matrícula); exige la categoría completa."""
-    category = assets.validate_category(
-        db,
-        auth.organization_id,
-        auth.user_id,
-        category_id,
-        body.validated_by_name,
-        body.validated_reference,
-    )
+    """La valida CONTADOR AI (D-120): exige la categoría completa y su fuente oficial."""
+    category = assets.validate_category(db, auth.organization_id, auth.user_id, category_id)
     return _category_out(db, category)
 
 

@@ -41,6 +41,14 @@ export interface Rule {
   deprecation_reason: string | null
   deprecated_at: string | null
   used_by_calculations: boolean
+  /** D-120: si CONTADOR AI puede verificarla (fuente oficial leída) y, si no, por qué. */
+  verifiable: boolean
+  unverifiable_reason: string | null
+}
+
+export interface RuleBulkVerifyResult {
+  verified: string[]
+  left_pending: { id: string; code: string; version: number; reason: string }[]
 }
 
 export interface RuleLoadResult {

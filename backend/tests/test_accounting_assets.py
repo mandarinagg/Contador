@@ -7,6 +7,7 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
+from app.core.verification import source_reference
 from app.modules.accounting import proposed_asset_categories
 from tests.accounting_utils import ACC, error_code
 from tests.assets_utils import (
@@ -118,20 +119,17 @@ def test_validation_requires_post_and_resets_on_structural_change(
 ) -> None:
     _, admin = make_user("admin")  # gestiona, pero no contabiliza ni valida (D-043)
     cid = books["categories"][MUEBLES]["id"]
-    body = {"validated_by_name": "Cdora. Ana Pérez", "validated_reference": "Mat. 1234"}
-    denied = client.post(
-        f"{ACC}/asset-categories/{cid}/validate", json=body, headers=auth_header(admin)
-    )
+    denied = client.post(f"{ACC}/asset-categories/{cid}/validate", headers=auth_header(admin))
     assert denied.status_code == 403
     validated = ok(
         client.post(
             f"{ACC}/asset-categories/{cid}/validate",
-            json=body,
             headers=auth_header(books["token"]),
         )
     )
     assert validated["validation_status"] == "validated"
-    assert validated["validated_by_name"] == "Cdora. Ana Pérez"
+    assert validated["validated_by_name"] == "CONTADOR AI"
+    assert validated["validated_reference"] == source_reference(validated["legal_reference"])
     # Un cambio de nota no la invalida; uno de vida útil, sí.
     noted = ok(
         client.patch(
@@ -151,10 +149,38 @@ def test_validation_requires_post_and_resets_on_structural_change(
     terrenos = books["categories"][TERRENOS]["id"]
     res = client.post(
         f"{ACC}/asset-categories/{terrenos}/validate",
-        json=body,
         headers=auth_header(books["token"]),
     )
     assert res.status_code == 422 and error_code(res) == "ASSET_CATEGORY_INCOMPLETE"
+
+
+def test_own_category_without_official_source_is_not_validated(
+    client: TestClient, books: dict[str, Any]
+) -> None:
+    """D-120: CONTADOR AI no valida una categoría sin fuente oficial; queda `pending`."""
+    headers = auth_header(books["token"])
+    muebles = books["categories"][MUEBLES]
+    own = ok(
+        client.post(
+            f"{ACC}/asset-categories",
+            json={
+                "name": "Categoría propia completa",
+                "useful_life_months": 36,
+                "residual_rate": "5",
+                "asset_account_id": muebles["asset_account_id"],
+                "accumulated_account_id": muebles["accumulated_account_id"],
+                "expense_account_id": muebles["expense_account_id"],
+            },
+            headers=headers,
+        ),
+        201,
+    )
+    assert own["complete"] is True
+    res = client.post(f"{ACC}/asset-categories/{own['id']}/validate", headers=headers)
+    assert res.status_code == 422 and error_code(res) == "CATEGORY_NOT_VERIFIABLE"
+    assert "fuente oficial" in res.json()["error"]["message"]
+    category = ok(client.get(f"{ACC}/asset-categories/{own['id']}", headers=headers))
+    assert category["validation_status"] == "pending"
 
 
 def test_asset_defaults_come_from_category_and_settings(

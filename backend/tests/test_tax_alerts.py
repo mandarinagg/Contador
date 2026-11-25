@@ -117,11 +117,7 @@ def test_each_alert_goes_away_when_resolved(
     ok(
         client.post(
             f"{TAX}/profile/{pid}/verify",
-            json={
-                "verified_by_name": "Contadora",
-                "verified_license": "Mat. 1",
-                "verified_document_reference": "Constancia",
-            },
+            json={"verified_document_reference": "Constancia"},
             headers=headers,
         )
     )
@@ -143,7 +139,7 @@ def test_each_alert_goes_away_when_resolved(
         ok(
             client.post(
                 f"{TAX}/rules/{rule['id']}/verify",
-                json={"reviewed_by_name": "Contadora", "reviewed_reference": "Mat. 1"},
+                json={},
                 headers=headers,
             )
         )

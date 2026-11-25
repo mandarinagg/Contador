@@ -1,6 +1,6 @@
 /**
  * Plan de cuentas: árbol por código, alta de subcuentas, edición, archivo, validación por un
- * contador (D-038, D-046) y la cuenta de resultados para la refundición (D-050).
+ * CONTADOR AI (D-038, D-046, D-120) y la cuenta de resultados para la refundición (D-050).
  */
 import { useMutation } from '@tanstack/react-query'
 import { Archive, ArchiveRestore, ChevronDown, ChevronRight, ListTree, Pencil, Plus, Search, ShieldAlert, ShieldCheck, Sparkles } from 'lucide-react'
@@ -34,17 +34,17 @@ function StatusPanel({ chart, perms, onValidate, onInvalidate }: { chart: Chart;
       <div className="flex items-start gap-3">
         {validated ? <ShieldCheck size={22} className="mt-0.5 shrink-0 text-ledger" aria-hidden /> : <ShieldAlert size={22} className="mt-0.5 shrink-0 text-amber" aria-hidden />}
         <div className="min-w-0">
-          <h2 className="text-md font-semibold">{validated ? 'Plan de cuentas validado' : 'Plan de cuentas sin validar por un contador'}</h2>
+          <h2 className="text-md font-semibold">{validated ? 'Plan de cuentas validado' : 'Plan de cuentas sin verificar contra la fuente oficial'}</h2>
           {validated ? (
             <p className="mt-1 text-ink-2">
-              Lo validó <span className="font-medium text-ink">{chart.chart_validated_by_name}</span>, matrícula{' '}
+              Lo validó <span className="font-medium text-ink">{chart.chart_validated_by_name}</span> contra{' '}
               <span className="font-medium text-ink">{chart.chart_validated_reference}</span>, el {formatDateTime(chart.chart_validated_at as string)}. Si
               se agrega una cuenta o se cambia un código, un tipo o una naturaleza, vuelve a quedar sin validar.
             </p>
           ) : (
             <p className="mt-1 max-w-[68ch] text-ink-2">
-              Es una propuesta basada en el modelo de la RG N° 49/2014 de la DNIT. Un contador tiene que revisarla y marcarla como validada con su
-              nombre y matrícula; hasta entonces, todos los reportes lo advierten.
+              Es una propuesta basada en el modelo de la RG N° 49/2014 de la DNIT. Hasta que la valides (la verifica CONTADOR AI contra ese modelo), todos
+              los reportes lo advierten.
             </p>
           )}
         </div>
@@ -62,7 +62,7 @@ function StatusPanel({ chart, perms, onValidate, onInvalidate }: { chart: Chart;
             </Button>
           )
         ) : (
-          <ReadOnlyHint reason={validated ? '' : 'Lo marca como validado un usuario con permiso para contabilizar: el propietario o el contador.'} />
+          <ReadOnlyHint reason={validated ? '' : 'Lo marca como validado un usuario con permiso para contabilizar, como el propietario.'} />
         )}
       </div>
     </Sheet>
@@ -270,7 +270,7 @@ function AccountForm({ chart, parent, account, onDone }: { chart: Chart; parent:
       {structural && chart.chart_status === 'validated' && (
         <div className="col-span-2">
           <Notice tone="warn" title="El plan va a volver a «sin validar»">
-            Un cambio en la estructura del plan necesita otra revisión del contador.
+            Un cambio en la estructura del plan necesita validarlo de nuevo.
           </Notice>
         </div>
       )}
@@ -326,40 +326,28 @@ function ArchiveForm({ account, chart, onDone }: { account: LedgerAccount; chart
 function ValidateForm({ onDone }: { onDone: () => void }) {
   const toast = useToast()
   const invalidate = useInvalidateAccounting()
-  const [name, setName] = useState('')
-  const [reference, setReference] = useState('')
-  const [touched, setTouched] = useState(false)
   const run = useMutation({
-    mutationFn: () => post<AccountingSettings>('/accounting/chart/validate', { validated_by_name: name.trim(), validated_reference: reference.trim() }),
+    mutationFn: () => post<AccountingSettings>('/accounting/chart/validate'),
     onSuccess: () => {
       invalidate()
       toast('ok', 'Plan de cuentas marcado como validado.')
       onDone()
     },
   })
-  const fe = run.error instanceof ApiError ? run.error.fieldErrors() : {}
-  const nameBad = name.trim().length < 3
-  const refBad = reference.trim().length < 2
   return (
     <form
       className="flex flex-col gap-4"
       noValidate
       onSubmit={(e) => {
         e.preventDefault()
-        setTouched(true)
-        if (!nameBad && !refBad) run.mutate()
+        run.mutate()
       }}
     >
       <p className="text-ink-2">
-        Dejá constancia de quién revisó el plan. Queda registrado en la auditoría y se muestra en los reportes en lugar del aviso de «sin validar».
+        CONTADOR AI lo valida contra el modelo de estados financieros de la RG N° 49/2014 de la DNIT. Tu aprobación queda en la auditoría, y los reportes dejan de
+        mostrar el aviso de «sin validar».
       </p>
-      {run.error && !Object.keys(fe).length ? <ApiErrorNotice error={run.error} /> : null}
-      <Field label="Nombre del contador" error={touched && nameBad ? 'Escribí nombre y apellido.' : fe.validated_by_name}>
-        {(p) => <Input {...p} autoFocus maxLength={150} value={name} onChange={(e) => setName(e.target.value)} />}
-      </Field>
-      <Field label="Matrícula profesional" error={touched && refBad ? 'Escribí la matrícula.' : fe.validated_reference}>
-        {(p) => <Input {...p} maxLength={100} value={reference} onChange={(e) => setReference(e.target.value)} />}
-      </Field>
+      <ApiErrorNotice error={run.error} />
       <div className="flex justify-end gap-2 border-t border-line pt-4">
         <Button type="button" variant="ghost" onClick={onDone}>
           Cancelar
@@ -564,7 +552,7 @@ export function ChartPage() {
             }
           >
             El plan propuesto tiene 173 cuentas con los códigos y nombres del modelo de estados financieros de la RG N° 49/2014 de la DNIT, más
-            algunas subcuentas habituales. Es una propuesta: queda «sin validar» hasta que tu contador la revise. Después podés agregar, renombrar o
+            algunas subcuentas habituales. Es una propuesta: queda «sin validar» hasta que la valides. Después podés agregar, renombrar o
             archivar cuentas.
           </EmptyState>
         </Sheet>

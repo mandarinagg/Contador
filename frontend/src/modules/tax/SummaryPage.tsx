@@ -51,7 +51,7 @@ export function TaxSummaryPage() {
     <>
       <PageHeader
         title="Resumen fiscal"
-        description="Lo que hay que presentar, lo que vence y lo que falta cargar. La app no presenta nada: arma recordatorios y borradores para que vos o tu contador lo hagan en Marangatu."
+        description="Lo que hay que presentar, lo que vence y lo que falta cargar. Por ahora la app no presenta nada: arma recordatorios y borradores para cargar en Marangatu. Más adelante lo presentará sola (D-119)."
         actions={
           <>
             <Link to="/impuestos/iva" className="inline-flex h-9 items-center gap-2 rounded-sm border border-line-strong bg-surface px-3.5 font-medium hover:bg-sunken">

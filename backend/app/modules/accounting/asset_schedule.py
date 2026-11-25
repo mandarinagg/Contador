@@ -37,8 +37,9 @@ from app.modules.accounting.models import (
 )
 
 WARNINGS = (
-    "Cuadro interno con las columnas del Anexo de la RG 77/2020, pendiente de validación por "
-    "un contador: las vidas útiles y los residuales vienen de las categorías candidatas.",
+    "Cuadro interno con las columnas del Anexo de la RG 77/2020, pendiente de verificar "
+    "contra la fuente oficial: las vidas útiles y los residuales vienen de las categorías "
+    "candidatas.",
     "La cuota fiscal del ejercicio se calcula por meses (prorrata mensual desde el mes de "
     "inicio); el anexo es anual y no aclara la prorrata del primer año (D-DEP-1, D-DEP-2).",
     "Las columnas de revalúo van en cero: ningún decreto dispuso un revalúo (D-DEP-7).",
@@ -287,7 +288,9 @@ def _warnings(groups: list[CategoryGroup]) -> list[str]:
         {g.category.name for g in groups if g.category.validation_status != "validated"}
     )
     if pending:
-        result.append("Categorías sin validar por un contador: " + ", ".join(pending) + ".")
+        result.append(
+            "Categorías sin verificar contra la fuente oficial: " + ", ".join(pending) + "."
+        )
     return result
 
 

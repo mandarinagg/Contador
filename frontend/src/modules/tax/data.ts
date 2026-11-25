@@ -72,7 +72,7 @@ export interface TaxPerms {
   canRead: boolean
   /** Perfil declarado, comprobantes, obligaciones, feriados, excepciones y configuración. */
   canManage: boolean
-  /** Verificar reglas, el perfil y los feriados; deprecar reglas (Propietario y Contador). */
+  /** Aprobar la verificación de CONTADOR AI (reglas, perfil, feriados) y deprecar reglas (D-120). */
   canVerify: boolean
   /** Proponer el asiento de un comprobante: además `accounting.manage`. */
   canProposeEntry: boolean
@@ -94,7 +94,7 @@ export function useTaxPerms(): TaxPerms {
     verifyReason: canVerify
       ? ''
       : canManage
-        ? `Tu rol (${role}) carga y opera; verificar reglas y el perfil es un acto profesional del contador o del propietario.`
+        ? `Tu rol (${role}) carga y opera; aprobar la verificación de reglas y del perfil le toca al propietario.`
         : `Tu rol (${role}) puede consultar los impuestos, pero no verificarlos.`,
   }
 }

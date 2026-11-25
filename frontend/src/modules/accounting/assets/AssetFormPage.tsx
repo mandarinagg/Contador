@@ -188,7 +188,7 @@ function AssetForm({ asset, acquisitionNumber, onSaved }: { asset?: FixedAsset; 
           {acquiredBeforeNorm(draft.acquired_on) && (
             <Notice tone="warn" title="Comprado antes del 14-10-2021">
               Las vidas útiles propuestas son las de la redacción del Decreto 6105/2021. Para un bien adquirido antes puede regir otra versión del art.
-              31 (art. 30: la norma vigente al adquirirlo). Verificá la vida útil y el residual con el contador.
+              31 (art. 30: la norma vigente al adquirirlo). La vida útil y el residual salen de la categoría.
             </Notice>
           )}
           <fieldset className="flex flex-col gap-2" disabled={locked}>
@@ -217,7 +217,7 @@ function AssetForm({ asset, acquisitionNumber, onSaved }: { asset?: FixedAsset; 
         <Sheet className="flex flex-col gap-4 p-5">
           <div>
             <h2 className="font-semibold">Parámetros de depreciación</h2>
-            <p className="mt-1 text-sm text-ink-2">Lineal mensual. Los propone la categoría; un contador puede ajustarlos para este bien.</p>
+            <p className="mt-1 text-sm text-ink-2">Lineal mensual. Los propone la categoría; podés ajustarlos para este bien.</p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Vida útil fiscal (meses)" error={shown('fiscal_life')} hint={/^\d+$/.test(draft.fiscal_life) ? monthsText(Number(draft.fiscal_life)) : undefined}>
@@ -229,7 +229,7 @@ function AssetForm({ asset, acquisitionNumber, onSaved }: { asset?: FixedAsset; 
           </div>
           <Check
             label="Los parámetros contables son iguales a los fiscales"
-            hint="Lo habitual. Desmarcalo solo si el contador decidió otra vida útil o residual para los libros."
+            hint="Lo habitual. Desmarcalo solo si este bien lleva en los libros otra vida útil u otro residual."
             checked={draft.same_params}
             disabled={locked}
             onChange={(v) => set(v ? { same_params: true } : { same_params: false, life: draft.life || draft.fiscal_life, residual: draft.residual || (check.body ? toInputText(check.body.residual_value as string, 'PYG') : '') })}

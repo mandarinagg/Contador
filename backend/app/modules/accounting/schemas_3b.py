@@ -17,8 +17,6 @@ from app.modules.accounting.schemas import (
     DocumentReference,
     EntryLineIn,
     EntryOut,
-    PersonName,
-    ProfessionalReference,
     Reason,
     StartRule,
 )
@@ -90,11 +88,6 @@ class AssetCategoryUpdate(_Strict):
     citation: LongText | None = None
     note: LongText | None = None
     archived: bool | None = None
-
-
-class CategoryValidate(_Strict):
-    validated_by_name: PersonName
-    validated_reference: ProfessionalReference
 
 
 class AssetCategoryOut(BaseModel):

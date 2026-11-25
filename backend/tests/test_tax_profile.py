@@ -10,11 +10,7 @@ from tests.conftest import auth_header
 from tests.finance_utils import audit_entries, ok
 from tests.tax_utils import TAX, fix_today, load_rules, put_profile, rejected, set_ruc, setup_tax
 
-VERIFY = {
-    "verified_by_name": "Contadora de Prueba",
-    "verified_license": "Mat. 4321",
-    "verified_document_reference": "Constancia de RUC 2026-11-01",
-}
+VERIFY = {"verified_document_reference": "Constancia de RUC 2026-11-01"}
 
 
 def test_no_profile_without_organization_ruc(
@@ -101,7 +97,7 @@ def test_verification_requires_license_and_is_final(
 ) -> None:
     setup_tax(client, owner_token, monkeypatch)
     pid = ok(client.get(f"{TAX}/profile", headers=auth_header(owner_token)))["current"]["id"]
-    missing = {k: v for k, v in VERIFY.items() if k != "verified_license"}
+    missing = {"verified_by_name": "Contadora", "verified_license": "Mat. 1"}  # ya no (D-120)
     res = client.post(f"{TAX}/profile/{pid}/verify", json=missing, headers=auth_header(owner_token))
     assert res.status_code == 422
     _, admin = make_user("admin")
@@ -111,7 +107,9 @@ def test_verification_requires_license_and_is_final(
         client.post(f"{TAX}/profile/{pid}/verify", json=VERIFY, headers=auth_header(owner_token))
     )
     assert body["current"]["origin"] == "verified"
-    assert body["current"]["verified_license"] == "Mat. 4321"
+    assert body["current"]["verified_by_name"] == "CONTADOR AI"
+    assert body["current"]["verified_license"] == "Constancia de RUC (DNIT)"
+    assert body["current"]["verified_document_reference"] == "Constancia de RUC 2026-11-01"
     # Verificada: la misma fecha no se corrige, ni por la API ni por SQL.
     res = put_profile(client, owner_token, expect=409)
     assert res["error"]["code"] == "PROFILE_VERIFIED"

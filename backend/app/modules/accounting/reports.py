@@ -16,7 +16,7 @@
   las columnas de cada cuenta suman su importe.
 
 Todos devuelven `chart_status`: si no es `validated`, la interfaz muestra el aviso "Plan de
-cuentas sin validar por un contador" (D-038).
+cuentas sin verificar contra la fuente oficial" (D-038, D-120).
 """
 
 import uuid

@@ -62,7 +62,7 @@ IDENTIFICATION_CODES = {
 SEPARATORS = {"semicolon": ";", "comma": ","}
 MIN_DATE = date(2021, 1, 1)
 DRAFT_NOTICE = (
-    "Borrador del archivo de importación de Marangatu, sin verificar por un contador. "
+    "Borrador del archivo de importación de Marangatu, sin verificar contra la fuente oficial. "
     "Marangatu lo valida hasta en 72 horas y puede rechazar líneas. Probá primero con un "
     "archivo de uno o dos comprobantes (`limit`) y usá un identificador distinto en cada "
     "archivo: Marangatu no acepta dos archivos con el mismo nombre para el mismo período."

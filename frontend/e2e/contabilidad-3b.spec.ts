@@ -78,7 +78,7 @@ function expectXlsx(path: string) {
 
 let acquisitionNumber = 0
 
-test('categorías: se cargan las 34 propuestas sin validar, se completa una y el contador valida otra', async ({ page }) => {
+test('categorías: se cargan las 34 propuestas sin validar, se completa una y CONTADOR AI valida otra', async ({ page }) => {
   await signIn(page, OWNER.email, PASSWORD)
   await assetsTab(page, 'Categorías')
   await expect(page.getByText('Todavía no hay categorías de activo fijo', { exact: true })).toBeVisible()
@@ -104,14 +104,13 @@ test('categorías: se cargan las 34 propuestas sin validar, se completa una y el
   // Una incompleta no se valida.
   await expect(page.getByRole('button', { name: 'Validar Terrenos (no depreciables)' })).toBeDisabled()
 
-  // El contador valida «Equipos de informática» con nombre y matrícula.
+  // CONTADOR AI valida «Equipos de informática» contra su norma (D-120): sin nombre ni matrícula.
   await signOut(page)
   await signIn(page, ACCOUNTANT.email, PASSWORD)
   await assetsTab(page, 'Categorías')
   await page.getByRole('button', { name: 'Validar Equipos de informática' }).click()
   const validate = page.getByRole('dialog', { name: 'Validar la categoría' })
-  await validate.getByLabel('Nombre del contador').fill('Contadora Externa')
-  await validate.getByLabel('Matrícula profesional').fill('MAT-1234')
+  await expect(validate.getByLabel('Matrícula profesional')).toHaveCount(0)
   await validate.getByRole('button', { name: 'Validar la categoría' }).click()
   await toast(page, 'Categoría «Equipos de informática» validada.')
   await expect(page.getByText('34 en uso, 1 validadas, 3 incompletas.')).toBeVisible()

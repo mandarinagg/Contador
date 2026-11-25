@@ -2,13 +2,13 @@
  * Tributación, fase 4, de punta a punta: avisos sin perfil, carga de las reglas y los feriados
  * candidatos, perfil fiscal declarado con el asistente, calendario generado, carga de una compra
  * y una venta, IVA del mes (estimación, copia a la obligación y borrador del F120), configuración,
- * verificación del contador (regla y perfil) y los límites del rol de consulta.
+ * verificación de CONTADOR AI (una regla, las demás en bloque y el perfil; D-120) y los límites del rol de consulta.
  *
  * Corre después de `contabilidad-3b.spec.ts` (misma base): la empresa tiene RUC 44444401-7 y el
  * plan propuesto validado. «Hoy» es la fecha del servidor; los comprobantes van en el mes anterior.
  */
 import type { Page } from '@playwright/test'
-import { ACCOUNTANT, expect, OWNER, PASSWORD, signIn, signOut, test, VIEWER } from './fixtures.ts'
+import { expect, OWNER, PASSWORD, signIn, signOut, test, VIEWER } from './fixtures.ts'
 
 test.describe.configure({ mode: 'serial' })
 test.use({ colorScheme: 'light' })
@@ -91,7 +91,7 @@ test('perfil fiscal declarado con el asistente', async ({ page }) => {
   }
   await page.getByRole('button', { name: 'Siguiente' }).click()
   await page.getByRole('button', { name: 'Guardar el perfil' }).click()
-  await expect(page.getByText('Declarado, sin verificar por un contador').first()).toBeVisible()
+  await expect(page.getByText('Declarado, sin verificar contra la constancia de RUC').first()).toBeVisible()
 })
 
 test('el calendario genera las obligaciones del perfil', async ({ page }) => {
@@ -165,29 +165,35 @@ test('configuración: días de aviso', async ({ page }) => {
   await signOut(page)
 })
 
-test('el contador verifica una regla y el perfil', async ({ page }) => {
-  await signIn(page, ACCOUNTANT.email, PASSWORD)
+test('CONTADOR AI verifica una regla, las demás con fuente oficial en bloque y el perfil (D-120)', async ({ page }) => {
+  await signIn(page, OWNER.email, PASSWORD)
   await open(page, 'Reglas y feriados')
   const rule = page.getByTestId('rule-IVA-GENERAL-TASAS')
   await rule.getByRole('button', { name: 'Verificar' }).click()
   const dialog = page.getByRole('dialog', { name: /Verificar IVA-GENERAL-TASAS/ })
-  await dialog.getByRole('button', { name: 'Verificar regla' }).click()
-  await expect(dialog.getByText('La matrícula es obligatoria')).toBeVisible()
-  await dialog.getByLabel('Nombre del contador').fill(ACCOUNTANT.name)
-  await dialog.getByLabel('Matrícula profesional').fill('C-1234')
+  await expect(dialog.getByLabel('Matrícula profesional')).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Verificar regla' }).click()
   await toast(page, 'Regla IVA-GENERAL-TASAS verificada.')
-  await expect(rule).toContainText(`Verificada por ${ACCOUNTANT.name} (matrícula C-1234)`)
+  await expect(rule).toContainText('Verificada por CONTADOR AI contra')
+
+  // El clic único: verifica las que tienen la fuente oficial leída y lista las que no.
+  await page.getByLabel('Solo las que usa la app').uncheck()
+  await page.getByRole('button', { name: /^Verificar las \d+ con fuente oficial$/ }).click()
+  await toast(page, /reglas verificadas; \d+ quedan sin verificar\./)
+  await expect(page.getByText(/reglas quedaron sin verificar/)).toBeVisible()
+  await expect(page.getByText(/CONTADOR AI no puede verificarla: La fuente oficial no se leyó/).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Verificar con fuente oficial' })).toBeDisabled()
 
   await open(page, 'Perfil fiscal')
   await page.getByRole('button', { name: 'Verificar' }).first().click()
   const profile = page.getByRole('dialog', { name: 'Verificar el perfil fiscal' })
-  await profile.getByLabel('Nombre del contador').fill(ACCOUNTANT.name)
-  await profile.getByLabel('Matrícula profesional').fill('C-1234')
+  await expect(profile.getByLabel('Matrícula profesional')).toHaveCount(0)
+  await profile.getByRole('button', { name: 'Verificar perfil' }).click()
+  await expect(profile.getByText('Indicá la referencia del documento.')).toBeVisible()
   await profile.getByLabel('Referencia de la constancia de RUC').fill('Constancia 2026-001')
   await profile.getByRole('button', { name: 'Verificar perfil' }).click()
   await toast(page, 'Perfil fiscal verificado.')
-  await expect(page.getByText(/Verificado por Contadora Externa \(matrícula C-1234\)/)).toBeVisible()
+  await expect(page.getByText(/Verificado por CONTADOR AI contra la Constancia de RUC \(DNIT\): Constancia 2026-001/)).toBeVisible()
   await signOut(page)
 })
 

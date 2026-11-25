@@ -4,12 +4,15 @@
   del YAML de la investigación. La carga es idempotente: una versión que ya está igual no se
   toca, una que cambió en el YAML no se pisa (se informa en `differing`) y una cuyos
   `parameters` no cumplen el esquema de su código no se carga (`rejected`).
-- Una versión no se edita: solo cambia su estado (`pending → verified` con nombre y
-  matrícula, `cualquiera → deprecated` con motivo). Lo impone también el trigger.
+- Una versión no se edita: solo cambia su estado (`pending → verified`, `cualquiera →
+  deprecated` con motivo). Lo impone también el trigger.
+- Verifica la herramienta (D-118, D-120): solo una regla con la fuente oficial leída
+  (`confidence = oficial_leida`, URL, referencia legal y fecha de consulta). La que no cumple
+  sigue `pending`.
 - Regla vigente a una fecha: la versión no deprecada con `valid_from ≤ fecha ≤ valid_to`.
   Una regla sin `valid_from` (fecha desconocida) nunca está vigente: «sin regla».
 - D-082: una regla `pending` sí se usa, y todo lo que depende de ella informa
-  `rule_status: "pending"` («sin verificar por un contador»).
+  `rule_status: "pending"` («sin verificar contra la fuente oficial»).
 """
 
 import uuid
@@ -22,6 +25,7 @@ from sqlalchemy import or_, select, text
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError, Conflict, NotFound
+from app.core.verification import TOOL_VERIFIER, source_reference
 from app.modules.tax import candidate_rules, rule_params
 from app.modules.tax.common import flush_translated, jsonable, now, record, snapshot
 from app.modules.tax.models import DueDateException, RuleVersion
@@ -310,27 +314,38 @@ def worst_status(rules: Iterable[RuleVersion]) -> str | None:
     return "verified" if statuses == {"verified"} else "pending"
 
 
-def verify(
+def unverifiable_reason(rule: RuleVersion) -> str | None:
+    """Por qué la herramienta no puede verificar la regla (`None` si puede, D-120)."""
+    if rule.confidence != "oficial_leida":
+        return (
+            "La fuente oficial no se leyó (confianza "
+            f"«{rule.confidence or 'sin indicar'}»): no se verifica de memoria ni por terceros."
+        )
+    missing = [
+        label
+        for label, value in (
+            ("la URL de la fuente", rule.source_url),
+            ("la referencia legal", rule.legal_reference),
+            ("la fecha de consulta", rule.consulted_at),
+        )
+        if not value
+    ]
+    if missing:
+        return "Le falta " + " y ".join(missing) + "."
+    return None
+
+
+def _mark_verified(
     db: Session,
     organization_id: uuid.UUID,
     actor_id: uuid.UUID,
-    rule_id: uuid.UUID,
-    *,
-    reviewed_by_name: str,
-    reviewed_reference: str,
+    rule: RuleVersion,
     review_note: str | None,
-) -> RuleVersion:
-    rule = get_rule(db, rule_id, lock=True)
-    if rule.validation_status != "pending":
-        raise Conflict(
-            "RULE_NOT_PENDING",
-            f"La regla {rule.code} (versión {rule.version}) está {rule.validation_status}: solo "
-            "se verifica una pendiente.",
-        )
+) -> None:
     before = snapshot(rule, STATE_FIELDS)
     rule.validation_status = "verified"
-    rule.reviewed_by_name = reviewed_by_name
-    rule.reviewed_reference = reviewed_reference
+    rule.reviewed_by_name = TOOL_VERIFIER
+    rule.reviewed_reference = source_reference(rule.legal_reference or "")
     rule.reviewed_at = now()
     rule.review_note = review_note
     flush_translated(db)
@@ -344,8 +359,62 @@ def verify(
         before=before,
         after=snapshot(rule, STATE_FIELDS),
     )
+
+
+def verify(
+    db: Session,
+    organization_id: uuid.UUID,
+    actor_id: uuid.UUID,
+    rule_id: uuid.UUID,
+    *,
+    review_note: str | None,
+) -> RuleVersion:
+    rule = get_rule(db, rule_id, lock=True)
+    if rule.validation_status != "pending":
+        raise Conflict(
+            "RULE_NOT_PENDING",
+            f"La regla {rule.code} (versión {rule.version}) está {rule.validation_status}: solo "
+            "se verifica una pendiente.",
+        )
+    reason = unverifiable_reason(rule)
+    if reason is not None:
+        raise AppError(
+            "RULE_NOT_VERIFIABLE",
+            f"CONTADOR AI no puede verificar la regla {rule.code}: {reason}",
+            {"code": rule.code, "version": rule.version, "reason": reason},
+            status_code=422,
+        )
+    _mark_verified(db, organization_id, actor_id, rule, review_note)
     db.commit()
     return rule
+
+
+@dataclass
+class BulkVerifyResult:
+    verified: list[RuleVersion] = field(default_factory=list)
+    left_pending: list[tuple[RuleVersion, str]] = field(default_factory=list)
+
+
+def verify_verifiable(
+    db: Session, organization_id: uuid.UUID, actor_id: uuid.UUID
+) -> BulkVerifyResult:
+    """Verifica de una vez las pendientes con fuente oficial leída; informa las demás."""
+    result = BulkVerifyResult()
+    pending = db.scalars(
+        select(RuleVersion)
+        .where(RuleVersion.validation_status == "pending")
+        .order_by(RuleVersion.code, RuleVersion.version)
+        .with_for_update()
+    ).all()
+    for rule in pending:
+        reason = unverifiable_reason(rule)
+        if reason is None:
+            _mark_verified(db, organization_id, actor_id, rule, None)
+            result.verified.append(rule)
+        else:
+            result.left_pending.append((rule, reason))
+    db.commit()
+    return result
 
 
 def deprecate(

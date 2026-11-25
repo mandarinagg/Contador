@@ -213,7 +213,6 @@ def test_validated_chart_has_no_notice(client: TestClient, books: dict[str, Any]
     ok(
         client.post(
             f"{ACC}/chart/validate",
-            json={"validated_by_name": "Cdor. Juan Benítez", "validated_reference": "Mat. 99"},
             headers=auth_header(books["token"]),
         )
     )

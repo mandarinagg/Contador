@@ -176,8 +176,7 @@ def compute(db: Session, organization_id: uuid.UUID, today: date) -> dict[str, A
             _alert(
                 "PROFILE_UNVERIFIED",
                 "info",
-                "El perfil fiscal vigente no está verificado por un contador con la constancia "
-                "de RUC.",
+                "El perfil fiscal vigente no está verificado contra la constancia de RUC.",
             )
         )
 
@@ -194,7 +193,7 @@ def compute(db: Session, organization_id: uuid.UUID, today: date) -> dict[str, A
             _alert(
                 "RULES_UNVERIFIED",
                 "info",
-                "Hay reglas en uso sin verificar por un contador: los vencimientos y las "
+                "Hay reglas en uso sin verificar contra la fuente oficial: los vencimientos y las "
                 "estimaciones que dependen de ellas se muestran «sin verificar».",
                 [rules.applied(r) for r in unverified],
             )

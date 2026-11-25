@@ -13,7 +13,8 @@ from tests.tax_utils import TAX, create_voucher, obligation, setup_tax
 ANY = str(uuid.uuid4())
 WRITES: list[tuple[str, str, dict[str, Any] | None]] = [
     ("post", "/rules/load-candidates", None),
-    ("post", f"/rules/{ANY}/verify", {"reviewed_by_name": "X", "reviewed_reference": "Mat. 1"}),
+    ("post", f"/rules/{ANY}/verify", {}),
+    ("post", "/rules/verify-verifiable", None),
     ("post", f"/rules/{ANY}/deprecate", {"reason": "Prueba"}),
     ("post", "/holidays/load-candidates", None),
     ("post", "/holidays", {"day": "2027-01-02", "name": "X", "legal_reference": "X"}),

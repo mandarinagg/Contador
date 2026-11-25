@@ -315,7 +315,7 @@ export function VatPage() {
             </div>
             {v.proration_warning && (
               <Notice tone="warn" title="Hay ventas exentas y compras con IVA: puede corresponder el prorrateo del crédito fiscal">
-                La app no prorratea todavía (D-F4-14): las casillas del prorrateo quedan vacías hasta que el contador lo confirme.
+                La app no prorratea todavía (D-F4-14): las casillas del prorrateo quedan vacías hasta resolverlo contra la norma.
               </Notice>
             )}
             {v.warnings.map((w) => (

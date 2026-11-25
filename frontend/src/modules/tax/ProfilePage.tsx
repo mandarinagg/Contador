@@ -1,7 +1,8 @@
 /**
  * Perfil fiscal (D-083): un asistente que explica cada dato y dónde está en la constancia de
- * RUC. Lo declara el propietario (o quien tenga `tax.manage`) y lo verifica el contador con la
- * constancia (`tax.verify`). Cada cambio es una versión con su fecha de vigencia.
+ * RUC. Lo declara el propietario (o quien tenga `tax.manage`) y lo verifica CONTADOR AI contra
+ * la constancia, con la aprobación de quien tiene `tax.verify` (D-118, D-120). Cada cambio es
+ * una versión con su fecha de vigencia.
  */
 import { useMutation } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, Check, FilePlus2, ShieldCheck } from 'lucide-react'
@@ -204,7 +205,7 @@ function Wizard({ profile, onDone }: { profile: Profile; onDone: () => void }) {
         {step === 1 && (
           <>
             <Where>
-              En el apartado de obligaciones figura <b>700 — IRE General</b> o <b>701 — IRE SIMPLE</b>. Si no figura ninguna, consultalo con tu contador antes de elegir.
+              En el apartado de obligaciones figura <b>700 — IRE General</b> o <b>701 — IRE SIMPLE</b>. Si no figura ninguna, revisá tus obligaciones en Marangatu antes de elegir.
             </Where>
             <fieldset className="flex flex-col gap-2">
               <legend className="sr-only">Régimen del IRE</legend>
@@ -372,7 +373,7 @@ function Wizard({ profile, onDone }: { profile: Profile; onDone: () => void }) {
               {(p) => <Input {...p} maxLength={500} value={d.notes} onChange={(e) => set({ notes: e.target.value })} />}
             </Field>
             {problems.length > 0 && <Notice tone="warn" title="La combinación no es coherente">{problems.join(' ')}</Notice>}
-            <p className="text-sm text-ink-2">Queda como perfil declarado. Después, un contador lo verifica comparándolo con la constancia de RUC.</p>
+            <p className="text-sm text-ink-2">Queda como perfil declarado. Después se verifica comparándolo con la constancia de RUC.</p>
             {apiProblems.length > 0 ? <Notice tone="bad" title={save.error instanceof ApiError ? save.error.message : ''} /> : <ApiErrorNotice error={save.error} />}
           </>
         )}
@@ -415,7 +416,7 @@ function VersionCard({ version, canVerify, onVerify }: { version: ProfileVersion
             {version.vat_taxpayer ? ' · contribuyente del IVA' : ' · sin IVA'}
           </p>
           <p className="mt-1">
-            {version.origin === 'verified' ? <UnverifiedMark status="verified" /> : <UnverifiedMark status="pending" label="Declarado, sin verificar por un contador" />}
+            {version.origin === 'verified' ? <UnverifiedMark status="verified" /> : <UnverifiedMark status="pending" label="Declarado, sin verificar contra la constancia de RUC" />}
           </p>
         </div>
         {version.origin === 'declared' && canVerify && (
@@ -427,7 +428,7 @@ function VersionCard({ version, canVerify, onVerify }: { version: ProfileVersion
       </div>
       {version.origin === 'verified' && (
         <p className="text-sm text-ink-2">
-          Verificado por {version.verified_by_name} (matrícula {version.verified_license}) con la constancia {version.verified_document_reference}
+          Verificado por {version.verified_by_name} contra la {version.verified_license}: {version.verified_document_reference}
           {version.verified_at && <>, el {formatDateTime(version.verified_at)}</>}.
         </p>
       )}
@@ -570,7 +571,7 @@ export function ProfilePage() {
                     <td className="px-4 py-2.5 tabular-nums">{v.obligations.map((o) => o.code).join(', ') || '—'}</td>
                     <td className="px-4 py-2.5">
                       {v.origin === 'verified' ? (
-                        <span title={`${v.verified_by_name}, matrícula ${v.verified_license}`}>
+                        <span title={`${v.verified_by_name}, ${v.verified_license}: ${v.verified_document_reference}`}>
                           <Badge tone="ok">Verificado</Badge>
                         </span>
                       ) : (
@@ -590,8 +591,8 @@ export function ProfilePage() {
           <VerifyForm
             intro={
               <>
-                Confirmás que el perfil vigente desde el {formatBookDate(current.valid_from)} coincide con la constancia de RUC de la empresa. Una versión verificada ya
-                no cambia: un cambio posterior se carga como versión nueva.
+                Confirmás que el perfil vigente desde el {formatBookDate(current.valid_from)} coincide con la constancia de RUC de la empresa. Queda verificado por
+                CONTADOR AI con tu aprobación. Una versión verificada ya no cambia: un cambio posterior se carga como versión nueva.
               </>
             }
             thirdLabel="Referencia de la constancia de RUC"
@@ -599,8 +600,8 @@ export function ProfilePage() {
             thirdRequired
             submit="Verificar perfil"
             onCancel={() => setVerifying(false)}
-            onSubmit={async ({ name, license, third }) => {
-              await post(`/tax/profile/${current.id}/verify`, { verified_by_name: name, verified_license: license, verified_document_reference: third })
+            onSubmit={async ({ third }) => {
+              await post(`/tax/profile/${current.id}/verify`, { verified_document_reference: third })
               invalidate()
               setVerifying(false)
               toast('ok', 'Perfil fiscal verificado.')

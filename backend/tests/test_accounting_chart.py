@@ -173,22 +173,17 @@ def test_validation_requires_accountant_and_any_structural_change_resets_it(
     headers = auth_header(owner_token)
     res = client.post(
         f"{ACC}/chart/validate",
-        json={"validated_by_name": "Cdora. Ana Pérez", "validated_reference": "Mat. 1234"},
         headers=headers,
     )
     assert res.status_code == 409 and error_code(res) == "CHART_EMPTY"
     accounts = load_chart(client, owner_token)
     _, admin = make_user("admin")
     _, accountant = make_user("accountant")
-    body = {"validated_by_name": "Cdora. Ana Pérez", "validated_reference": "Mat. 1234"}
-    assert (
-        client.post(f"{ACC}/chart/validate", json=body, headers=auth_header(admin)).status_code
-        == 403
-    )
-    settings = ok(client.post(f"{ACC}/chart/validate", json=body, headers=auth_header(accountant)))
+    assert client.post(f"{ACC}/chart/validate", headers=auth_header(admin)).status_code == 403
+    settings = ok(client.post(f"{ACC}/chart/validate", headers=auth_header(accountant)))
     assert settings["chart_status"] == "validated"
-    assert settings["chart_validated_by_name"] == "Cdora. Ana Pérez"
-    assert settings["chart_validated_reference"] == "Mat. 1234"
+    assert settings["chart_validated_by_name"] == "CONTADOR AI"
+    assert settings["chart_validated_reference"].startswith("RG 49/2014")
     assert settings["chart_validated_at"]
     create_year(client, owner_token)
     report = ok(
@@ -222,7 +217,7 @@ def test_validation_requires_accountant_and_any_structural_change_resets_it(
     settings = ok(client.get(f"{ACC}/settings", headers=headers))
     assert settings["chart_status"] == "pending" and settings["chart_validated_by_name"] is None
 
-    ok(client.post(f"{ACC}/chart/validate", json=body, headers=headers))
+    ok(client.post(f"{ACC}/chart/validate", headers=headers))
     ok(client.post(f"{ACC}/chart/invalidate", headers=headers))
     res = client.post(f"{ACC}/chart/invalidate", headers=headers)
     assert res.status_code == 409 and error_code(res) == "CHART_NOT_VALIDATED"

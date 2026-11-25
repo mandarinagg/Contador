@@ -3,7 +3,7 @@
 Cada archivo trae:
 - encabezado con la razón social, el RUC con su dígito verificador, el título, el rango o
   la fecha, la fecha de emisión y, si el plan no está validado, el aviso "Plan de cuentas
-  sin validar por un contador" (D-038), más las notas propias del reporte;
+  sin verificar contra la fuente oficial" (D-038, D-120), más las notas propias del reporte;
 - importes como **números** (guaraníes enteros, `int`: nunca `float` ni texto) con el
   formato `#,##0`. Es el código de formato de Excel: en una configuración regional de
   Paraguay se muestra con punto de miles, `#.##0` (D-076);
@@ -31,7 +31,7 @@ from app.modules.organizations.models import Organization
 XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 MONEY_FORMAT = "#,##0"
 DATE_FORMAT = "yyyy-mm-dd"  # el que pone openpyxl a las fechas; `fast_xlsx` usa el mismo
-UNVALIDATED_NOTICE = "Plan de cuentas sin validar por un contador"
+UNVALIDATED_NOTICE = "Plan de cuentas sin verificar contra la fuente oficial"
 
 
 @dataclass(frozen=True)

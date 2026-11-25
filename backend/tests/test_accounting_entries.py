@@ -575,7 +575,6 @@ def test_permissions_by_role(client: TestClient, books: dict[str, Any], make_use
         client.post(f"{ACC}/fiscal-years", json={"year": 2027}, headers=a),
         client.post(
             f"{ACC}/chart/validate",
-            json={"validated_by_name": "Admin", "validated_reference": "Mat. 1"},
             headers=a,
         ),
     ]

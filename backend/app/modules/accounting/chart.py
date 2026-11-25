@@ -10,9 +10,10 @@ Reglas:
   nota, y se puede archivar (BR-ACC-09). También lo impide un trigger.
 - No se archiva una cuenta con saldo, con hijas sin archivar, usada en borradores, ni
   asignada en la configuración o en finanzas.
-- El plan nace `pending` y solo lo marca `validated` un usuario con `accounting.post`, con
-  nombre y matrícula del contador (BR-ACC-10). Un cambio estructural (alta, código, tipo,
-  naturaleza, imputabilidad, archivo) lo vuelve a `pending` (D-046).
+- El plan nace `pending` y lo marca `validated` un usuario con `accounting.post`: queda como
+  validado por CONTADOR AI, con la RG 49/2014 como referencia (BR-ACC-10, D-120). Un cambio
+  estructural (alta, código, tipo, naturaleza, imputabilidad, archivo) lo vuelve a `pending`
+  (D-046).
 """
 
 import uuid
@@ -26,6 +27,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError, Conflict, NotFound
+from app.core.verification import CHART_SOURCE, TOOL_VERIFIER
 from app.modules.accounting import proposed_chart
 from app.modules.accounting.balances import (
     BALANCE_KINDS,
@@ -162,13 +164,20 @@ def mark_pending(db: Session, organization_id: uuid.UUID, actor_id: uuid.UUID) -
 
 
 def validate_chart(
-    db: Session, organization_id: uuid.UUID, actor_id: uuid.UUID, by_name: str, reference: str
+    db: Session, organization_id: uuid.UUID, actor_id: uuid.UUID
 ) -> AccountingSettings:
+    """Valida CONTADOR AI, con la RG 49/2014 como referencia (D-120)."""
     settings = lock_settings(db, organization_id)
     if not _has_accounts(db, organization_id):
         raise Conflict("CHART_EMPTY", "El plan de cuentas está vacío: no hay nada que validar.")
     _set_status(
-        db, settings, actor_id, "validated", "validated", by_name=by_name, reference=reference
+        db,
+        settings,
+        actor_id,
+        "validated",
+        "validated",
+        by_name=TOOL_VERIFIER,
+        reference=CHART_SOURCE,
     )
     db.commit()
     return settings

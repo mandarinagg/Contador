@@ -43,22 +43,22 @@ export function EntryStatusBadge({ status }: { status: EntryStatus }) {
   return <Badge tone={tone}>{STATUS_LABELS[status]}</Badge>
 }
 
-/** Aviso obligatorio mientras el plan no esté validado por un contador (D-038). */
+/** Aviso obligatorio mientras el plan no esté validado (D-038); lo valida CONTADOR AI (D-120). */
 export function UnvalidatedNotice({ status, compact = false }: { status: ChartStatus; compact?: boolean }) {
   if (status === 'validated') return null
   if (compact) {
     return (
       <p role="status" className="flex items-center gap-2 rounded-sm bg-amber-soft px-3 py-2 text-sm font-medium text-amber">
         <ShieldAlert size={15} aria-hidden />
-        Plan de cuentas sin validar por un contador
+        Plan de cuentas sin verificar contra la fuente oficial
       </p>
     )
   }
   return (
-    <Notice tone="warn" title="Plan de cuentas sin validar por un contador">
+    <Notice tone="warn" title="Plan de cuentas sin verificar contra la fuente oficial">
       {status === 'none'
         ? 'Todavía no hay plan de cuentas cargado.'
-        : 'Es una propuesta basada en la RG N° 49/2014. Hasta que un contador la revise y la marque como validada, estos números no son un estado contable firmado.'}
+        : 'Es una propuesta basada en la RG N° 49/2014. Hasta que se valide contra ese modelo, estos números no son un estado contable firmado.'}
     </Notice>
   )
 }
@@ -79,12 +79,12 @@ export function ChartStatusStrip({ settings }: { settings: AccountingSettings | 
       {validated ? <ShieldCheck size={16} className="text-ledger" aria-hidden /> : <ShieldAlert size={16} className="text-amber" aria-hidden />}
       {validated ? (
         <span className="text-ink">
-          <span className="font-semibold text-ledger">Plan de cuentas validado</span> por {settings.chart_validated_by_name} (matrícula{' '}
-          {settings.chart_validated_reference}), el {formatDateTime(settings.chart_validated_at as string)}.
+          <span className="font-semibold text-ledger">Plan de cuentas validado</span> por {settings.chart_validated_by_name} contra{' '}
+          {settings.chart_validated_reference}, el {formatDateTime(settings.chart_validated_at as string)}.
         </span>
       ) : settings.chart_status === 'pending' ? (
         <span className="text-ink">
-          <span className="font-semibold text-amber">Plan de cuentas sin validar por un contador.</span> Los reportes lo van a decir hasta que se valide.
+          <span className="font-semibold text-amber">Plan de cuentas sin verificar contra la fuente oficial.</span> Los reportes lo van a decir hasta que se valide.
         </span>
       ) : (
         <span className="text-ink">

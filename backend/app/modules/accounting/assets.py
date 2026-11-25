@@ -27,6 +27,7 @@ from sqlalchemy import ColumnElement, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError, Conflict, NotFound
+from app.core.verification import TOOL_VERIFIER, source_reference
 from app.modules.accounting import chart, depreciation, proposed_asset_categories
 from app.modules.accounting.balances import ZERO
 from app.modules.accounting.common import (
@@ -269,17 +270,34 @@ def validate_category(
     organization_id: uuid.UUID,
     actor_id: uuid.UUID,
     category_id: uuid.UUID,
-    by_name: str,
-    reference: str,
 ) -> AssetCategory:
+    """Valida CONTADOR AI contra la norma citada en la categoría (D-120)."""
     category = get_category(db, organization_id, category_id, lock=True)
     depreciation.require_complete(db, [category])
+    missing = [
+        label
+        for label, value in (
+            ("la URL de la fuente", category.source_url),
+            ("la referencia legal", category.legal_reference),
+            ("la cita de la norma", category.citation),
+        )
+        if not value
+    ]
+    if missing:
+        raise AppError(
+            "CATEGORY_NOT_VERIFIABLE",
+            f"CONTADOR AI no puede validar «{category.name}» sin fuente oficial: le falta "
+            + " y ".join(missing)
+            + ".",
+            {"missing": missing},
+            status_code=422,
+        )
     before, after = apply_changes(
         category,
         {
             "validation_status": "validated",
-            "validated_by_name": by_name,
-            "validated_reference": reference,
+            "validated_by_name": TOOL_VERIFIER,
+            "validated_reference": source_reference(category.legal_reference or ""),
             "validated_at": now(),
         },
     )

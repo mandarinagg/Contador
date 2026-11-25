@@ -39,7 +39,6 @@ from app.modules.accounting.models import (
 from app.modules.accounting.schemas import (
     BalanceSheetOut,
     ChartOut,
-    ChartValidate,
     CostCenterColumnOut,
     EntryIn,
     EntryKind,
@@ -358,11 +357,9 @@ def update_ledger_account(
 
 
 @router.post("/chart/validate", response_model=SettingsOut)
-def validate_chart(body: ChartValidate, auth: Poster, db: DbSession) -> SettingsOut:
-    """Marca el plan como validado por un contador (nombre y matrícula, D-038)."""
-    settings = chart.validate_chart(
-        db, auth.organization_id, auth.user_id, body.validated_by_name, body.validated_reference
-    )
+def validate_chart(auth: Poster, db: DbSession) -> SettingsOut:
+    """Marca el plan como validado por CONTADOR AI (D-038, D-120); sin nombre ni matrícula."""
+    settings = chart.validate_chart(db, auth.organization_id, auth.user_id)
     return _settings_out(settings)
 
 

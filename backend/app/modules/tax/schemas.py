@@ -11,7 +11,6 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.modules.accounting.schemas import (
-    PersonName,
     ProfessionalReference,
     RateIn,
     Reason,
@@ -97,12 +96,27 @@ class RuleOut(BaseModel):
     deprecation_reason: str | None
     deprecated_at: datetime | None
     used_by_calculations: bool
+    # D-120: si CONTADOR AI puede verificarla y, si no, por qué.
+    verifiable: bool
+    unverifiable_reason: str | None
 
 
 class RuleVerifyIn(_Strict):
-    reviewed_by_name: PersonName
-    reviewed_reference: ProfessionalReference
+    """Verifica CONTADOR AI contra la fuente de la regla (D-120): sin nombre ni matrícula."""
+
     review_note: Text500 | None = None
+
+
+class RuleLeftPending(BaseModel):
+    id: uuid.UUID
+    code: str
+    version: int
+    reason: str
+
+
+class RuleBulkVerifyOut(BaseModel):
+    verified: list[str]
+    left_pending: list[RuleLeftPending]
 
 
 class RuleLoadOut(BaseModel):
@@ -212,8 +226,8 @@ class ProfileIn(_Strict):
 
 
 class ProfileVerifyIn(_Strict):
-    verified_by_name: PersonName
-    verified_license: ProfessionalReference
+    """Verifica CONTADOR AI contra la constancia de RUC (D-120): número o fecha de la constancia."""
+
     verified_document_reference: ProfessionalReference
 
 

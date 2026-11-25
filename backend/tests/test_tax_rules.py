@@ -9,7 +9,9 @@ import yaml
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.verification import source_reference
 from app.modules.tax import candidate_rules, rules
+from tests.accounting_utils import error_code
 from tests.conftest import BACKEND_DIR, auth_header
 from tests.finance_utils import audit_entries, ok
 from tests.tax_utils import TAX, load_rules, org_id, rejected, rules_by_code, setup_tax, user_id
@@ -138,7 +140,7 @@ def test_trigger_blocks_edits_transitions_and_deletes(
     # pending → verified (por la API), y verified → pending no.
     res = client.post(
         f"{TAX}/rules/{rid}/verify",
-        json={"reviewed_by_name": "Contadora Prueba", "reviewed_reference": "Mat. 1234"},
+        json={},
         headers=auth_header(owner_token),
     )
     assert ok(res)["validation_status"] == "verified"
@@ -214,39 +216,78 @@ def test_rule_in_force_at_a_date(client: TestClient, owner_token: str) -> None:
     assert "CAL-EXCEPCION-2026-11" not in {r["code"] for r in before}
 
 
-def test_verify_requires_name_and_license_and_permission(
+def test_tool_verifies_against_the_official_source_with_permission(
     client: TestClient, owner_token: str, make_user: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """D-120: verifica CONTADOR AI, sin nombre ni matrícula, y con `tax.verify`."""
     setup_tax(client, owner_token, monkeypatch, profile=False)
-    rid = rules_by_code(client, owner_token)["IVA-GENERAL-TASAS"]["id"]
+    rule = rules_by_code(client, owner_token)["IVA-GENERAL-TASAS"]
+    rid = rule["id"]
+    assert rule["verifiable"] is True and rule["unverifiable_reason"] is None
+    # Ya no se aceptan nombre ni matrícula.
     res = client.post(
         f"{TAX}/rules/{rid}/verify",
-        json={"reviewed_by_name": "Alguien"},
+        json={"reviewed_by_name": "Alguien", "reviewed_reference": "Mat. 1"},
         headers=auth_header(owner_token),
     )
-    assert res.status_code == 422
+    assert res.status_code == 422 and error_code(res) == "VALIDATION_ERROR"
     _, admin = make_user("admin")
-    res = client.post(
-        f"{TAX}/rules/{rid}/verify",
-        json={"reviewed_by_name": "Admin", "reviewed_reference": "Mat. 1"},
-        headers=auth_header(admin),
-    )
+    res = client.post(f"{TAX}/rules/{rid}/verify", json={}, headers=auth_header(admin))
     assert res.status_code == 403
     _, accountant = make_user("accountant")
     res = client.post(
-        f"{TAX}/rules/{rid}/verify",
-        json={
-            "reviewed_by_name": "Contadora",
-            "reviewed_reference": "Mat. 99",
-            "review_note": "OK",
-        },
-        headers=auth_header(accountant),
+        f"{TAX}/rules/{rid}/verify", json={"review_note": "OK"}, headers=auth_header(accountant)
     )
     body = ok(res)
-    assert body["reviewed_by_name"] == "Contadora"
-    assert body["reviewed_reference"] == "Mat. 99"
+    assert body["reviewed_by_name"] == "CONTADOR AI"
+    assert body["reviewed_reference"] == source_reference(rule["legal_reference"])
+    assert body["review_note"] == "OK"
+    assert body["verifiable"] is False  # ya no está pendiente
     entries = audit_entries(client, owner_token, "tax.rule_version")
     assert any(e["action"] == "tax.rule_version.verified" for e in entries)
+
+
+def test_rule_without_official_source_read_is_not_verifiable(
+    client: TestClient, owner_token: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Una regla sin la fuente oficial leída sigue `pending` (D-120, prompt maestro §8)."""
+    setup_tax(client, owner_token, monkeypatch, profile=False)
+    weak = [r for r in rules_by_code(client, owner_token).values() if not r["verifiable"]]
+    assert weak and all(r["confidence"] != "oficial_leida" for r in weak)
+    res = client.post(
+        f"{TAX}/rules/{weak[0]['id']}/verify", json={}, headers=auth_header(owner_token)
+    )
+    assert res.status_code == 422 and error_code(res) == "RULE_NOT_VERIFIABLE"
+    assert res.json()["error"]["details"]["code"] == weak[0]["code"]
+
+
+def test_bulk_verify_verifies_only_the_verifiable(
+    client: TestClient, owner_token: str, make_user: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """El clic único (D-120): verifica las pendientes con fuente leída e informa las demás."""
+    setup_tax(client, owner_token, monkeypatch, profile=False)
+    _, admin = make_user("admin")
+    url = f"{TAX}/rules/verify-verifiable"
+    assert client.post(url, headers=auth_header(admin)).status_code == 403
+
+    def listed() -> dict[str, dict[str, Any]]:
+        rows = ok(client.get(f"{TAX}/rules", headers=auth_header(owner_token)))
+        return {f"{r['code']} v{r['version']}": r for r in rows}
+
+    before = listed()
+    verifiable = {key for key, r in before.items() if r["verifiable"]}
+    pending = {key for key, r in before.items() if r["validation_status"] == "pending"}
+    assert verifiable and pending - verifiable
+    body = ok(client.post(url, headers=auth_header(owner_token)))
+    assert set(body["verified"]) == verifiable
+    assert {f"{r['code']} v{r['version']}" for r in body["left_pending"]} == pending - verifiable
+    assert all(r["reason"] for r in body["left_pending"])
+    for key, r in listed().items():
+        expected = "verified" if key in verifiable else before[key]["validation_status"]
+        assert r["validation_status"] == expected, key
+    # Repetir no cambia nada.
+    again = ok(client.post(url, headers=auth_header(owner_token)))
+    assert again["verified"] == [] and len(again["left_pending"]) == len(body["left_pending"])
 
 
 @pytest.mark.parametrize(

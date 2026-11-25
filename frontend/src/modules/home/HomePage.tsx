@@ -122,7 +122,7 @@ export function HomePage() {
                 >
                   {taxProfile.data?.current
                     ? `${IRE_REGIME_LABELS[taxProfile.data.current.ire_regime]}, ${taxProfile.data.current.obligations.length} obligaciones. ${
-                        taxProfile.data.current.origin === 'verified' ? 'Verificado por un contador.' : 'Declarado: falta que un contador lo verifique con la constancia de RUC.'
+                        taxProfile.data.current.origin === 'verified' ? 'Verificado contra la constancia de RUC.' : 'Declarado: falta verificarlo contra la constancia de RUC.'
                       }`
                     : 'Régimen, cierre del ejercicio y obligaciones, como figuran en la constancia de RUC. El sistema no asume impuestos ni vencimientos sin él.'}
                 </ChecklistItem>

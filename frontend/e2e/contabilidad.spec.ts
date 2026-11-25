@@ -63,7 +63,7 @@ test('plan de cuentas: se carga el propuesto y avisa que no está validado', asy
   await toast(page, 'Plan propuesto cargado: 173 cuentas, sin validar.')
 
   // El estado del plan siempre a la vista.
-  await expect(page.getByText('Plan de cuentas sin validar por un contador').first()).toBeVisible()
+  await expect(page.getByText('Plan de cuentas sin verificar contra la fuente oficial').first()).toBeVisible()
   await expect(page.getByText('173 cuentas, 122 imputables')).toBeVisible()
 
   // Búsqueda por código.
@@ -78,7 +78,7 @@ test('plan de cuentas: se carga el propuesto y avisa que no está validado', asy
 
   // Otras pantallas de contabilidad también avisan.
   await open(page, 'Asientos')
-  await expect(page.getByRole('note', { name: 'Estado del plan de cuentas' })).toContainText('sin validar')
+  await expect(page.getByRole('note', { name: 'Estado del plan de cuentas' })).toContainText('sin verificar contra la fuente oficial')
 })
 
 test('ejercicio 2026: se crea con sus 12 períodos mensuales', async ({ page }) => {
@@ -241,7 +241,7 @@ test.describe('con errores esperados de la API', () => {
     await expect(sheet.getByText('Servicio al exterior contable e2e')).toHaveCount(0)
     const journalTotals = page.getByRole('row').filter({ hasText: 'Totales del período' })
     await expect(journalTotals).toContainText('12.200.000')
-    await expect(sheet.getByText('Plan de cuentas sin validar por un contador').first()).toBeVisible()
+    await expect(sheet.getByText('Plan de cuentas sin verificar contra la fuente oficial').first()).toBeVisible()
 
     // Libro mayor del banco: saldo final 2.200.000 deudor.
     await page.getByRole('navigation', { name: 'Reportes contables' }).getByRole('link', { name: 'Libro mayor' }).click()
@@ -365,19 +365,18 @@ test('plan de cuentas: se agrega una subcuenta y se archiva (antes de validar el
   await expect(page.getByRole('button', { name: 'Desarchivar 1.01.01.04.09 BANCO - CUENTA E2E' })).toBeAttached()
 })
 
-test('validación del plan: el contador lo marca como validado con nombre y matrícula', async ({ page }) => {
+test('validación del plan: CONTADOR AI lo valida contra la RG 49/2014, sin nombre ni matrícula (D-120)', async ({ page }) => {
   await signIn(page, ACCOUNTANT.email, PASSWORD)
   await open(page, 'Plan de cuentas')
   await page.getByRole('button', { name: 'Marcar como validado' }).click()
   const dialog = page.getByRole('dialog')
-  await dialog.getByLabel('Nombre del contador').fill('Contadora Externa')
-  await dialog.getByLabel('Matrícula profesional').fill('MAT-1234')
+  await expect(dialog.getByLabel('Matrícula profesional')).toHaveCount(0)
   await dialog.getByRole('button', { name: 'Marcar como validado' }).click()
   await toast(page, 'Plan de cuentas marcado como validado.')
   await expect(page.getByRole('heading', { name: 'Plan de cuentas validado' })).toBeVisible()
-  await expect(page.getByText(/Lo validó Contadora Externa, matrícula MAT-1234/)).toBeVisible()
+  await expect(page.getByText(/Lo validó CONTADOR AI contra RG 49\/2014/)).toBeVisible()
   await open(page, 'Libros y balances')
-  await expect(page.getByText('Plan de cuentas sin validar por un contador')).toHaveCount(0)
+  await expect(page.getByText('Plan de cuentas sin verificar contra la fuente oficial')).toHaveCount(0)
 })
 
 test('cierre del ejercicio 2025: con los 12 meses cerrados se contabiliza la refundición', async ({ page }) => {

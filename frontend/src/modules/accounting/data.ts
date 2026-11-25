@@ -91,7 +91,7 @@ export function useAccountingPerms(): AccountingPerms {
     postReason: canPost
       ? ''
       : canManage
-        ? `Tu rol (${role}) prepara el plan y los borradores; contabilizar, revertir, cerrar períodos y validar el plan lo hace un propietario o el contador.`
+        ? `Tu rol (${role}) prepara el plan y los borradores; contabilizar, revertir, cerrar períodos y validar el plan lo hace el propietario.`
         : `Tu rol (${role}) puede consultar la contabilidad, pero no modificarla.`,
     manageReason: canManage ? '' : `Tu rol (${role}) puede consultar la contabilidad, pero no modificarla.`,
   }

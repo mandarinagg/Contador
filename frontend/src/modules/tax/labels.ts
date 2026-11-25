@@ -1,4 +1,4 @@
-/** Textos de la tributación: nombres de obligaciones, estados, tipos y las dudas abiertas para el contador. */
+/** Textos de la tributación: nombres de obligaciones, estados, tipos y las dudas abiertas de la investigación. */
 import type { Condition, DocType, Direction, IreRegime, VoucherType } from './types'
 
 /** Obligaciones que genera el sistema (regla → nombre, D-085). */

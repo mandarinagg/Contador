@@ -1,7 +1,8 @@
 """Perfil fiscal versionado (D-083, BR-TAX-04).
 
-- Lo declara el propietario (`origin = declared`) y lo verifica el contador con la
-  constancia de RUC (`verified`: nombre, matrícula y referencia del documento, D-094).
+- Lo declara el propietario (`origin = declared`) y lo verifica CONTADOR AI contra la
+  constancia de RUC (`verified`, D-094, D-120): quién verificó, la fuente y la referencia de
+  la constancia; el usuario que aprobó queda en `verified_by`.
 - Cada versión rige desde su `valid_from`. Una versión nueva con la misma fecha que una
   declarada la **corrige** (queda auditado el antes y el después); si esa versión ya está
   verificada, no cambia (409): se carga otra con otra fecha.
@@ -21,6 +22,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError, Conflict, NotFound
+from app.core.verification import PROFILE_SOURCE, TOOL_VERIFIER
 from app.modules.organizations.models import Organization
 from app.modules.tax.common import flush_translated, jsonable, now, record, snapshot
 from app.modules.tax.models import Profile, ProfileObligation
@@ -176,8 +178,6 @@ def verify(
     actor_id: uuid.UUID,
     profile_id: uuid.UUID,
     *,
-    verified_by_name: str,
-    verified_license: str,
     verified_document_reference: str,
 ) -> ProfileVersion:
     profile = db.scalar(
@@ -191,8 +191,8 @@ def verify(
         raise Conflict("PROFILE_VERIFIED", "Esta versión del perfil ya está verificada.")
     before = snapshot(profile, VERIFICATION_FIELDS)
     profile.origin = "verified"
-    profile.verified_by_name = verified_by_name
-    profile.verified_license = verified_license
+    profile.verified_by_name = TOOL_VERIFIER
+    profile.verified_license = PROFILE_SOURCE
     profile.verified_document_reference = verified_document_reference
     profile.verified_at = now()
     profile.verified_by = actor_id

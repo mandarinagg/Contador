@@ -22,7 +22,7 @@ export function UnverifiedMark({ status, className, label = 'Sin verificar' }: {
   return (
     <span
       className={cx('inline-flex items-center gap-1 rounded-sm bg-amber-soft px-1.5 py-0.5 text-xs font-medium text-amber', className)}
-      title="Depende de reglas que ningún contador verificó todavía: no es un dato oficial."
+      title="Depende de reglas que todavía no se verificaron contra la fuente oficial: no es un dato oficial."
     >
       <ShieldAlert size={12} aria-hidden />
       {status === 'deprecated' ? 'Regla deprecada' : label}
@@ -71,14 +71,14 @@ export function RulesApplied({ rules, byId, summary = 'Regla y norma' }: { rules
   )
 }
 
-/** Duda abierta de la investigación (D-F4-x): se muestra donde afecta, para que el contador la resuelva. */
+/** Duda abierta de la investigación (D-F4-x): se muestra donde afecta, hasta que se resuelva contra la norma (D-118). */
 export function DoubtNote({ codes, className }: { codes: string[]; className?: string }) {
   if (codes.length === 0) return null
   return (
     <details className={cx('group text-sm', className)}>
       <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded-sm font-medium text-amber hover:underline [&::-webkit-details-marker]:hidden">
         <HelpCircle size={13} aria-hidden />
-        Duda abierta para el contador ({codes.join(', ')})
+        Duda abierta ({codes.join(', ')})
       </summary>
       <ul className="mt-1 flex flex-col gap-1 pl-4 text-ink-2">
         {codes.map((c) => (
@@ -171,8 +171,9 @@ export function ReasonForm({
 }
 
 /**
- * Verificación profesional (BR-TAX-12): nombre y matrícula del contador, y una tercera
- * referencia (nota o constancia de RUC).
+ * Verificación por CONTADOR AI (BR-TAX-12, D-118, D-120): no hay contador ni matrícula. Verifica
+ * la herramienta contra la fuente oficial; quien hace clic aprueba y queda en la auditoría. Un solo
+ * dato opcional u obligatorio: la nota de la regla o la referencia de la constancia de RUC.
  */
 export function VerifyForm({
   intro,
@@ -188,36 +189,23 @@ export function VerifyForm({
   thirdHint: string
   thirdRequired: boolean
   submit: string
-  onSubmit: (v: { name: string; license: string; third: string }) => Promise<unknown>
+  onSubmit: (v: { third: string }) => Promise<unknown>
   onCancel: () => void
 }) {
-  const [name, setName] = useState('')
-  const [license, setLicense] = useState('')
   const [third, setThird] = useState('')
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [error, setError] = useState<string | undefined>()
   const run = useMutation({ mutationFn: onSubmit })
   const send = (e: FormEvent) => {
     e.preventDefault()
-    const next: Record<string, string> = {}
-    if (name.trim().length < 3) next.name = 'Escribí el nombre completo de quien verifica.'
-    if (license.trim().length < 2) next.license = 'La matrícula es obligatoria: la verificación es un acto profesional.'
-    if (thirdRequired && third.trim().length < 2) next.third = 'Indicá la referencia del documento.'
-    setErrors(next)
-    if (Object.keys(next).length === 0) run.mutate({ name: name.trim(), license: license.trim(), third: third.trim() })
+    const missing = thirdRequired && third.trim().length < 2
+    setError(missing ? 'Indicá la referencia del documento.' : undefined)
+    if (!missing) run.mutate({ third: third.trim() })
   }
   return (
     <form onSubmit={send} className="flex flex-col gap-4" noValidate>
       <div className="text-ink-2">{intro}</div>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Nombre del contador" error={errors.name}>
-          {(p) => <Input {...p} autoFocus value={name} onChange={(e) => setName(e.target.value)} />}
-        </Field>
-        <Field label="Matrícula profesional" error={errors.license} hint="Número de registro del Colegio de Contadores o de la DNIT.">
-          {(p) => <Input {...p} value={license} onChange={(e) => setLicense(e.target.value)} />}
-        </Field>
-      </div>
-      <Field label={thirdLabel} hint={thirdHint} error={errors.third}>
-        {(p) => <Input {...p} value={third} onChange={(e) => setThird(e.target.value)} />}
+      <Field label={thirdLabel} hint={thirdHint} error={error}>
+        {(p) => <Input {...p} autoFocus value={third} onChange={(e) => setThird(e.target.value)} />}
       </Field>
       <ApiErrorNotice error={run.error} />
       <div className="flex justify-end gap-2 border-t border-line pt-4">

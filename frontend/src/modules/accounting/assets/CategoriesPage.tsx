@@ -111,12 +111,12 @@ function CategoryForm({ category, onDone }: { category?: AssetCategory; onDone: 
       <Field label="Cuenta de gasto" hint="De gasto (por ejemplo 15.01 Depreciaciones del ejercicio).">
         {(p) => <LedgerAccountSelect {...p} accounts={accountsFor(accounts, 'expense')} kinds={['expense']} value={expense} onChange={setExpense} empty="Sin cuenta" />}
       </Field>
-      <Field label="Nota" hint="Opcional: qué bienes incluye o qué decidió el contador.">
+      <Field label="Nota" hint="Opcional: qué bienes incluye o por qué se eligió esta vida útil.">
         {(p) => <Textarea {...p} maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} />}
       </Field>
       {category?.validation_status === 'validated' && structural && (
         <Notice tone="warn" title="La categoría va a volver a «sin validar»">
-          Cambiar la vida útil, el residual o las cuentas de una categoría validada la devuelve a pendiente: la tiene que validar de nuevo un contador.
+          Cambiar la vida útil, el residual o las cuentas de una categoría validada la devuelve a pendiente: hay que validarla de nuevo.
         </Notice>
       )}
       <div className="flex justify-end gap-2 border-t border-line pt-4">
@@ -134,13 +134,9 @@ function CategoryForm({ category, onDone }: { category?: AssetCategory; onDone: 
 function ValidateForm({ category, onDone }: { category: AssetCategory; onDone: () => void }) {
   const toast = useToast()
   const invalidate = useInvalidateAccounting()
-  const [name, setName] = useState('')
-  const [ref, setRef] = useState('')
-  const [touched, setTouched] = useState(false)
-  const nameBad = name.trim().length < 3
-  const refBad = ref.trim().length < 2
+  const sourceless = !category.source_url || !category.legal_reference || !category.citation
   const run = useMutation({
-    mutationFn: () => post<AssetCategory>(`/accounting/asset-categories/${category.id}/validate`, { validated_by_name: name.trim(), validated_reference: ref.trim() }),
+    mutationFn: () => post<AssetCategory>(`/accounting/asset-categories/${category.id}/validate`),
     onSuccess: (c) => {
       invalidate()
       toast('ok', `Categoría «${c.name}» validada.`)
@@ -153,26 +149,25 @@ function ValidateForm({ category, onDone }: { category: AssetCategory; onDone: (
       noValidate
       onSubmit={(e) => {
         e.preventDefault()
-        setTouched(true)
-        if (!nameBad && !refBad) run.mutate()
+        run.mutate()
       }}
     >
       <p className="text-ink-2">
-        Validar dice que un contador revisó la vida útil ({category.useful_life_months ? monthsText(category.useful_life_months) : '—'}), el residual (
-        {percentText(category.residual_rate)}) y las cuentas de «{category.name}» para esta empresa. Queda registrado con su nombre y matrícula.
+        CONTADOR AI valida la vida útil ({category.useful_life_months ? monthsText(category.useful_life_months) : '—'}), el residual (
+        {percentText(category.residual_rate)}) y las cuentas de «{category.name}» contra la norma que cita la categoría ({category.legal_reference ?? 'sin referencia'}).
+        Tu aprobación queda en la auditoría.
       </p>
+      {sourceless && (
+        <Notice tone="warn" title="Sin fuente oficial">
+          Una categoría sin la URL, la referencia legal y la cita de la norma no se puede validar: queda sin validar.
+        </Notice>
+      )}
       {run.error ? <ApiErrorNotice error={run.error} /> : null}
-      <Field label="Nombre del contador" error={touched && nameBad ? 'Escribí nombre y apellido.' : undefined}>
-        {(p) => <Input {...p} autoFocus maxLength={150} value={name} onChange={(e) => setName(e.target.value)} />}
-      </Field>
-      <Field label="Matrícula profesional" error={touched && refBad ? 'Escribí la matrícula.' : undefined}>
-        {(p) => <Input {...p} maxLength={100} value={ref} onChange={(e) => setRef(e.target.value)} />}
-      </Field>
       <div className="flex justify-end gap-2 border-t border-line pt-4">
         <Button type="button" variant="ghost" onClick={onDone}>
           Cancelar
         </Button>
-        <Button type="submit" busy={run.isPending}>
+        <Button type="submit" busy={run.isPending} disabled={sourceless}>
           <BadgeCheck size={15} />
           Validar la categoría
         </Button>
@@ -373,7 +368,7 @@ export function AssetCategoriesPage() {
           >
             Cada bien se deprecia según su categoría: vida útil, valor residual y las tres cuentas (bien, depreciación acumulada y gasto). Las propuestas
             salen de la tabla del Decreto 3182/2019, art. 31, con la redacción del Decreto 6105/2021 (vigente desde el 14-10-2021), y se cargan{' '}
-            <strong className="font-semibold">sin validar</strong>: un contador tiene que revisarlas antes de que la depreciación sea un dato firme.
+            <strong className="font-semibold">sin validar</strong>: CONTADOR AI las valida contra la norma, con tu aprobación, para que la depreciación sea un dato firme.
           </EmptyState>
         </Sheet>
       ) : (
@@ -523,7 +518,7 @@ export function AssetCategoriesPage() {
                             )}
                             {c.validation_status === 'validated' && (
                               <p className="mt-1 text-ink-2">
-                                Validada por {c.validated_by_name} (matrícula {c.validated_reference}){c.validated_at ? `, el ${formatDateTime(c.validated_at)}` : ''}.
+                                Validada por {c.validated_by_name} contra {c.validated_reference}{c.validated_at ? `, el ${formatDateTime(c.validated_at)}` : ''}.
                               </p>
                             )}
                           </td>

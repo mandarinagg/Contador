@@ -122,11 +122,6 @@ class ChartOut(SettingsOut):
     accounts: list[LedgerAccountOut]
 
 
-class ChartValidate(_Strict):
-    validated_by_name: PersonName
-    validated_reference: ProfessionalReference
-
-
 class SettingsUpdate(_Strict):
     """Solo cambian los campos que llegan."""
 
