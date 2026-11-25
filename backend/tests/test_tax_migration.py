@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -189,5 +190,6 @@ def test_downgrade_refuses_to_lose_vouchers_or_filed_obligations(
     # Anulado igual cuenta: la bajada no lo borra.
     with pytest.raises(RuntimeError, match=r"hay 1 comprobantes"):
         command.downgrade(cfg, "0004")
-    assert _scalar(engine, "SELECT version_num FROM alembic_version") == "0006"  # sigue en head
+    head = ScriptDirectory.from_config(cfg).get_current_head()
+    assert _scalar(engine, "SELECT version_num FROM alembic_version") == head  # sigue en head
     assert _scalar(engine, "SELECT count(*) FROM tax.vouchers") == 1

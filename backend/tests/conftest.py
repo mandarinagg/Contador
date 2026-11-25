@@ -11,6 +11,11 @@ from typing import Any
 
 os.environ["CONTADOR_ENV"] = "test"
 os.environ.setdefault("CONTADOR_LOG_LEVEL", "WARNING")
+# Bot de Marangatu: navegador sin ventana y almacén de credenciales de prueba (un archivo por
+# prueba, `CONTADOR_TEST_KEYRING_FILE`), nunca el del sistema. Lo hereda el trabajador.
+os.environ.setdefault("CONTADOR_MARANGATU_HEADLESS", "true")
+os.environ["PYTHON_KEYRING_BACKEND"] = "tests.marangatu_fake.keyring_file.FileKeyring"
+os.environ.pop("CONTADOR_TEST_KEYRING_FILE", None)
 
 import pytest
 from alembic import command

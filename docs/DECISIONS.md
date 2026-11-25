@@ -320,3 +320,44 @@ Detalle en `docs/specs/FASE4_TRIBUTACION.md`.
   - No hay servicio web oficial para presentar declaraciones juradas.
   - La RG 04/2007 (la clave) no se pudo leer: el PDF es un escaneo.
 
+
+## D-127 a D-133 — Bot de Marangatu, B1 (la base), 2026-11-25
+
+Spec: `docs/specs/BOT_MARANGATU.md` §10, paso 1. Catálogo **provisorio** (pantallas del portal simulado) hasta el reconocimiento real.
+
+- **D-127 — El trabajador es otro proceso y no toca la base.** **Aceptada · 2026-11-25.**
+  - El backend le pasa el trabajo en una línea JSON por la entrada; el trabajador contesta con una línea JSON por paso y una al final. Su salida de errores va a `<datos>/logs/marangatu-<corrida>.log`.
+  - El backend escribe los pasos y calcula él mismo el SHA-256 de cada captura. El trabajador no tiene credenciales de la base.
+  - Arranque: `python -m app.modules.marangatu.worker` en desarrollo; en el ejecutable de PyInstaller (sin `python -m`), el backend se relanza a sí mismo con `contador-backend.exe marangatu-worker`, que `app/__main__.py` desvía al trabajador.
+  - El supervisor corre en un hilo del backend con un límite (el del trabajo más 60 s) y al vencer mata el árbol entero: grupo de procesos en Linux, `taskkill /T` en Windows. La API sigue respondiendo.
+  - Una sola corrida en curso por organización (índice único parcial). Si al lanzar otra hay una `en_curso` que nadie atiende (la app se cerró), queda `detenida` con `BROWSER_ERROR`.
+- **D-128 — La clave, en el almacén de credenciales del sistema.** **Aceptada · 2026-11-25.**
+  - Entrada `ContadorAI/Marangatu/<RUC>`, usuario: el RUC sin DV. Hace falta el RUC de la empresa (409 `ORGANIZATION_WITHOUT_RUC`).
+  - En Windows se usa explícitamente el Administrador de credenciales (`WinVaultKeyring`), sin depender del descubrimiento de backends de `keyring` en el ejecutable. `PYTHON_KEYRING_BACKEND` manda si está definida: las pruebas la usan para un almacén en archivo que comparten con el trabajador.
+  - La API solo guarda, borra e informa si hay clave. El cuerpo es `SecretStr`; el registro de pedidos ya anotaba solo método, ruta y estado, y los errores de validación no repiten lo enviado. Los errores del almacén salen sin el texto original (503 `CREDENTIAL_STORE_UNAVAILABLE`).
+  - Segunda defensa: el paso que llena el campo de la clave siempre queda con `[oculta]`, aunque el trabajador mandara otra cosa.
+- **D-129 — El clic final no se puede ejecutar en el B1.** **Aceptada · 2026-11-25.**
+  - `final` va en la acción `clic` del catálogo (la spec lo mostraba en la pantalla).
+  - `catalog.FINAL_ACTIONS_ENABLED = False`: el clic final se niega en **toda** etapa, también `habilitada`, y la corrida se detiene con `NOT_ENABLED`. Se habilita recién con la tarea que presenta y las 12 condiciones de la D-119.
+  - Las etapas de cada tipo de tarea se ven pero no se cambian por la API en el B1: todas empiezan en `reconocimiento`.
+- **D-130 — Permisos del bot: los de tributación.** **Aceptada · 2026-11-25.** Sin permisos ni migración de permisos nuevos.
+  - Leer (interruptor, estado de la clave, corridas, pasos, capturas, verificación): `tax.read`.
+  - Apagar el bot: `tax.manage` (frenar siempre es seguro).
+  - Encender el bot, guardar o borrar la clave y lanzar un reconocimiento: `tax.verify`, porque entra a Marangatu con la clave del contribuyente. El administrador no puede (como en la D-094).
+- **D-131 — Capturas y archivos en la carpeta de datos de la app.** **Aceptada · 2026-11-25.**
+  - La app todavía no tiene almacén de documentos (fase 6). Van a `<datos>/documentos/marangatu/<corrida>/`; el paso guarda la ruta relativa a `<datos>` y el SHA-256.
+  - `<datos>` es `CONTADOR_DATA_DIR`; el lanzador ahora se la pasa al backend. Sin ella, la misma que calcula el lanzador (`%LOCALAPPDATA%\ContadorAI` en Windows).
+  - La API entrega una captura solo si su SHA-256 sigue siendo el registrado (409 `CAPTURE_MODIFIED`).
+  - **Pendiente:** la copia de seguridad diaria guarda la base, no esta carpeta.
+- **D-132 — Reconocimiento: cómo reconoce y por dónde camina.** **Aceptada · 2026-11-25.**
+  - Una pantalla coincide si está todo lo que pide (URL por expresión regular, título contenido, textos, selectores). Si coincide una que `detiene`, gana; si coinciden varias normales, es desconocida.
+  - El ingreso tiene que seguir el catálogo paso a paso: lo desconocido detiene (`UNKNOWN_SCREEN`), y el captcha (por el catálogo o por señales genéricas como `.g-recaptcha`) detiene **antes** de escribir la clave. Un solo intento.
+  - En el recorrido, una pantalla desconocida no detiene: es lo que se viene a conocer. Solo se siguen `<a href>` del mismo sitio abriendo su dirección (nunca un clic), con una lista negra de palabras (presentar, enviar, confirmar, pagar, firmar, aceptar, guardar, eliminar, anular, cambiar, cargar, salir…), sin descargas ni `javascript:`/`#`. Los diálogos del sitio se descartan y las descargas se rechazan.
+  - Límite: los menús que solo funcionan con JavaScript (`href="#"`) se registran pero no se siguen. Si el portal real los usa, el reconocimiento real lo va a mostrar y hará falta abrirlos con una acción del catálogo.
+  - El borrador del catálogo sale en YAML: PyYAML pasa de dependencia de pruebas a dependencia del backend.
+- **D-133 — Registro del bot: cadena en la base, corridas fijas.** **Aceptada · 2026-11-25.**
+  - `marangatu.steps` es una sola cadena para todos los pasos, calculada por un disparador (como `audit.audit_logs`): una fila tocada o borrada a mano rompe la cadena desde ahí. UPDATE, DELETE y TRUNCATE se rechazan.
+  - `marangatu.runs`: no se borran; mientras está en curso solo cambia el resultado y, una vez terminada, nada.
+  - Lo que se revisa sin navegador (bot apagado, sin clave, sin RUC) también deja una corrida `detenida` con su paso «preparar»: queda registro de que se intentó.
+  - El reconocimiento general es una corrida de tipo `general` (solo en la etapa `reconocimiento`). Resultados: `en_curso`, `completada`, `detenida`, `incierta`.
+  - `GET /marangatu/verify` recorre la cadena y además vuelve a calcular el SHA-256 de cada archivo.

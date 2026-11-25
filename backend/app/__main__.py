@@ -5,6 +5,10 @@
 
 La app de escritorio (Tauri) lanza este proceso y le pasa la configuración por
 variables de entorno `CONTADOR_*`.
+
+Con el argumento `marangatu-worker` arranca, en cambio, el trabajador del bot de Marangatu
+(D-127): el ejecutable empaquetado no tiene `python -m`, así que el backend se relanza a sí
+mismo con ese argumento.
 """
 
 import logging
@@ -17,6 +21,7 @@ from alembic.config import Config
 
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.modules.marangatu.protocol import WORKER_ARG
 
 logger = logging.getLogger("contador.launcher")
 
@@ -36,6 +41,10 @@ def upgrade_database(url: str) -> None:
 
 
 def main() -> None:
+    if len(sys.argv) > 1 and sys.argv[1] == WORKER_ARG:
+        from app.modules.marangatu.worker import main as worker_main
+
+        sys.exit(worker_main())
     settings = get_settings()
     configure_logging(settings.log_level)
     import psycopg

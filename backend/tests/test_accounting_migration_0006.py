@@ -7,6 +7,7 @@ cargada (mismo criterio que la 0004 y la 0005, D-080).
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -44,7 +45,8 @@ def test_0006_is_reversible_and_keeps_authorizations(
     new_asset(api, books, fiscal_useful_life_months=96, fiscal_life_authorization="CV 800")
     with pytest.raises(RuntimeError, match=r"1 bien\(es\) tienen una autorización"):
         command.downgrade(cfg, "0005")
-    assert _version(engine) == "0006"
+    # Sigue en head: la bajada entera se revierte.
+    assert _version(engine) == ScriptDirectory.from_config(cfg).get_current_head()
     with engine.connect() as conn:
         assert conn.scalar(
             text("SELECT fiscal_life_authorization FROM accounting.fixed_assets")

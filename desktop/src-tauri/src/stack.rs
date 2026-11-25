@@ -344,6 +344,8 @@ fn spawn_backend(config: &StackConfig, password: &str, log: &Path) -> Result<Chi
         )
         .env("CONTADOR_API_HOST", "127.0.0.1")
         .env("CONTADOR_API_PORT", config.api_port.to_string())
+        // Documentos (capturas del bot de Marangatu) y registros, junto a la base.
+        .env("CONTADOR_DATA_DIR", &config.data_dir)
         .stdin(Stdio::null())
         .stdout(out)
         .stderr(err)

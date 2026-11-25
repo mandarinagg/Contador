@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Marangatu - Obligaciones</title></head>
+<body>
+  <h1>Consulta de obligaciones</h1>
+  <h2>Obligaciones pendientes</h2>
+  <table><tr><th>Obligación</th><th>Vencimiento</th></tr>
+    <tr><td>IVA General</td><td>07/12/2026</td></tr></table>
+  <form method="post" action="/eset/presentar">
+    <label for="periodo">Período</label> <input id="periodo" name="periodo" value="11/2026">
+    <select id="formulario" name="formulario"><option>120</option></select>
+    <input type="submit" id="presentar" value="Presentar">
+    <button id="buscar" type="button" onclick="location.href='/eset/presentar'">Buscar</button>
+  </form>
+  <a href="/eset/inicio">Volver al inicio</a>
+  <a id="salir" href="/eset/salir">Salir</a>
+</body></html>

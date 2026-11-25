@@ -16,6 +16,12 @@ dependencies = [
   "openpyxl==3.1.5",  # lectura de extractos XLSX (fase 2)
   "defusedxml==0.7.1",  # openpyxl lo usa solo: XML de los XLSX sin expansión de entidades
   "python-multipart==0.0.34",  # formularios multipart (subida de extractos)
+  # Bot de Marangatu (docs/specs/BOT_MARANGATU.md). Playwright maneja el navegador (en Windows,
+  # el Edge del sistema: no se empaqueta Chromium); keyring guarda la clave en el almacén de
+  # credenciales del sistema; PyYAML escribe el borrador del catálogo del reconocimiento.
+  "playwright==1.65.2",
+  "keyring==25.7.0",
+  "pyyaml==6.0.4",
 ]
 
 [project.optional-dependencies]
@@ -25,7 +31,7 @@ dev = [
   "ruff==0.17.6",
   "mypy==2.4.1",
   "types-openpyxl==3.1.5.20261122",  # tipos de openpyxl para mypy estricto
-  "pyyaml==6.0.4",  # solo pruebas: el plan empaquetado es idéntico al YAML de la investigación
+  "types-PyYAML==6.0.12.20261122",  # tipos de PyYAML para mypy estricto
 ]
 
 # Empaquetado del backend como ejecutable (ver docs/ARCHITECTURE.md § Distribución).
@@ -64,6 +70,7 @@ ignore = [
 "app/modules/accounting/proposed_asset_categories.py" = ["E501"]  # generado desde el YAML
 "app/modules/tax/candidate_rules.py" = ["E501", "RUF001"]  # generado desde el YAML
 "app/modules/tax/candidate_holidays.py" = ["E501", "RUF001"]  # generado desde el YAML
+"app/modules/marangatu/pantallas.py" = ["E501", "RUF001"]  # generado desde el YAML
 
 [tool.mypy]
 python_version = "3.12"

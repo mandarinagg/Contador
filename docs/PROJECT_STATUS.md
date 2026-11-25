@@ -99,7 +99,7 @@
 | P-10 | ~~Los asientos traen el id de quien creó/contabilizó, no el nombre~~ | **Resuelto**: en la API (`test_accounting_entry_user_names.py`) y en la interfaz (asiento y libro diario, sin leer `/users`) |
 
 ## Decisiones tomadas en esta sesión
-D-001 a D-126 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requiere tu confirmación.**
+D-001 a D-133 en `DECISIONS.md` (D-127 a D-133: el B1 del bot de Marangatu). **D-007 (facturación como servicio Node) requiere tu confirmación.**
 
 ## Información requerida del propietario
 1. **Confirmar D-007**: reutilizar el núcleo SIFEN como servicio Node (recomendado) en lugar de portarlo a Python.
@@ -165,14 +165,10 @@ D-001 a D-126 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 **Entorno local:** Postgres de desarrollo en el proyecto docker `contador` (127.0.0.1:55433). Para probar el lanzador sin `sudo` se usan los binarios de PostgreSQL 18 de Ubuntu (`apt download` + `dpkg-deb -x`, con `LD_LIBRARY_PATH`) y las variables `CONTADOR_TEST_PGSQL_BIN` y `CONTADOR_TEST_BACKEND_EXE`. E2E en paralelo con otra corrida: `CONTADOR_E2E_DB_NAME`, `CONTADOR_E2E_API_PORT` y `CONTADOR_E2E_WEB_PORT`.
 
 ## Próximo objetivo recomendado
-- **Construir el B1 del bot de Marangatu** (`docs/specs/BOT_MARANGATU.md` §10):
-  - el módulo `marangatu`, con sus tablas y su migración;
-  - las credenciales con `keyring`;
-  - el trabajador con Playwright (Edge del sistema en Windows);
-  - el motor del catálogo de pantallas;
-  - el registro solo para agregar, con cadena de hashes;
-  - el interruptor general;
-  - el portal simulado;
-  - el modo reconocimiento.
+- **B1 del bot de Marangatu: hecho en el backend (D-127 a D-133), sin interfaz todavía.**
+  - Módulo `backend/app/modules/marangatu/`, migración `0007_marangatu`, API `/api/v1/marangatu` (interruptor, clave, reconocimiento, corridas, pasos, capturas, verificación).
+  - Trabajador en otro proceso (`contador-backend.exe marangatu-worker` en el instalador), Playwright con el Edge del sistema en Windows, clave en el Administrador de credenciales.
+  - Catálogo **provisorio** (`docs/research/marangatu_pantallas.yaml`, regenerar la copia con `scripts/generar_pantallas_marangatu.py`) y portal simulado en `backend/tests/marangatu_fake/`.
+  - Falta: la pantalla Impuestos → Marangatu en la interfaz; incluir `<datos>/documentos` en la copia de seguridad (D-131).
 - **Hacer el reconocimiento real con el propietario en su PC.** Hace falta para escribir el catálogo: hoy no se conocen las pantallas por dentro.
 - **Instalar en la PC real del propietario** (cierra la fase 1B). Sirve para el reconocimiento.

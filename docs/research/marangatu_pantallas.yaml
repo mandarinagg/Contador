@@ -1,0 +1,91 @@
+# Catálogo de pantallas de Marangatu (docs/specs/BOT_MARANGATU.md §3).
+#
+# ⚠ PROVISORIO. Hoy no se conocen las pantallas reales de Marangatu por dentro: estas son las
+# del portal simulado (backend/tests/marangatu_fake/), armadas con lo poco que dicen las guías
+# de la DNIT (usuario = RUC sin DV, clave, captcha al tercer intento fallido). Se reemplazan
+# con el borrador que deja el reconocimiento real (spec §10, paso 2), revisado a mano.
+#
+# La copia empaquetada es backend/app/modules/marangatu/pantallas.py: una prueba controla que
+# sean idénticas (si este archivo cambia, hay que regenerar la copia).
+#
+# Formato de cada pantalla:
+#   id, version              identificador estable; version + 1 cuando el portal cambia.
+#   provisoria               true hasta confirmarla en el portal real.
+#   reconoce                 TODO lo que figura tiene que estar, si no, es pantalla desconocida:
+#     url                    expresión regular que se busca en la URL;
+#     titulo                 texto que contiene el título de la página;
+#     textos                 textos que aparecen en la página;
+#     campos                 selectores CSS que existen en la página.
+#   detiene                  (opcional) código de detención: si el bot ve esta pantalla, se
+#                            detiene con ese motivo (gana sobre cualquier otra que coincida).
+#   acciones                 lo único que el bot puede hacer en esta pantalla:
+#     llenar: {dato, campo}  escribe un dato (`usuario`, `clave`; después, casillas);
+#     clic: {boton, campo, va_a, final}
+#                            `va_a`: pantallas a las que puede llevar; `final: true` solo para
+#                            el clic que presenta (en el B1 no se ejecuta nunca).
+#   capturada_en             fecha del reconocimiento que la registró (null: simulada).
+meta:
+  formato: 1
+  provisorio: true
+  aviso: "PROVISORIO: pantallas del portal simulado; reemplazar tras el reconocimiento real."
+  actualizado: "2026-11-25"
+  ingreso: login
+  inicio: inicio
+  # Enlace para salir de Marangatu desde cualquier pantalla con la sesión abierta.
+  salida:
+    campo: "#salir"
+    texto: "Salir"
+pantallas:
+  - id: login
+    version: 1
+    provisoria: true
+    reconoce:
+      url: "/eset/login"
+      titulo: "Marangatu"
+      textos: ["Ingreso al sistema", "Usuario", "Contraseña"]
+      campos: ["#usuario", "#clave", "#ingresar"]
+    acciones:
+      - llenar: {dato: usuario, campo: "#usuario"}
+      - llenar: {dato: clave, campo: "#clave"}
+      - clic:
+          boton: "Ingresar"
+          campo: "#ingresar"
+          va_a: [inicio, login_fallido, login_captcha]
+          final: false
+    capturada_en: null
+  - id: login_fallido
+    version: 1
+    provisoria: true
+    detiene: LOGIN_FAILED
+    reconoce:
+      url: "/eset/login"
+      textos: ["Usuario o contraseña incorrectos"]
+    acciones: []
+    capturada_en: null
+  - id: login_captcha
+    version: 1
+    provisoria: true
+    detiene: CAPTCHA
+    reconoce:
+      url: "/eset/login"
+      textos: ["No soy un robot"]
+    acciones: []
+    capturada_en: null
+  - id: inicio
+    version: 1
+    provisoria: true
+    reconoce:
+      url: "/eset/inicio"
+      titulo: "Marangatu"
+      textos: ["Menú principal"]
+      campos: ["#salir"]
+    acciones: []
+    capturada_en: null
+  - id: sesion_cerrada
+    version: 1
+    provisoria: true
+    reconoce:
+      url: "/eset/salir"
+      textos: ["Sesión finalizada"]
+    acciones: []
+    capturada_en: null

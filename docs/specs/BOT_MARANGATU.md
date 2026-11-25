@@ -1,6 +1,7 @@
 # Bot de Marangatu: diseño (D-119, D-126)
 
-Estado: **diseño, 2026-11-25.** Investigación previa en `docs/research/BOT_MARANGATU.md`.
+Estado: **diseño, 2026-11-25; B1 (la base) construido** (D-127 a D-133). Investigación previa en
+`docs/research/BOT_MARANGATU.md`.
 
 ## 1. Qué hace
 
@@ -31,7 +32,7 @@ Lo que **no** hace:
 | Pieza | Dónde | Qué hace |
 |---|---|---|
 | Motor | `backend/app/modules/marangatu/` (módulo nuevo) | Tareas, condiciones, catálogo de pantallas y registro. |
-| Trabajador | Proceso aparte (`python -m app.modules.marangatu.worker`), lanzado por el backend | Maneja el navegador. Si se cuelga o se cae, no tumba la API. |
+| Trabajador | Proceso aparte (`python -m app.modules.marangatu.worker`; en el ejecutable empaquetado, `contador-backend.exe marangatu-worker`), lanzado por el backend (D-127) | Maneja el navegador. Si se cuelga o se cae, no tumba la API. No toca la base: cuenta los pasos en líneas JSON y el backend los escribe. |
 | Navegador | Playwright para Python. En Windows, el **Microsoft Edge** del sistema (`channel="msedge"`), que Windows 11 trae siempre, así que no se empaquetan 150 MB de Chromium. En Linux y en el CI, el Chromium de Playwright. | Ventana visible por defecto (la persona ve lo que hace). Sin ventana solo en las pruebas. |
 | Credenciales | Almacén de credenciales de Windows (DPAPI, por usuario) con `keyring`. Entrada `ContadorAI/Marangatu/<RUC>`. | El backend solo informa si hay clave guardada. Nunca la devuelve. No va al repositorio, la base, la auditoría ni los registros. |
 | Catálogo de pantallas | `docs/research/marangatu_pantallas.yaml`, con su copia empaquetada (`pantallas.py`) y la prueba de igualdad, como las reglas | Cada pantalla conocida y lo que se puede hacer en ella. |
@@ -56,17 +57,21 @@ Cada pantalla del catálogo tiene:
 ```yaml
 - id: f120_casillas_debito
   version: 1
+  provisoria: true     # hasta confirmarla en el portal real
   reconoce:            # todo tiene que estar; si falta algo, pantalla desconocida
-    url: "/eset/.../formulario"        # patrón
-    titulo: "Formulario 120"
+    url: "/eset/.../formulario"        # expresión regular que se busca en la URL
+    titulo: "Formulario 120"           # el título de la página lo contiene
     textos: ["Rubro 1", "Casilla 10"]
     campos: ["#casilla10", "#casilla11"]
+  detiene: null        # o un código de §8: al ver esta pantalla, se detiene (gana sobre las demás)
   acciones:            # lo único que el bot puede hacer en esta pantalla
     - llenar: {casilla: 10, campo: "#casilla10"}
-    - clic: {boton: "Siguiente", va_a: f120_casillas_credito}
-  final: false         # true solo para el botón que presenta
+    - clic: {boton: "Siguiente", campo: "#siguiente", va_a: [f120_casillas_credito], final: false}
   capturada_en: "2026-12-..."   # cuándo se registró, en el reconocimiento
 ```
+
+- `final` va en la acción (`clic`), no en la pantalla: es `true` solo para el clic que presenta
+  (D-129). Si coinciden varias pantallas normales, es pantalla desconocida.
 
 - El bot solo avanza por las pantallas del catálogo y solo hace sus acciones (condición 7). Ante
   una pantalla, un texto, un mensaje o un error que no estén en el catálogo, **se detiene sin
@@ -77,6 +82,11 @@ Cada pantalla del catálogo tiene:
   - La primera corrida es un **reconocimiento** con la clave del propietario: ingresa, recorre los
     menús de consulta y abre los formularios, **sin llenar ni presentar nada**.
   - De cada pantalla guarda la captura y la estructura (títulos, campos, botones).
+  - En el recorrido solo sigue enlaces del mismo sitio, abriendo su dirección: nunca hace clic en
+    botones ni envía formularios, y salta los enlaces con palabras como «Presentar», «Enviar»,
+    «Confirmar» o «Pagar», las descargas y el de salir. Una pantalla desconocida no lo detiene en
+    el recorrido (es lo que viene a conocer), pero sí en el ingreso (D-132).
+  - Deja un borrador del catálogo (`catalogo_borrador.yaml`) para revisar a mano.
   - Con eso se escribe el catálogo y el portal simulado.
 - El portal puede cambiar sin aviso (Res. 568/2006, art. 13). Entonces se detiene, y el siguiente
   reconocimiento actualiza el catálogo (con `version` + 1).
@@ -145,12 +155,14 @@ diferencias** del mismo tipo, en períodos distintos. El propietario puede volve
 - Tablas `marangatu.runs` (corrida: tipo, período, etapa, resultado, motivo) y `marangatu.steps`
   (paso: hora, pantalla reconocida, acción, valores sin la clave, resultado y captura).
 - Las capturas y los archivos descargados se guardan en el almacén de documentos de la app, con su
-  SHA-256.
+  SHA-256. Mientras no exista ese almacén (fase 6), van a `<datos>/documentos/marangatu/<corrida>/`
+  y el paso guarda la ruta relativa y el SHA-256 (D-131).
 - **Solo agregar:** un disparador rechaza `UPDATE` y `DELETE` en `steps`, como en los asientos
   contabilizados.
 - Cada paso guarda el hash del anterior (cadena). Una verificación recorre la cadena y avisa si
   algo se modificó.
 - Se conservan durante la prescripción. La bajada de la migración se niega si hay corridas (D-080).
+- La verificación también vuelve a calcular el SHA-256 de cada archivo (D-133).
 
 ## 6. Guía paso a paso (D-126)
 

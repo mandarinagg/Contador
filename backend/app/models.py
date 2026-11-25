@@ -29,6 +29,7 @@ from app.modules.finance.models import (
     Transaction,
 )
 from app.modules.identity.models import PermissionRow, RolePermission, RoleRow, User, UserSession
+from app.modules.marangatu.models import BotSettings, Run, Step, TaskStage
 from app.modules.organizations.models import Organization, OrganizationMember
 from app.modules.tax.models import (
     DueDateException,
@@ -48,6 +49,7 @@ __all__ = [
     "AssetYearValue",
     "AuditLog",
     "Base",
+    "BotSettings",
     "Category",
     "CostCenter",
     "Counterparty",
@@ -76,7 +78,10 @@ __all__ = [
     "RolePermission",
     "RoleRow",
     "RuleVersion",
+    "Run",
     "SecurityEvent",
+    "Step",
+    "TaskStage",
     "TaxSettings",
     "Transaction",
     "User",
