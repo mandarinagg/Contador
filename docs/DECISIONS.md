@@ -270,4 +270,14 @@ Detalle en `docs/specs/FASE4_TRIBUTACION.md`.
   - Siguen `pending` `RUC-DV-MODULO11` (la DNIT no publica el algoritmo) y `PATENTE-MUNICIPAL` (falta el municipio).
   - Sigue abierta D-3: el IDU depende del estatuto de la EAS.
   - Firma de contador: la RG 77/2020 y la RG 50/2026 no la piden. La RG 110/2013 no se pudo leer. El único caso confirmado es el Decreto 3182, art. 58.
+- **D-122 — Verificación de CONTADOR AI, bloque 2: el IVA del Formulario 120.** **Aceptada · 2026-11-25.** Detalle y citas en `docs/research/TRIBUTACION_FASE4.md` §9.
+  - **El IVA del mes se calcula aplicando la tasa a la suma de las bases**, por tasa y redondeado a guaraníes. Así lo pide el instructivo del Formulario 120 v4, y lo usan el borrador, la estimación y la obligación. El control contra el mayor sigue comparando con el IVA de cada comprobante, que es lo contabilizado. Resuelve D-F4-7; queda sin regla escrita el redondeo de la mitad.
+  - Resueltas:
+    - D-F4-4: la nota de crédito recibida va en el débito y la emitida en el crédito.
+    - D-F4-6: 151/157 para el 5 %; compras directas salvo que haya operaciones exoneradas; la casilla 52 la carga el contribuyente.
+    - D-F4-5: el crédito va en el mes de emisión de la factura, según una consulta de la DNIT.
+    - D-F4-11: el sábado es inhábil (RG DNIT 60/2026, art. 1).
+    - D-F4-3: rige la RG 90/2021, art. 9.
+  - Las reglas `IVA-F120-ESTRUCTURA`, `IVA-CREDITO-REQUISITOS` y `CAL-DIA-INHABIL` pasan a versión 2, con la misma salvedad de la D-121 sobre las bases que ya tienen cargada la versión 1.
+  - El aviso de vencimientos sigue usando la fecha fija sin correr (D-098), porque falta D-F4-12 (feriados).
 

@@ -73,17 +73,13 @@ export const DOC_TYPE_LABELS: Record<DocType, string> = {
 
 export const CONDITION_LABELS: Record<Condition, string> = { cash: 'Contado', credit: 'Crédito' }
 
-/** Dudas abiertas de la investigación de la fase 4 (`docs/research/TRIBUTACION_FASE4.md` §6). */
+/** Dudas abiertas de la investigación de la fase 4 (`docs/research/TRIBUTACION_FASE4.md` §6). Las resueltas (D-122) ya no se muestran. */
 export const DOUBTS: Record<string, string> = {
   'D-F4-1': 'Separador del CSV: la especificación dice coma y su propio ejemplo usa punto y coma. Probá con un archivo de una línea.',
   'D-F4-2': 'La columna «imputa IRE» aplica solo al IRE SIMPLE según las guías de la DNIT; en el IRE General se marca «no imputar».',
-  'D-F4-4': 'Notas de crédito: la guía de registro manual pone la recibida en VENTAS y la emitida en COMPRAS.',
-  'D-F4-5': 'No hay una norma que diga hasta cuándo se puede computar el crédito de una factura de un mes anterior.',
-  'D-F4-6': 'Qué casillas usa la EAS: 5 % «otros bienes y servicios» (151/157) o agrícolas (150/156); compras directas (32/35/38) o indistintas (33/36/39); de dónde salen las retenciones (52).',
-  'D-F4-7': 'Redondeo: la app suma el IVA redondeado de cada comprobante; Marangatu podría calcular sobre la suma de las bases.',
+  'D-F4-7': 'Redondeo: la app aplica la tasa sobre la suma de las bases del mes, como pide el instructivo del Formulario 120; la norma no dice cómo se redondea la mitad de un guaraní (la app redondea hacia arriba).',
   'D-F4-8': 'Tipo de cambio: comprador o vendedor del BCP del día anterior, o la cotización del comprobante.',
   'D-F4-10': 'El algoritmo del DV coincide con los ejemplos oficiales, pero no se encontró el documento oficial que lo describe. Hay RUC antiguos con letra.',
-  'D-F4-11': 'No está claro si un vencimiento en sábado pasa al lunes.',
   'D-F4-12': 'No está claro si un feriado nacional corre los vencimientos de la DNIT.',
 }
 

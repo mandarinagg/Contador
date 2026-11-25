@@ -51,8 +51,8 @@ function AlertBody({ alert, compact }: { alert: TaxAlert; compact: boolean }) {
           <ObligationItems items={alert.items as AlertObligationItem[]} limit={limit} showRemind={alert.code === 'OBLIGATIONS_DUE_SOON'} />
           {alert.code === 'OBLIGATIONS_DUE_SOON' && !compact && (
             <p className="mt-2 text-sm text-ink-3">
-              Avisamos por la fecha fija del calendario aunque el vencimiento se corra por un día inhábil: no está verificado que sábados y feriados corran el plazo
-              (dudas D-F4-11 y D-F4-12).
+              Avisamos por la fecha fija del calendario aunque el vencimiento se corra por un día inhábil: los fines de semana corren el plazo (RG DNIT 60/2026), pero
+              no está verificado que los feriados también lo hagan (duda D-F4-12).
             </p>
           )}
         </>

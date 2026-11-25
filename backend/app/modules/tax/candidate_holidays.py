@@ -36,8 +36,8 @@ DATA: dict[str, Any] = {
         },
     },
     "sabados": {
-        "status": "no_encontrada",
-        "note": "La Ley 7544 no dice nada de los sábados. La RG 38/2020 habla de «día inhábil» sin definirlo. Indicio oficial: la RG DNIT 60/2026 da como vencimiento «conforme RG n.° 38/2020» de la terminación 0 el 9 de noviembre de 2026 (lunes), cuando el día fijo es el 7 (sábado); y para la terminación 4 el 16 (lunes) en vez del 15 (domingo). Es decir, trata el sábado como inhábil. En cambio, la RG DNIT 48/2026 lista como vencimiento de la terminación 7 el «21 de marzo de 2026» (sábado) sin correrlo. Duda D-F4-11.\n",
+        "status": "oficial_leida",
+        "note": "La Ley 7544 no dice nada de los sábados. La RG 38/2020 habla de «día inhábil» sin definirlo. Indicio oficial: la RG DNIT 60/2026 da como vencimiento «conforme RG n.° 38/2020» de la terminación 0 el 9 de noviembre de 2026 (lunes), cuando el día fijo es el 7 (sábado); y para la terminación 4 el 16 (lunes) en vez del 15 (domingo). Es decir, trata el sábado como inhábil. En cambio, la RG DNIT 48/2026 lista como vencimiento de la terminación 7 el «21 de marzo de 2026» (sábado) sin correrlo, pero fue una contingencia (corrió las fechas al martes 24). Resuelta en la D-122 (2026-11-25): la columna es la fecha «conforme RG n.° 38/2020», así que la propia DNIT trata el sábado como inhábil.\n",
         "source_url": "https://www.dnit.gov.py/documents/20123/2664257/RG+60+-+2026_firmado.pdf/cadc1f8b-47cd-7ec3-491a-42a0feb6265d?t=1794273017967",
     },
     "calendario_propio_dnit": {

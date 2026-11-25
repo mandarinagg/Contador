@@ -180,12 +180,28 @@ def test_form_120_boxes(client: TestClient, owner_token: str, month: dict[str, A
     ):
         assert boxes[box] is None, box
     by_box = {b["box"]: b for b in form["boxes"]}
-    assert by_box["52"]["doubts"] == ["D-F4-6"]
+    assert by_box["52"]["doubts"] == [] and "La cargás vos" in by_box["52"]["note"]
     assert by_box["164"]["status"] == "not_calculated" and "BR-TAX-11" in by_box["164"]["note"]
-    assert "D-F4-4" in by_box["15"]["doubts"]
+    assert by_box["15"]["doubts"] == [] and by_box["22"]["doubts"] == ["D-F4-7"]
     assert by_box["46"]["status"] == "from_previous"
     # El borrador coincide con la estimación genérica.
     assert boxes["50"] == result["result"]["to_pay"]
+
+
+def test_vat_is_the_rate_on_the_month_bases_not_the_sum_per_voucher(
+    client: TestClient, owner_token: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D-122: casilla 38 = tasa sobre las bases (instructivo del Formulario 120 v4)."""
+    setup_tax(client, owner_token, monkeypatch)
+    for n in range(3):  # IVA de cada una: 1.005 / 11 = 91,36 → 91; base 914
+        create_voucher(client, owner_token, number=f"001-001-000020{n}", taxed_10="1005")
+    result = _vat(client, owner_token)
+    boxes = _boxes(result)
+    assert boxes["35"] == "2742"
+    assert boxes["38"] == "274"  # el 10 % de 2.742 = 274,2; la suma por comprobante daría 273
+    assert result["credit"]["purchases"]["vat"] == "274"
+    assert result["credit"]["total"] == "274"
+    assert result["result"]["credit_balance"] == "274"
 
 
 def test_proration_warning(client: TestClient, owner_token: str, month: dict[str, Any]) -> None:

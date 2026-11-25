@@ -178,11 +178,11 @@ def test_credit_notes_change_section_and_electronic_are_excluded(
     assert preview["excluded_electronic"]["count"] == 1
     assert preview["excluded_electronic"]["vouchers"][0]["id"] == electronic["id"]
     assert preview["excluded_not_imputed"]["count"] == 1
-    assert {d["code"] for d in preview["doubts"]} >= {"D-F4-1", "D-F4-4"}
+    assert {d["code"] for d in preview["doubts"]} == {"D-F4-1", "D-F4-2"}  # D-F4-4 resuelta
     assert preview["rules_applied"][0]["code"] == "REG-COMPROB-IMPORTACION"
     _, rows, _ = _rows(_download(client, token).content)
     by_number = {r[7]: r for r in rows}
-    # D-F4-4: la nota de crédito emitida va en COMPRAS y la recibida en VENTAS.
+    # D-122: la nota de crédito emitida va en COMPRAS y la recibida en VENTAS.
     assert by_number["001-001-0000011"][0] == "2"
     assert by_number["001-001-0000011"][-2:] == ["001-001-0000010", "12345678"]
     assert by_number["001-001-0000021"][0] == "1"

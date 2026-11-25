@@ -627,33 +627,40 @@ rules:
       «con base imponible diferente al precio neto» junto con las no gravadas.
 
   - code: IVA-CREDITO-REQUISITOS
+    version: 2
     description: >
       El IVA de una compra solo es crédito si: (1) el bien o servicio está afectado directa o indistintamente
       a operaciones gravadas; (2) es una erogación real; (3) el comprobante identifica nombre o razón social
       y RUC del comprador, describe con precisión el bien o servicio y cumple los demás requisitos; (4) el
       comprobante es timbrado, el timbrado está vigente, sin enmiendas ni adulteraciones, y refleja la
-      realidad. El comprador debe verificar el timbrado en los medios de la DNIT.
+      realidad. El comprador debe verificar el timbrado en los medios de la DNIT. El crédito va en la
+      liquidación del mes en que se emitió la factura.
     parameters:
       requires_taxed_use: true
       requires_real_outflow: true
       requires_buyer_ruc_on_document: true
       requires_valid_timbrado: true
       buyer_must_verify_timbrado: true
-      credit_month: mes_de_la_compra
+      credit_month: mes_de_emision_del_comprobante
       credit_sources: [compras_en_plaza_del_mes, iva_pagado_en_importaciones_del_mes, retenciones_a_no_residentes]
     valid_from: "2020-01-01"
     valid_to: null
     published_at: "2019-12-19"
     source_url: "https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+3107-19.pdf/d723b322-e502-e34b-18bc-3df7bfd0f785?t=1681423809891"
-    legal_reference: "Ley N° 6380/2019, arts. 88, 89 y 92; Decreto N° 3107/2019, Anexo, arts. 22 y 26; Decreto N° 3107/2019, art. 5° (remite al Decreto N° 6539/2005 de timbrado)"
-    consulted_at: "2026-11-24"
+    legal_reference: "Ley N° 6380/2019, arts. 83, 88, 89 y 92; Decreto N° 3107/2019, Anexo, arts. 22 y 26; Decreto N° 3107/2019, art. 5° (remite al Decreto N° 6539/2005 de timbrado); DNIT, consulta no vinculante sobre la utilización de notas de crédito (2021)"
+    consulted_at: "2026-11-25"
     validation_status: pending
     reviewed_by: null
     confidence: oficial_leida
     notes: >
-      «credit_month» sale de la letra del art. 88, num. 1 («compras en plaza realizadas en el mes»). No
-      encontré una norma que fije un plazo para computar comprobantes de meses anteriores (D-F4-5).
-      El Decreto 3107 es un escaneo; los arts. 13 a 30 los confirmé mirando las páginas del PDF oficial.
+      «credit_month»: art. 88, num. 1 («compras en plaza realizadas en el mes») y art. 83 (la factura
+      se expide al nacer la obligación). La DNIT lo dice en una consulta no vinculante publicada
+      (https://www.dnit.gov.py/documents/47797/47809/Documentos_Utilizaci%C3%B3n+de+Notas+de+Cr%C3%A9dito.pdf/c79a808c-545e-10d4-247d-6cbb61dde614?t=1680715347881): el adquirente incluye el importe «como crédito fiscal en la liquidación mensual del IVA
+      correspondiente al periodo fiscal en que se emitió la factura». Resuelve D-F4-5 (D-122): una
+      factura que llega tarde va en el mes de su emisión, rectificando esa DJ si ya se presentó; no se
+      corre a un mes posterior. La misma consulta: la factura solo se anula por errores al expedirla y
+      la nota de crédito solo documenta devoluciones, descuentos o bonificaciones. El Decreto 3107 es
+      un escaneo; los arts. 13 a 30 los confirmé mirando las páginas del PDF oficial.
 
   - code: IVA-PRORRATEO
     description: >
@@ -742,6 +749,7 @@ rules:
     notes: "Con comprobantes electrónicos, el incobrable se documenta con nota de crédito electrónica (Decreto 872/2023, art. 12)."
 
   - code: IVA-F120-ESTRUCTURA
+    version: 2
     description: >
       Formulario 120 v4 (obligación 211), mensual. Casillas que la app puede precalcular como BORRADOR:
       Rubro 1: casilla 10 (base 10%) y 22 (débito 10%); 151 (base 5%, otros bienes y servicios) y 157
@@ -752,6 +760,9 @@ rules:
       resultado, 50 impuesto determinado. Rubro 5: 51 saldo financiero anterior, 52 retenciones, 169
       percepciones, 54 saldo a favor, 58 a pagar. Rubro 6: compras ligadas a exoneradas (59-63) e IVA
       costo (64). Las casillas 14, 29, 49, 152, 153, 162, 163, 165 y el Anexo son solo para exportadores.
+      El IVA de cada casilla es la tasa aplicada al monto imponible del mes. Las notas de crédito
+      recibidas ajustan el débito (Rubro 1, inc. h a k) y las emitidas dan crédito (Rubro 3, inc. e).
+      Las retenciones (52) las carga el contribuyente.
     parameters:
       form: "120"
       version: 4
@@ -759,18 +770,32 @@ rules:
       amounts_without_cents: true
       amounts_exclude_iva: true
       exporters_only_boxes: [14, 29, 49, 152, 153, 162, 163, 165]
+      tax_box_is_rate_on_base: true
+      agricultural_5_percent_boxes: [150, 154, 156, 158, 161]
+      other_5_percent_boxes: [151, 155, 157, 159]
+      credit_notes: {received: "rubro_1_inc_h_a_k", issued: "rubro_3_inc_e"}
+      indistinct_purchases_only_with_exempt_operations: true
+      retentions_box_entered_by_taxpayer: 52
     valid_from: "2020-01-01"
     valid_to: null
     published_at: "2020-01-07"
     source_url: "https://www.dnit.gov.py/documents/44828/89027/Formulario+N%C2%B0+120+IVA+Versi%C3%B3n+4.pdf/ced4ba56-a201-5126-29ea-c233d01ed6a4?t=1680627132264"
-    legal_reference: "RG N° 33/2020, arts. 2°, 5° y 9°; Formulario 120 v4 e Instructivo del Formulario 120 v4 (04-01-2020)"
-    consulted_at: "2026-11-24"
+    legal_reference: "RG N° 33/2020, arts. 2°, 5° y 9°; Formulario 120 v4 e Instructivo del Formulario 120 v4 (04-01-2020): Importes, Rubro 1 inc. a) a k), Rubro 3 inc. a), b) y e), Rubro 5 inc. c)"
+    consulted_at: "2026-11-25"
     validation_status: pending
     reviewed_by: null
     confidence: oficial_leida
     notes: >
-      La app solo arma un borrador para copiar a mano; no presenta. No encontré una versión 5 en la página
-      de formularios de la DNIT. Duda D-F4-6: cómo llevar las notas de crédito recibidas y emitidas.
+      Instructivo leído el 2026-11-25 (D-122). Resuelve D-F4-4, D-F4-6 y D-F4-7:
+      - montos «sin incluir el IVA»; casilla 38: «la suma del IVA Crédito resultante de la aplicación
+        de dichas tasas»; casilla 22: «el IVA Débito correspondiente» a la casilla 10;
+      - 150/156 solo para productos agrícolas en estado natural (art. 90, inc. d, num. 1) y sus
+        derivados del primer proceso; el resto del 5 % va en 151/157;
+      - 33/36/39: compras «atribuidas en forma indistinta a operaciones gravadas, exoneradas o no
+        alcanzadas»; sin operaciones exoneradas, todo es directo (32/35/38);
+      - 52: «se debe consignar el importe de las retenciones que le fueron practicadas».
+      Sin regla escrita: cómo se redondea la mitad de un guaraní (la app redondea hacia arriba).
+      No encontré una versión 5 en la página de formularios de la DNIT.
 
   # ---------------------------------------------------------------- REGISTRO DE COMPROBANTES
   - code: REG-COMPROB-IMPORTACION
@@ -899,25 +924,30 @@ rules:
 
   # ---------------------------------------------------------------- CALENDARIO
   - code: CAL-DIA-INHABIL
+    version: 2
     description: >
-      Días inhábiles para correr vencimientos: domingos, feriados nacionales de la Ley 7544/2025 (fijos,
-      Jueves y Viernes Santo, móviles con sus traslados por decreto y hasta 3 adicionales por año) y,
-      según el indicio de la RG DNIT 60/2026, sábados. Los asuetos son hábiles, pero un plazo que vence
+      Días inhábiles para correr vencimientos: sábados y domingos (la DNIT corre al lunes los que caen
+      en fin de semana, RG DNIT 60/2026) y feriados nacionales de la Ley 7544/2025 (fijos, Jueves y
+      Viernes Santo, móviles con sus traslados por decreto y hasta 3 adicionales por año). Los asuetos son hábiles, pero un plazo que vence
       ese día pasa al siguiente hábil.
     parameters:
       holidays_file: docs/research/feriados_py.yaml
       sunday_non_business: true
-      saturday_non_business: null
+      saturday_non_business: true
       asueto_shifts_deadline: true
     valid_from: "2025-09-03"
     valid_to: null
     published_at: "2025-09-03"
     source_url: "https://www.bacn.gov.py/leyes-paraguayas/12908/ley-n-7544-2025"
-    legal_reference: "Ley N° 7544/2025, arts. 1° a 4° y 7°; RG N° 38/2020, art. 3°; RG DNIT N° 60/2026, art. 1° (indicio sobre sábados)"
-    consulted_at: "2026-11-24"
+    legal_reference: "Ley N° 7544/2025, arts. 1° a 4° y 7°; RG N° 38/2020, art. 3°; RG DNIT N° 60/2026, art. 1° (columna «fecha de vencimiento conforme RG n.° 38/2020»)"
+    consulted_at: "2026-11-25"
     validation_status: pending
     reviewed_by: null
     confidence: oficial_leida
     notes: >
-      saturday_non_business queda en null a propósito (D-F4-11). Antes del 03-09-2025 regían las leyes
-      08/1990 y siguientes, derogadas por la Ley 7544; no las leí.
+      Resuelve D-F4-11 (D-122): en el art. 1 de la RG DNIT 60/2026 (PDF firmado, leído el 2026-11-25),
+      la columna «fecha de vencimiento conforme RG n.° 38/2020» da 9 de noviembre de 2026 a la
+      terminación 0 (día fijo 7, sábado), 16 a la 4 (día 15, domingo) y 23 a la 7 (día 21, sábado).
+      La RG DNIT 48/2026 listó un sábado sin correrlo, pero es una medida de contingencia (corrió las
+      fechas al martes 24). Sigue abierta D-F4-12: si un feriado nacional corre los vencimientos.
+      Antes del 03-09-2025 regían las leyes 08/1990 y siguientes, derogadas por la Ley 7544; no las leí.

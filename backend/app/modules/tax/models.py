@@ -394,7 +394,7 @@ class Obligation(TimestampMixin, Base):
     nominal_due_date: Mapped[date] = mapped_column(Date, nullable=False)
     due_date: Mapped[date] = mapped_column(Date, nullable=False)
     # D-098: el aviso usa la fecha fija del calendario sin correr si es anterior, porque no
-    # está verificado que sábados y feriados corran los vencimientos (D-F4-11, D-F4-12):
+    # está verificado que los feriados corran los vencimientos (D-F4-12; los sábados sí, D-122):
     # así nunca se avisa más tarde que el vencimiento real.
     remind_by: Mapped[date] = mapped_column(
         Date, Computed("LEAST(nominal_due_date, due_date)", persisted=True)

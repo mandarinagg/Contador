@@ -14,9 +14,12 @@ Estimación genérica (D-090), por tasa:
 - resultado = débito - crédito - saldo anterior: a ingresar si es positivo, saldo a favor
   si es negativo.
 
-El IVA de cada comprobante es el guardado (impreso o calculado por comprobante, D-088). La
-DNIT no publica una regla de redondeo para el mes (D-F4-7): se suma el IVA de cada
-comprobante. La base sin IVA de cada comprobante es su importe menos su IVA.
+La base sin IVA de cada comprobante es su importe menos su IVA guardado (impreso o calculado
+por comprobante, D-088). El IVA del mes **se aplica sobre la suma de las bases**, por tasa y
+redondeado a guaraníes: el instructivo del Formulario 120 v4 pide en cada casilla de impuesto
+el IVA «resultante de la aplicación de dichas tasas» a los montos imponibles (D-122, resuelve
+D-F4-7). El redondeo de la mitad hacia arriba no está escrito en la norma. El control contra
+el mayor sigue usando el IVA de cada comprobante, que es lo que se contabiliza.
 
 Borrador del Formulario 120 v4 (D-097): las casillas del mapa de la investigación
 (`TRIBUTACION_FASE4.md` §2, regla `IVA-F120-ESTRUCTURA`), **sin IVA y sin céntimos**. Solo se
@@ -24,8 +27,11 @@ precalculan las que la investigación marca como calculables; las de exportadore
 retenciones y percepciones (52, 169), el prorrateo (164, BR-TAX-11), el Rubro 6 y lo que
 viene de la DJ anterior o de la cuenta corriente quedan vacías y con aviso. Cada casilla
 lleva su número oficial y la duda que la afecta (D-F4-x). Ubicación de las notas de crédito
-según la guía de la DNIT (D-F4-4): la recibida ajusta el débito (Rubro 1, inc. h a k,
-casillas 15/23, 155/159 y 17) y la emitida da crédito (Rubro 3, inc. e, casillas 34/37/42).
+según la guía de la DNIT y el instructivo (D-122, resuelve D-F4-4): la recibida ajusta el
+débito (Rubro 1, inc. h a k, casillas 15/23, 155/159 y 17) y la emitida da crédito (Rubro 3,
+inc. e, casillas 34/37/42). Todas las compras van como «directas» (32/35/38): las
+«indistintas» son las afectadas a la vez a operaciones gravadas y exoneradas, y eso solo
+pasa con ventas exentas, caso en que se avisa el prorrateo (D-122, resuelve D-F4-6).
 
 Prorrateo: si en el mes hay ventas exentas y compras con crédito, se avisa que puede
 corresponder y no se calcula (BR-TAX-11). El control contra el mayor compara el movimiento
@@ -36,7 +42,7 @@ import uuid
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from sqlalchemy import case, func, select
@@ -61,6 +67,11 @@ PRORATION_RULE = "IVA-PRORRATEO"
 PRORATION_WINDOW = 6
 
 
+def rate_of(base: Decimal, percent: int) -> Decimal:
+    """IVA de una base sin IVA: base por la tasa, en guaraníes enteros (D-122)."""
+    return (base * percent / 100).quantize(Decimal(1), rounding=ROUND_HALF_UP)
+
+
 @dataclass
 class Sums:
     """Importes con IVA incluido e IVA de un grupo de comprobantes."""
@@ -82,7 +93,21 @@ class Sums:
 
     @property
     def vat(self) -> Decimal:
+        """IVA guardado en los comprobantes (lo que se contabiliza)."""
         return self.vat_10 + self.vat_5
+
+    @property
+    def form_vat_10(self) -> Decimal:
+        """IVA a declarar al 10 %: la tasa sobre la suma de las bases (D-122)."""
+        return rate_of(self.base_10, 10)
+
+    @property
+    def form_vat_5(self) -> Decimal:
+        return rate_of(self.base_5, 5)
+
+    @property
+    def form_vat(self) -> Decimal:
+        return self.form_vat_10 + self.form_vat_5
 
 
 @dataclass
@@ -97,10 +122,10 @@ class MonthSums:
     purchases_not_imputed: int = 0
 
     def net_debit(self) -> Decimal:
-        return self.sales.vat - self.sale_credit_notes.vat
+        return self.sales.form_vat - self.sale_credit_notes.form_vat
 
     def net_credit(self) -> Decimal:
-        return self.purchases.vat - self.purchase_credit_notes.vat
+        return self.purchases.form_vat - self.purchase_credit_notes.form_vat
 
 
 def _group_key(direction: str, voucher_type: str) -> str:
@@ -234,7 +259,7 @@ class Box:
 
 EXPORTERS = "Solo para exportadores: la app no la calcula."
 FROM_USER = "Viene de la DJ anterior o de la cuenta corriente en Marangatu: la app no la calcula."
-NOTES_DOUBT = ("D-F4-4", "D-F4-6")
+ROUNDING_DOUBT = "D-F4-7"
 
 
 def form_120(
@@ -252,21 +277,21 @@ def form_120(
 
     v: dict[str, Decimal] = {
         "10": s.base_10,
-        "22": s.vat_10,
+        "22": s.form_vat_10,
         "151": s.base_5,
-        "157": s.vat_5,
+        "157": s.form_vat_5,
         "12": s.exempt,
         "15": pcn.base_10,
-        "23": pcn.vat_10,
+        "23": pcn.form_vat_10,
         "155": pcn.base_5,
-        "159": pcn.vat_5,
+        "159": pcn.form_vat_5,
         "17": pcn.exempt,
         "32": p.base_5,
         "35": p.base_10,
-        "38": p.vat,
+        "38": p.form_vat,
         "34": scn.base_5,
         "37": scn.base_10,
-        "42": scn.vat,
+        "42": scn.form_vat,
     }
     v["18"] = v["10"] + v["151"] + v["12"] + v["15"] + v["155"] + v["17"]
     v["21"] = v["157"] + v["159"]
@@ -289,22 +314,15 @@ def form_120(
     v["55"] = v["50"]
 
     boxes = [
-        calc("10", 1, "Gravadas al 10 %: monto imponible", v["10"], "D-F4-7"),
+        calc("10", 1, "Gravadas al 10 %: monto imponible", v["10"]),
         empty(
             "150",
             1,
             "Productos agrícolas al 5 %: monto imponible",
-            "La app carga el 5 % en la casilla 151.",
-            "D-F4-6",
+            "Solo productos agrícolas en estado natural y sus derivados del primer proceso: "
+            "la app carga el 5 % en la casilla 151.",
         ),
-        calc(
-            "151",
-            1,
-            "Otros bienes y servicios al 5 %: monto imponible",
-            v["151"],
-            "D-F4-6",
-            "D-F4-7",
-        ),
+        calc("151", 1, "Otros bienes y servicios al 5 %: monto imponible", v["151"]),
         calc("12", 1, "Exoneradas o no alcanzadas", v["12"]),
         empty("152", 1, "Exportaciones", EXPORTERS),
         empty("153", 1, "Exportaciones", EXPORTERS),
@@ -315,37 +333,33 @@ def form_120(
             "Ajustes, devoluciones realizadas y descuentos obtenidos al 10 % (notas de crédito "
             "recibidas): monto",
             v["15"],
-            *NOTES_DOUBT,
         ),
         empty(
             "154",
             1,
             "Ídem al 5 %, productos agrícolas",
             "La app carga el 5 % en la casilla 155.",
-            "D-F4-6",
         ),
-        calc("155", 1, "Ídem al 5 %, otros bienes y servicios: monto", v["155"], *NOTES_DOUBT),
-        calc("17", 1, "Ídem exonerados o no alcanzados", v["17"], *NOTES_DOUBT),
+        calc("155", 1, "Ídem al 5 %, otros bienes y servicios: monto", v["155"]),
+        calc("17", 1, "Ídem exonerados o no alcanzados", v["17"]),
         calc("18", 1, "Total del monto imponible (Col. I)", v["18"]),
         empty(
             "156",
             1,
             "IVA débito 5 %, productos agrícolas",
             "La app carga el 5 % en la casilla 157.",
-            "D-F4-6",
         ),
-        calc("157", 1, "IVA débito 5 %, otros bienes y servicios", v["157"], "D-F4-6", "D-F4-7"),
+        calc("157", 1, "IVA débito 5 %, otros bienes y servicios", v["157"], ROUNDING_DOUBT),
         empty(
             "158",
             1,
             "IVA de ajustes al 5 %, productos agrícolas",
             "La app carga el 5 % en la casilla 159.",
-            "D-F4-6",
         ),
-        calc("159", 1, "IVA de ajustes al 5 %, otros bienes y servicios", v["159"], *NOTES_DOUBT),
+        calc("159", 1, "IVA de ajustes al 5 %, otros bienes y servicios", v["159"], ROUNDING_DOUBT),
         calc("21", 1, "Total IVA débito 5 % (Col. II)", v["21"]),
-        calc("22", 1, "IVA débito 10 %", v["22"], "D-F4-7"),
-        calc("23", 1, "IVA de ajustes al 10 %", v["23"], *NOTES_DOUBT),
+        calc("22", 1, "IVA débito 10 %", v["22"], ROUNDING_DOUBT),
+        calc("23", 1, "IVA de ajustes al 10 %", v["23"], ROUNDING_DOUBT),
         calc("24", 1, "Total IVA débito 10 % (Col. III)", v["24"]),
         calc(
             "160",
@@ -358,7 +372,6 @@ def form_120(
             2,
             "Productos agrícolas, últimos 6 meses",
             "La app no usa las casillas 150 y 154.",
-            "D-F4-6",
         ),
         calc("26", 2, "Exoneradas o no alcanzadas, últimos 6 meses (12 y 17)", v["26"]),
         calc("27", 2, "Total del mercado interno, últimos 6 meses", v["27"]),
@@ -377,38 +390,32 @@ def form_120(
             3,
             "Compras atribuidas directamente a operaciones gravadas: base 5 %",
             v["32"],
-            "D-F4-6",
-            "D-F4-5",
         ),
         calc(
             "35",
             3,
             "Compras atribuidas directamente a operaciones gravadas: base 10 %",
             v["35"],
-            "D-F4-6",
-            "D-F4-5",
         ),
-        calc("38", 3, "IVA crédito de compras directas", v["38"], "D-F4-6", "D-F4-7"),
+        calc("38", 3, "IVA crédito de compras directas", v["38"], ROUNDING_DOUBT),
         empty(
             "33",
             3,
             "Compras atribuidas indistintamente: base 5 %",
-            "La app carga todas las compras como directas (casillas 32, 35 y 38).",
-            "D-F4-6",
+            "Solo si hay operaciones gravadas y exoneradas a la vez: la app carga todas las "
+            "compras como directas (casillas 32, 35 y 38) y avisa el prorrateo.",
         ),
         empty(
             "36",
             3,
             "Compras atribuidas indistintamente: base 10 %",
             "La app carga todas las compras como directas.",
-            "D-F4-6",
         ),
         empty(
             "39",
             3,
             "IVA crédito de compras indistintas",
             "La app carga todas las compras como directas.",
-            "D-F4-6",
         ),
         empty(
             "164",
@@ -422,17 +429,15 @@ def form_120(
             3,
             "Ajustes por ventas ya declaradas (notas de crédito emitidas): base 5 %",
             v["34"],
-            *NOTES_DOUBT,
         ),
         calc(
             "37",
             3,
             "Ajustes por ventas ya declaradas (notas de crédito emitidas): base 10 %",
             v["37"],
-            *NOTES_DOUBT,
         ),
-        calc("42", 3, "IVA de los ajustes por ventas ya declaradas", v["42"], *NOTES_DOUBT),
-        calc("43", 3, "Total IVA crédito (38 + 164 + 165 + 42; sin 164 ni 165)", v["43"], "D-F4-6"),
+        calc("42", 3, "IVA de los ajustes por ventas ya declaradas", v["42"], ROUNDING_DOUBT),
+        calc("43", 3, "Total IVA crédito (38 + 164 + 165 + 42; sin 164 ni 165)", v["43"]),
         calc("44", 4, "IVA débito (21 + 24)", v["44"]),
         calc("45", 4, "IVA crédito (43)", v["45"]),
         Box(
@@ -469,8 +474,8 @@ def form_120(
             "52",
             5,
             "Retenciones computables a favor del contribuyente",
-            "Las retenciones no se calculan en esta fase: consultalas en Marangatu.",
-            "D-F4-6",
+            "La cargás vos: las retenciones de IVA que te practicaron en el mes (instructivo, "
+            "Rubro 5, inc. c). La app no las calcula: consultalas en Marangatu.",
         ),
         empty("169", 5, "Percepciones", FROM_USER),
         empty("56", 5, "Multa por presentación tardía", FROM_USER),
@@ -513,15 +518,20 @@ def form_120(
 
 
 def _rate_block(sums: Sums) -> dict[str, Any]:
+    """Por tasa: importe con IVA, base y el IVA a declarar (tasa sobre la base, D-122)."""
     return {
         "rate_10": {
             "taxed": pyg(sums.taxed_10),
             "base": pyg(sums.base_10),
-            "vat": pyg(sums.vat_10),
+            "vat": pyg(sums.form_vat_10),
         },
-        "rate_5": {"taxed": pyg(sums.taxed_5), "base": pyg(sums.base_5), "vat": pyg(sums.vat_5)},
+        "rate_5": {
+            "taxed": pyg(sums.taxed_5),
+            "base": pyg(sums.base_5),
+            "vat": pyg(sums.form_vat_5),
+        },
         "exempt": pyg(sums.exempt),
-        "vat": pyg(sums.vat),
+        "vat": pyg(sums.form_vat),
         "count": sums.count,
     }
 

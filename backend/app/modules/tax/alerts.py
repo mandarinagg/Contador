@@ -4,7 +4,7 @@
 - `OBLIGATIONS_DUE_SOON`: pendientes no vencidas cuyo `remind_by` cae dentro de los días de
   anticipación (`tax.settings.alert_days`, 10 por defecto). `remind_by` es la fecha fija
   del calendario sin correr si es anterior al vencimiento (D-098): como no está verificado
-  que sábados y feriados corran el plazo (D-F4-11, D-F4-12), se avisa por la fecha más
+  que los feriados corran el plazo (D-F4-12; los sábados sí, D-122), se avisa por la fecha más
   temprana y nunca más tarde que el vencimiento real.
 - `REGISTER_UNCONFIRMED`: registro de comprobantes (955) de un mes ya terminado sin
   confirmar.

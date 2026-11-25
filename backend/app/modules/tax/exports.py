@@ -16,8 +16,9 @@ Técnica para Importación, versión 1 (junio de 2021), transcripta en ese YAML 
 - separador: la especificación dice coma y su ejemplo usa punto y coma (D-F4-1). Por
   defecto, el punto y coma del ejemplo oficial; `separator=comma` usa la coma. En los textos
   libres (nombres) se reemplaza el separador por un espacio y se avisa;
-- notas de crédito según la guía de registro manual (D-F4-4): la **recibida** va en VENTAS
-  y la **emitida** en COMPRAS; las notas de débito, en la sección de su comprobante;
+- notas de crédito según la guía de registro manual y el instructivo del Formulario 120
+  (D-122, resuelve D-F4-4): la **recibida** va en VENTAS y la **emitida** en COMPRAS; las
+  notas de débito, en la sección de su comprobante;
 - «NO IMPUTA» (solo compras) va en `N`: la app no registra imputaciones parciales. Un
   comprobante que no imputa a ninguna obligación no se exporta (Marangatu exige al menos
   una) y se lista;
@@ -70,8 +71,6 @@ DRAFT_NOTICE = (
 DOUBTS = {
     "D-F4-1": "Separador: la especificación dice coma y su ejemplo usa punto y coma.",
     "D-F4-2": "La columna «IMPUTA IRE» aplica solo al IRE SIMPLE según las guías de la DNIT.",
-    "D-F4-4": "Notas de crédito: la recibida va en VENTAS y la emitida en COMPRAS (guía de "
-    "registro manual de 2022).",
 }
 
 
@@ -86,7 +85,7 @@ def _int(value: Decimal) -> str:
 def _section(voucher: Voucher) -> int:
     is_sale = voucher.direction == "sale"
     if voucher.voucher_type == "credit_note":
-        is_sale = not is_sale  # D-F4-4
+        is_sale = not is_sale  # D-122 (D-F4-4 resuelta)
     return REGISTER_SALES if is_sale else REGISTER_PURCHASES
 
 
@@ -216,7 +215,8 @@ def marangatu_plan(
     if non_ruc_purchases:
         plan.warnings.append(
             f"{non_ruc_purchases} fila(s) en COMPRAS no son RUC (notas de crédito emitidas a "
-            "clientes sin RUC): la especificación pide RUC en compras. Ver la duda D-F4-4."
+            "clientes sin RUC): la especificación pide RUC en compras y Marangatu puede "
+            "rechazarlas. Cargalas a mano."
         )
     if old_cash:
         plan.warnings.append(

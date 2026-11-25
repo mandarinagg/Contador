@@ -474,30 +474,30 @@ export function setCheckDigit(digits: string): number {
 - **Si la EAS está en el IRE General, ¿las compras van con IVA = S, IRE = N?** ¿Y las compras sin IVA que solo sirven para el IRE (por ejemplo, exentas), se registran con «No imputar» o no se registran?
 - Se cruza con D-1 y D-2 de `TRIBUTACION_PY.md` (régimen del IRE de la EAS).
 
-**D-F4-3. Importar después de confirmar el talón.**
+**D-F4-3. Importar después de confirmar el talón.** ✅ **Resuelta (§9):** rige la RG 90/2021, art. 9° (texto de la RG DNIT 12/2024), que es posterior a la guía de 2021.
 
 - La guía de 2021 dice que, confirmado el talón, solo queda la carga manual.
 - El art. 9° de la RG 90/2021 (texto RG DNIT 12/2024) permite importar después del talón.
 - Asumo que rige la resolución. **¿Lo confirma en la práctica?**
 
-**D-F4-4. Notas de crédito: ¿en ventas o en compras?**
+**D-F4-4. Notas de crédito: ¿en ventas o en compras?** ✅ **Resuelta el 2026-11-25 (§9, D-122).**
 
 - La guía de registro manual: las NC **recibidas** van en VENTAS y las **emitidas** en COMPRAS.
 - Es contrario a la intuición (una NC recibida de un proveedor reduce el crédito de una compra). Coincide con el Formulario 120: la NC recibida reduce el crédito como «débito» (Rubro 1, inc. h a j: «devoluciones realizadas, descuentos obtenidos») y la emitida da «crédito» (Rubro 3, inc. e).
 - **¿Es así como lo registra usted?** Define cómo la app arma el archivo y el borrador.
 
-**D-F4-5. Plazo para computar el crédito de comprobantes de meses anteriores.**
+**D-F4-5. Plazo para computar el crédito de comprobantes de meses anteriores.** ✅ **Resuelta el 2026-11-25 (§9, D-122).**
 
 - La ley (art. 88) habla de compras «realizadas en el mes». No encontré una norma que permita, o prohíba, computar una factura atrasada en un mes posterior, ni hasta cuándo.
 - **¿Qué criterio usa la DNIT?** ¿Hay que rectificar la DJ del mes de la factura?
 
-**D-F4-6. Casillas del Formulario 120 para la EAS.**
+**D-F4-6. Casillas del Formulario 120 para la EAS.** ✅ **Resuelta el 2026-11-25 (§9, D-122).**
 
 - **¿La EAS usa la casilla 151/157 (5% «otros bienes y servicios») o la 150/156 (productos agrícolas)?** Depende de la actividad.
 - **¿Las compras se cargan como «directas» (32/35/38) o «indistintas» (33/36/39)?** Si la EAS solo tiene operaciones gravadas, ¿todo es directo?
 - **¿Las retenciones (casilla 52) las trae Marangatu** («Ver retenciones recibidas») o las carga el contribuyente?
 
-**D-F4-7. Redondeo.**
+**D-F4-7. Redondeo.** ✅ **Resuelta en lo principal (§9, D-122):** la tasa se aplica sobre la suma de las bases. Queda sin regla escrita el redondeo de la mitad de un guaraní.
 
 - El formulario va «sin céntimos». El registro pide montos enteros con IVA incluido.
 - **¿El IVA del mes se calcula sobre la suma de las bases, o se suma el IVA redondeado de cada comprobante?** La diferencia es de pocos guaraníes, pero puede no cuadrar con lo que calcula Marangatu.
@@ -512,7 +512,7 @@ export function setCheckDigit(digits: string): number {
 - Sitios de terceros dicen que hay RUC antiguos que terminan en letra y que la letra se reemplaza por su código ASCII. La implementación actual rechaza letras.
 - **¿Hace falta aceptar RUC con letra** en proveedores o clientes?
 
-**D-F4-11. ¿Los sábados son inhábiles para la DNIT?**
+**D-F4-11. ¿Los sábados son inhábiles para la DNIT?** ✅ **Resuelta el 2026-11-25 (§9, D-122).**
 
 - La RG DNIT 60/2026 los trata como inhábiles (pasa del sábado 7 al lunes 9). La RG DNIT 48/2026 lista un sábado como fecha de vencimiento sin correrla.
 - **¿Un vencimiento que cae en sábado pasa al lunes?**
@@ -601,3 +601,59 @@ Todas abiertas el 2026-11-24.
 | RG DNIT 48/2026 | 23-03-2026 | <https://www.dnit.gov.py/web/portal-institucional/w/resoluci%C3%B3n-general-dnit-n%C2%B0-48/26> |
 | RG DNIT 60/2026 | 09-11-2026 | <https://www.dnit.gov.py/documents/20123/2664257/RG+60+-+2026_firmado.pdf/cadc1f8b-47cd-7ec3-491a-42a0feb6265d?t=1794273017967> |
 | Proyecto de facturación (local, solo lectura) | — | `~/Escritorio/facturacion-sifen-zestia/packages/contracts/src/sifen.ts` |
+
+---
+
+## 9. Verificación de CONTADOR AI, bloque 2 (2026-11-25)
+
+Leído el 2026-11-25 en la DNIT. Las citas son textuales.
+
+### 9.1 Instructivo del Formulario 120 v4 (resuelve D-F4-4, D-F4-6 y D-F4-7)
+
+Fuente: <https://www.dnit.gov.py/documents/47797/47809/Instructivo+del+Formulario+N%C2%B0+120+IVA+Versi%C3%B3n+4.pdf/63799cd8-6212-3c22-779b-51b2f97a136b?t=1680624028092> (5 páginas, con texto extraíble).
+
+- **Importes:** los montos de los Rubros 1 a 3 «deberán registrarse sin incluir el IVA».
+- **IVA de cada casilla (D-F4-7):**
+  - Rubro 1, inc. a): «En la casilla 10 se debe consignar el monto imponible de las operaciones gravadas a la tasa del 10% […]. En la casilla 22 se consigna el IVA Débito correspondiente.»
+  - Rubro 3, inc. a): en las casillas 32 y 35 van los montos imponibles; «En la casilla 38 se debe consignar la suma del IVA Crédito resultante de la aplicación de dichas tasas.»
+  - Conclusión: el IVA del mes es la tasa aplicada a la suma de las bases, no la suma del IVA de cada comprobante. La diferencia es de pocos guaraníes, pero así cuadra con Marangatu.
+  - Sigue sin regla escrita el redondeo de la mitad de un guaraní. La app redondea hacia arriba.
+- **Casillas del 5 % (D-F4-6):** la casilla 150 es para «productos agrícolas en estado natural (Art. 90, inciso d, numeral 1 […]) y sus derivados del primer proceso de elaboración o industrialización». La 151 es para «otros bienes (distintos a los señalados en el inciso b), y/o prestación de servicios». Una EAS de servicios usa la 151 y la 157.
+- **Compras directas o indistintas (D-F4-6):**
+  - 32/35: «atribuidas en forma directa a operaciones gravadas en el mercado interno».
+  - 33/36: «atribuidas en forma indistinta a operaciones gravadas, exoneradas o no alcanzadas».
+  - Sin operaciones exoneradas no hay compras indistintas: todo va como directo. Con ventas exentas, la app avisa el prorrateo.
+- **Retenciones (D-F4-6):** Rubro 5, inc. c): «En la casilla 52 se debe consignar el importe de las retenciones que le fueron practicadas al contribuyente durante el período que se declara». Las carga el contribuyente; el instructivo no dice que el sistema las complete. La app las deja vacías, con esa nota.
+- **Notas de crédito (D-F4-4):**
+  - Rubro 1, inc. h): «En la casilla 15 se debe consignar la base imponible de los ajustes de precios, devoluciones realizadas y descuentos obtenidos, por compras gravadas con IVA Crédito al 10%». Es decir, la nota de crédito **recibida** ajusta el débito.
+  - Rubro 3, inc. e): «En las casillas 34 y 37 se deben consignar los montos imponibles por los ajustes de precios, devoluciones, descuentos otorgados y operaciones declaradas incobrables, por ventas ya declaradas». Es decir, la **emitida** da crédito.
+  - Coincide con la guía de registro manual: la recibida en VENTAS y la emitida en COMPRAS.
+
+### 9.2 Mes del crédito fiscal (resuelve D-F4-5)
+
+- Fuente: consulta no vinculante de la DNIT sobre la utilización de notas de crédito, publicada en su sitio (<https://www.dnit.gov.py/documents/47797/47809/Documentos_Utilizaci%C3%B3n+de+Notas+de+Cr%C3%A9dito.pdf/c79a808c-545e-10d4-247d-6cbb61dde614?t=1680715347881>). Es un criterio de la Administración, no una norma.
+- Cita: el art. 83 de la Ley 6380 hace coincidir la factura con el nacimiento de la obligación, «debiendo el enajenante del bien incluir dicho importe como débito fiscal y el adquirente del bien como crédito fiscal en la liquidación mensual del IVA correspondiente al periodo fiscal en que se emitió la factura».
+- Conclusión: una factura que llega tarde va en el mes en que se emitió. Si esa DJ ya se presentó, hay que rectificarla; no se corre el crédito a un mes posterior. La app ya agrupa por fecha de emisión.
+- La misma consulta dice además:
+  - «La factura solamente podrá anularse en los casos de fallas o errores producidos al momento de su expedición».
+  - «La nota de crédito solamente podrá ser utilizada para documentar la devolución de bienes, descuento en el precio o bonificación».
+
+### 9.3 Sábados (resuelve D-F4-11)
+
+- Fuente: RG DNIT 60/2026, PDF firmado (<https://www.dnit.gov.py/documents/20123/2664257/RG+60+-+2026_firmado.pdf/cadc1f8b-47cd-7ec3-491a-42a0feb6265d?t=1794273017967>).
+- En el art. 1, la columna «FECHA DE VENCIMIENTO CONFORME RG n.° 38/2020» trae corridas las fechas que caen en fin de semana:
+  - terminación 0: «9 de noviembre de 2026» (el día fijo es el 7, sábado);
+  - terminación 4: «16 de noviembre de 2026» (el 15 es domingo);
+  - terminación 7: «23 de noviembre de 2026» (el 21 es sábado).
+- Conclusión: para la DNIT, el sábado es inhábil según la propia RG 38/2020. La RG DNIT 48/2026 listó un sábado, pero era una contingencia del sistema que corrió todo al martes 24.
+- Sigue abierta la D-F4-12 (feriados).
+
+### 9.4 Lo que queda abierto en el bloque 2
+
+- **D-F4-1** (coma o punto y coma): solo se resuelve probando en Marangatu. Lo hará el bot (D-119) con un archivo de una línea.
+- **D-F4-2** (IRE en compras exentas): depende del régimen del IRE (D-1, D-2).
+- **D-F4-8** (tipo de cambio comprador o vendedor): el Decreto 3107, art. 13, permite cualquiera de los dos. No encontré una norma vigente que los asigne a compras o a ventas. Los resultados de búsqueda citan el Decreto 6359/2005, que es anterior a la Ley 6380.
+- **D-F4-9** (lista de compras no deducibles): no hay lista. Rige el art. 89 de la Ley 6380.
+- **D-F4-10** (dígito verificador del RUC): ver `TRIBUTACION_PY.md` §13.3.
+- **D-F4-12** (feriados), **D-F4-13** (imputación automática, decisión del proyecto de facturación) y **D-F4-14** (prorrateo de una EAS nueva: no cambia nada si solo tiene operaciones gravadas).
+
