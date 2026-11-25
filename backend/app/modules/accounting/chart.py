@@ -13,7 +13,10 @@ Reglas:
 - El plan nace `pending` y lo marca `validated` un usuario con `accounting.post`: queda como
   validado por CONTADOR AI, con la RG 49/2014 como referencia (BR-ACC-10, D-120). Un cambio
   estructural (alta, código, tipo, naturaleza, imputabilidad, archivo) lo vuelve a `pending`
-  (D-046).
+  (D-046), y también renombrar una cuenta del modelo con otro nombre que el oficial (D-124).
+- CONTADOR AI solo valida si el plan respeta el modelo de la RG 49/2014 (`chart_problems`,
+  D-124): código del modelo con su nombre, cuentas propias colgando del modelo y, en el
+  balance, el tipo que fija el grupo.
 """
 
 import uuid
@@ -28,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import AppError, Conflict, NotFound
 from app.core.verification import CHART_SOURCE, TOOL_VERIFIER
-from app.modules.accounting import proposed_chart
+from app.modules.accounting import proposed_chart, rg49_codes
 from app.modules.accounting.balances import (
     BALANCE_KINDS,
     COUNTED_STATUSES,
@@ -163,13 +166,68 @@ def mark_pending(db: Session, organization_id: uuid.UUID, actor_id: uuid.UUID) -
         _set_status(db, settings, actor_id, "pending", "pending")
 
 
+# Grupos del balance de la RG 49/2014 y el tipo de cuenta que les corresponde.
+BALANCE_GROUPS = {"1": "asset", "2": "liability", "3": "equity"}
+PROBLEMS_SHOWN = 50
+
+
+def _same_name(a: str, b: str) -> bool:
+    return " ".join(a.split()).casefold() == " ".join(b.split()).casefold()
+
+
+def chart_problems(db: Session, organization_id: uuid.UUID) -> list[str]:
+    """Lo que impide validar el plan contra el modelo de la RG 49/2014 (D-124).
+
+    Art. 3: se usan los códigos del modelo y se pueden agregar cuentas o subcuentas. Por eso:
+    una cuenta con un código del modelo lleva su nombre; una cuenta propia cuelga de una
+    cuenta del modelo y no reutiliza un código; en el balance, el grupo fija el tipo.
+    Las cuentas archivadas no cuentan.
+    """
+    official = rg49_codes.CODES
+    problems: list[str] = []
+    accounts = db.scalars(
+        select(LedgerAccount)
+        .where(
+            LedgerAccount.organization_id == organization_id, LedgerAccount.archived_at.is_(None)
+        )
+        .order_by(LedgerAccount.code)
+    ).all()
+    for account in accounts:
+        code = account.code
+        model_name = official.get(code)
+        if model_name is not None:
+            if not _same_name(account.name, model_name):
+                problems.append(
+                    f"{code}: se llama «{account.name}» y en el modelo es «{model_name}»."
+                )
+        else:
+            ancestor = code
+            while ancestor not in official and "." in ancestor:
+                ancestor = ancestor.rsplit(".", 1)[0]
+            if ancestor not in official:
+                problems.append(f"{code}: no cuelga de ninguna cuenta del modelo.")
+        expected = BALANCE_GROUPS.get(code.split(".")[0])
+        if expected is not None and account.kind != expected:
+            problems.append(f"{code}: en el grupo {code.split('.')[0]} el tipo es {expected}.")
+    return problems
+
+
 def validate_chart(
     db: Session, organization_id: uuid.UUID, actor_id: uuid.UUID
 ) -> AccountingSettings:
-    """Valida CONTADOR AI, con la RG 49/2014 como referencia (D-120)."""
+    """Valida CONTADOR AI contra el modelo de la RG 49/2014 (D-120, D-124)."""
     settings = lock_settings(db, organization_id)
     if not _has_accounts(db, organization_id):
         raise Conflict("CHART_EMPTY", "El plan de cuentas está vacío: no hay nada que validar.")
+    problems = chart_problems(db, organization_id)
+    if problems:
+        raise AppError(
+            "CHART_NOT_VERIFIABLE",
+            f"CONTADOR AI no puede validar el plan: {len(problems)} cuenta(s) no respetan el "
+            "modelo de la RG 49/2014. Corregilas o archivalas.",
+            {"problems": problems[:PROBLEMS_SHOWN], "count": len(problems)},
+            status_code=422,
+        )
     _set_status(
         db,
         settings,
@@ -592,7 +650,11 @@ def update_account(
             before=before,
             after=after,
         )
-        if after.keys() & STRUCTURAL_FIELDS:
+        model_name = rg49_codes.CODES.get(account.code)
+        renamed_off_model = (
+            "name" in after and model_name is not None and not _same_name(account.name, model_name)
+        )
+        if after.keys() & STRUCTURAL_FIELDS or renamed_off_model:
             mark_pending(db, organization_id, actor_id)
     db.commit()
     return account

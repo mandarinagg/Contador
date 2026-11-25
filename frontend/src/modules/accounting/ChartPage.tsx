@@ -323,6 +323,24 @@ function ArchiveForm({ account, chart, onDone }: { account: LedgerAccount; chart
   )
 }
 
+/** D-124: qué cuentas no respetan el modelo de la RG 49/2014, si CONTADOR AI rechazó la validación. */
+function ChartProblems({ error }: { error: unknown }) {
+  if (!(error instanceof ApiError) || error.code !== 'CHART_NOT_VERIFIABLE') return null
+  const details = error.details as { problems?: string[]; count?: number } | undefined
+  const problems = details?.problems ?? []
+  if (problems.length === 0) return null
+  return (
+    <div className="text-sm">
+      <ul className="list-disc pl-5 text-ink-2" aria-label="Cuentas que no respetan el modelo">
+        {problems.map((p) => (
+          <li key={p}>{p}</li>
+        ))}
+      </ul>
+      {details?.count !== undefined && details.count > problems.length && <p className="mt-1 text-ink-3">Y {details.count - problems.length} más.</p>}
+    </div>
+  )
+}
+
 function ValidateForm({ onDone }: { onDone: () => void }) {
   const toast = useToast()
   const invalidate = useInvalidateAccounting()
@@ -344,10 +362,11 @@ function ValidateForm({ onDone }: { onDone: () => void }) {
       }}
     >
       <p className="text-ink-2">
-        CONTADOR AI lo valida contra el modelo de estados financieros de la RG N° 49/2014 de la DNIT. Tu aprobación queda en la auditoría, y los reportes dejan de
-        mostrar el aviso de «sin validar».
+        CONTADOR AI lo valida contra el modelo de estados financieros de la RG N° 49/2014 de la DNIT: cada código del modelo con su nombre oficial y cada cuenta
+        propia colgando de una del modelo. Tu aprobación queda en la auditoría, y los reportes dejan de mostrar el aviso de «sin validar».
       </p>
       <ApiErrorNotice error={run.error} />
+      <ChartProblems error={run.error} />
       <div className="flex justify-end gap-2 border-t border-line pt-4">
         <Button type="button" variant="ghost" onClick={onDone}>
           Cancelar

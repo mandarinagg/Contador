@@ -147,3 +147,24 @@ Pedidos por `docs/specs/FASE3B_CONTABILIDAD.md` §6, a partir de `docs/research/
 4. **Moneda extranjera:** ¿habrá cuentas en dólares? Si las hay, aplica la NIF 23 y se necesita registrar la diferencia de cambio.
 5. **Depreciación:** las vidas útiles y los valores residuales fiscales están investigados en `DEPRECIACION_PY.md` (Decreto 3182, art. 31) y el cuadro vigente es el Anexo de la RG 77/2020, no el Anexo 6 de la RG 49/2014. Falta que el contador valide las 34 categorías y las subcuentas por clase de bien de §3.4.
 6. **Gastos de constitución de la EAS:** ¿se activan en `1.02.06.01` y se amortizan, o van a gastos del ejercicio?
+
+---
+
+## Verificación de CONTADOR AI (2026-11-25, D-124)
+
+- **Fuente:** el XLS oficial de los anexos de la RG 49/2014, descargado de la DNIT el 2026-11-25. Su SHA-256 es `a61f008446942c990a4b1f275310d55c10b0e519a5c6661648475d8a27734c67`.
+  - Se extrajeron los 305 códigos con nombre de los Anexos 1 y 2, sin los renglones «xx». Están en `rg49_2014_codigos.yaml`.
+  - Los empaqueta `backend/app/modules/accounting/rg49_codes.py`.
+- **Resultado sobre el plan propuesto:** 0 problemas.
+  - Las 142 cuentas `rg49_2014` tienen el código y el nombre idénticos al modelo.
+  - Ninguna de las 31 cuentas propias reutiliza un código del modelo, y todas cuelgan de una cuenta del modelo.
+  - Cada código empieza con el de su padre, y ningún padre es imputable.
+  - En los grupos 1, 2 y 3, el tipo es el del grupo y las 14 regularizadoras «(-)» tienen la naturaleza opuesta.
+  - Lo controla la prueba `backend/tests/test_accounting_chart_rg49.py`.
+- **En la app:** CONTADOR AI controla el plan que está en la base antes de validarlo (`chart.chart_problems`). Si falla, responde 422 `CHART_NOT_VERIFIABLE` con la lista de problemas. Las reglas son:
+  - un código del modelo lleva su nombre oficial (sin distinguir mayúsculas ni espacios);
+  - una cuenta propia cuelga de una cuenta del modelo;
+  - en el balance, el tipo es el que fija el grupo.
+- **Renombrar:** si una cuenta del modelo recibe un nombre distinto del oficial, el plan vuelve a pendiente. Renombrar una cuenta propia no lo cambia.
+- **Interpretación propia (art. 3):** el código del modelo va con su concepto. Para otro nombre se crea una subcuenta.
+

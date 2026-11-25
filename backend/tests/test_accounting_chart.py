@@ -195,11 +195,27 @@ def test_validation_requires_accountant_and_any_structural_change_resets_it(
     )
     assert report["chart_status"] == "validated"
 
-    # Renombrar no cambia la estructura: sigue validado.
+    # Renombrar una cuenta propia no cambia la estructura: sigue validado.
+    own = next(a for a in accounts.values() if a["origin"] == "proposed" and a["is_postable"])
+    client.patch(
+        f"{ACC}/chart/accounts/{own['id']}", json={"name": own["name"] + " (2)"}, headers=headers
+    )
+    assert ok(client.get(f"{ACC}/settings", headers=headers))["chart_status"] == "validated"
+    # Renombrar una cuenta del modelo con otro nombre sí: vuelve a pendiente y CONTADOR AI no
+    # la valida hasta que tenga el nombre oficial (D-124).
     client.patch(
         f"{ACC}/chart/accounts/{accounts[CAJA]['id']}", json={"name": "CAJA CHICA"}, headers=headers
     )
-    assert ok(client.get(f"{ACC}/settings", headers=headers))["chart_status"] == "validated"
+    assert ok(client.get(f"{ACC}/settings", headers=headers))["chart_status"] == "pending"
+    res = client.post(f"{ACC}/chart/validate", headers=auth_header(accountant))
+    assert res.status_code == 422 and error_code(res) == "CHART_NOT_VERIFIABLE"
+    assert res.json()["error"]["details"]["problems"] == [
+        f"{CAJA}: se llama «CAJA CHICA» y en el modelo es «CAJA»."
+    ]
+    client.patch(
+        f"{ACC}/chart/accounts/{accounts[CAJA]['id']}", json={"name": "Caja"}, headers=headers
+    )
+    ok(client.post(f"{ACC}/chart/validate", headers=auth_header(accountant)))
     # Una cuenta nueva sí: vuelve a pendiente (D-046).
     ok(
         client.post(
