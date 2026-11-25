@@ -94,6 +94,7 @@ ASSET_FIELDS = (
     "fiscal_useful_life_months",
     "fiscal_residual_rate",
     "fiscal_residual_value",
+    "fiscal_life_authorization",
     "acquisition_entry_id",
     "source_transaction_id",
 )
@@ -485,6 +486,35 @@ def _check_links(db: Session, organization_id: uuid.UUID, values: dict[str, Any]
     return str(context_id)
 
 
+def _fiscal_authorization(
+    category: AssetCategory, fiscal_life: int, rate: Decimal, authorization: str | None
+) -> str | None:
+    """La autorización de la DNIT para salir de la tabla de la categoría (D-125).
+
+    Decreto 3182, art. 31 (texto del Decreto 6105/2021), último párrafo: solo la DNIT fija,
+    a pedido del contribuyente, una vida útil o un sistema distintos; lo autoriza bien por
+    bien, con un informe técnico de un tercero (consultas de la DNIT de 2025). Sin el número
+    de esa autorización, la vida útil y el residual fiscal son los de la categoría.
+    """
+    clean = " ".join(authorization.split()) if authorization else None
+    if fiscal_life == category.useful_life_months and rate == category.residual_rate:
+        return None
+    if not clean:
+        raise AppError(
+            "FISCAL_LIFE_NEEDS_AUTHORIZATION",
+            f"La vida útil o el residual fiscal difieren de la categoría «{category.name}» "
+            f"({category.useful_life_months} meses, {category.residual_rate:f} %): solo la DNIT "
+            "los cambia, bien por bien (Decreto 3182, art. 31). Cargá el número de su "
+            "autorización o usá los de la categoría.",
+            {
+                "category_useful_life_months": category.useful_life_months,
+                "category_residual_rate": format(category.residual_rate, "f"),
+            },
+            status_code=422,
+        )
+    return clean
+
+
 def _resolve(db: Session, organization_id: uuid.UUID, values: dict[str, Any]) -> dict[str, Any]:
     """Valida los parámetros completos de un bien y calcula los derivados."""
     category = _usable_category(db, organization_id, values["category_id"])
@@ -506,6 +536,9 @@ def _resolve(db: Session, organization_id: uuid.UUID, values: dict[str, Any]) ->
         )
     life = values.get("useful_life_months") or category.useful_life_months
     fiscal_life = values.get("fiscal_useful_life_months") or category.useful_life_months
+    authorization = _fiscal_authorization(
+        category, fiscal_life, rate, values.get("fiscal_life_authorization")
+    )
     for label, months, depreciable in (
         ("contable", life, cost - residual),
         ("fiscal", fiscal_life, cost - fiscal_residual),
@@ -555,6 +588,7 @@ def _resolve(db: Session, organization_id: uuid.UUID, values: dict[str, Any]) ->
         "fiscal_useful_life_months": fiscal_life,
         "fiscal_residual_rate": rate,
         "fiscal_residual_value": fiscal_residual,
+        "fiscal_life_authorization": authorization,
         "acquisition_entry_id": values.get("acquisition_entry_id"),
         "source_transaction_id": values.get("source_transaction_id"),
         "source_context_id": uuid.UUID(context_id) if context_id is not None else None,
@@ -619,6 +653,10 @@ def update_asset(
         k: data[k] for k in ("name", "description", "serial_or_reference") if k in data
     }
     financial = {k: data[k] for k in (*FINANCIAL_FIELDS, "acquisition_entry_id") if k in data}
+    if "category_id" in financial and financial["category_id"] != asset.category_id:
+        # Otra categoría: los parámetros fiscales vuelven a los suyos salvo que lleguen (D-125).
+        financial.setdefault("fiscal_useful_life_months", None)
+        financial.setdefault("fiscal_residual_rate", None)
     if (
         any(financial.get(k, getattr(asset, k)) != getattr(asset, k) for k in FINANCIAL_FIELDS)
         or "acquisition_entry_id" in financial
@@ -646,6 +684,9 @@ def update_asset(
             "useful_life_months": asset.useful_life_months,
             "fiscal_useful_life_months": asset.fiscal_useful_life_months,
             "fiscal_residual_rate": asset.fiscal_residual_rate,
+            "fiscal_life_authorization": data.get(
+                "fiscal_life_authorization", asset.fiscal_life_authorization
+            ),
             "acquisition_entry_id": asset.acquisition_entry_id,
             "source_transaction_id": asset.source_transaction_id,
             **financial,
@@ -657,6 +698,17 @@ def update_asset(
         else:
             resolved = _resolve(db, organization_id, values)
             changes.update({k: v for k, v in resolved.items() if not k.startswith("source_")})
+    if "fiscal_life_authorization" in data and "fiscal_life_authorization" not in changes:
+        # Solo la autorización (por ejemplo, corregir el número): se puede siempre, pero no
+        # quitarla si el bien sale de la tabla de su categoría.
+        category = db.get(AssetCategory, asset.category_id)
+        assert category is not None
+        changes["fiscal_life_authorization"] = _fiscal_authorization(
+            category,
+            asset.fiscal_useful_life_months,
+            asset.fiscal_residual_rate,
+            data["fiscal_life_authorization"],
+        )
     before, after = apply_changes(asset, changes)
     if after:
         flush_translated(db)

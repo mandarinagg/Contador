@@ -18,7 +18,7 @@ import { accountingKeys, useAccountingPerms, useAccountingSettings, useAssetCate
 import { monthsText, monthYear, percentText, START_RULE_LABELS } from '../labels'
 import type { Entry, FiscalYear, StartRule } from '../types'
 import type { FixedAsset, FixedAssetIn } from '../types3b'
-import { acquiredBeforeNorm, type AssetDraft, categoryDefaults, checkAsset, depreciationStart, draftFromAsset, emptyDraft, hasLiveDepreciation, type Plan } from './assetForm'
+import { acquiredBeforeNorm, type AssetDraft, categoryDefaults, checkAsset, depreciationStart, draftFromAsset, emptyDraft, hasLiveDepreciation, offTable, type Plan } from './assetForm'
 
 function PlanSummary({ title, plan, residual }: { title: string; plan: Plan | null; residual?: string }) {
   return (
@@ -217,7 +217,10 @@ function AssetForm({ asset, acquisitionNumber, onSaved }: { asset?: FixedAsset; 
         <Sheet className="flex flex-col gap-4 p-5">
           <div>
             <h2 className="font-semibold">Parámetros de depreciación</h2>
-            <p className="mt-1 text-sm text-ink-2">Lineal mensual. Los propone la categoría; podés ajustarlos para este bien.</p>
+            <p className="mt-1 text-sm text-ink-2">
+              Lineal mensual. Los fiscales son los de la categoría (Decreto 3182, art. 31): solo cambian con una autorización de la DNIT para este bien. Los contables
+              podés ajustarlos.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Field label="Vida útil fiscal (meses)" error={shown('fiscal_life')} hint={/^\d+$/.test(draft.fiscal_life) ? monthsText(Number(draft.fiscal_life)) : undefined}>
@@ -227,6 +230,15 @@ function AssetForm({ asset, acquisitionNumber, onSaved }: { asset?: FixedAsset; 
               {(p) => <Input {...p} inputMode="decimal" className="tabular-nums" disabled={locked} value={draft.fiscal_rate} onChange={(e) => set({ fiscal_rate: e.target.value })} />}
             </Field>
           </div>
+          {offTable(draft, category) && (
+            <Field
+              label="Autorización de la DNIT"
+              error={shown('authorization')}
+              hint="El número de la consulta o resolución que autoriza esta vida útil o este residual para este bien. La DNIT la da bien por bien, con un informe técnico."
+            >
+              {(p) => <Input {...p} maxLength={100} disabled={locked} value={draft.authorization} onChange={(e) => set({ authorization: e.target.value })} />}
+            </Field>
+          )}
           <Check
             label="Los parámetros contables son iguales a los fiscales"
             hint="Lo habitual. Desmarcalo solo si este bien lleva en los libros otra vida útil u otro residual."

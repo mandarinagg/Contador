@@ -189,5 +189,5 @@ def test_downgrade_refuses_to_lose_vouchers_or_filed_obligations(
     # Anulado igual cuenta: la bajada no lo borra.
     with pytest.raises(RuntimeError, match=r"hay 1 comprobantes"):
         command.downgrade(cfg, "0004")
-    assert _scalar(engine, "SELECT version_num FROM alembic_version") == "0005"
+    assert _scalar(engine, "SELECT version_num FROM alembic_version") == "0006"  # sigue en head
     assert _scalar(engine, "SELECT count(*) FROM tax.vouchers") == 1

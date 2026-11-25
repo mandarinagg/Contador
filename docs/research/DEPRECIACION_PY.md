@@ -359,7 +359,7 @@ Son tres consultas no vinculantes publicadas por la DNIT. No son normas, pero la
 
 **Para la app:**
 - Confirmadas con fuente oficial independiente: informática (2 años, 10 %), maquinarias (10, 20 %) y muebles y equipos en general (5, 10 %).
-- Una vida útil distinta de la tabla solo vale con una autorización particular de la DNIT para ese bien. Por eso la app no debería aceptar vidas útiles fiscales fuera de la tabla sin el número de esa autorización. Queda como mejora (bloque 3, D-123).
+- Una vida útil distinta de la tabla solo vale con una autorización particular de la DNIT para ese bien. Por eso la app no debería aceptar vidas útiles fiscales fuera de la tabla sin el número de esa autorización. Hecho en la D-125: la app exige el número de la autorización.
 - **D-DEP-14 (clasificación):** sigue sin ejemplos oficiales. Lo único firme es que la DNIT no cambia la categoría: la elige el contribuyente según el Anexo.
 
 ### Las páginas viejas de la DNIT no sirven

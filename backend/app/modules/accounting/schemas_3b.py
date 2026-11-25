@@ -129,6 +129,8 @@ class FixedAssetCreate(_Strict):
     useful_life_months: Months | None = None
     fiscal_useful_life_months: Months | None = None
     fiscal_residual_rate: PercentIn | None = None
+    # Obligatoria si la vida útil o el residual fiscal difieren de la categoría (D-125).
+    fiscal_life_authorization: Reference | None = None
     # Por defecto, `settings.default_asset_start_rule`.
     start_rule: StartRule | None = None
     acquisition_entry_id: uuid.UUID | None = None
@@ -147,6 +149,7 @@ class FixedAssetUpdate(_Strict):
     useful_life_months: Months | None = None
     fiscal_useful_life_months: Months | None = None
     fiscal_residual_rate: PercentIn | None = None
+    fiscal_life_authorization: Reference | None = None
     start_rule: StartRule | None = None
     acquisition_entry_id: uuid.UUID | None = None
 
@@ -186,6 +189,7 @@ class FixedAssetOut(BaseModel):
     fiscal_useful_life_months: int
     fiscal_residual_rate: str
     fiscal_residual_value: str
+    fiscal_life_authorization: str | None
     acquisition_entry_id: uuid.UUID | None
     source_transaction_id: uuid.UUID | None
     status: str

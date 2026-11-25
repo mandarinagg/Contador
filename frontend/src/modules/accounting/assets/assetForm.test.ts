@@ -10,6 +10,7 @@ import {
   emptyDraft,
   installmentPlan,
   nextMonthStart,
+  offTable,
   parseMonths,
   parseRate,
   residualFromRate,
@@ -129,6 +130,7 @@ describe('validación del alta', () => {
       start_rule: 'next_month',
       fiscal_useful_life_months: 24,
       fiscal_residual_rate: '10',
+      fiscal_life_authorization: null,
       useful_life_months: 24,
       residual_value: '1200000',
     })
@@ -169,3 +171,26 @@ describe('validación del alta', () => {
     expect(acquiredBeforeNorm('')).toBe(false)
   })
 })
+
+describe('vida útil fiscal fuera de la categoría (D-125)', () => {
+  it('detecta cuándo sale de la tabla, con el residual escrito de cualquier forma', () => {
+    expect(offTable(draft(), category)).toBe(false)
+    expect(offTable(draft({ fiscal_rate: '10,00' }), { ...category, residual_rate: '10.00' })).toBe(false)
+    expect(offTable(draft({ fiscal_life: '60' }), category)).toBe(true)
+    expect(offTable(draft({ fiscal_rate: '5' }), category)).toBe(true)
+    expect(offTable(draft({ fiscal_life: 'x' }), category)).toBe(false)
+    expect(offTable(draft(), undefined)).toBe(false)
+  })
+
+  it('exige el número de la autorización de la DNIT y solo lo envía si hace falta', () => {
+    const missing = checkAsset(draft({ fiscal_life: '60' }), category)
+    expect(missing.body).toBeNull()
+    expect(missing.errors.authorization).toMatch(/solo la DNIT/)
+    const authorized = checkAsset(draft({ fiscal_life: '60', authorization: '  CV  N° 800 ' }), category)
+    expect(authorized.body?.fiscal_life_authorization).toBe('CV N° 800')
+    expect(authorized.body?.fiscal_useful_life_months).toBe(60)
+    const inTable = checkAsset(draft({ authorization: 'CV 800' }), category)
+    expect(inTable.body?.fiscal_life_authorization).toBeNull()
+  })
+})
+

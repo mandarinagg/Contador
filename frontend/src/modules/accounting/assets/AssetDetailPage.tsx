@@ -326,6 +326,7 @@ export function AssetDetailPage() {
                     <dt className="text-ink-3">Fiscal</dt>
                     <dd>
                       {monthsText(a.fiscal_useful_life_months)}, residual {percentText(a.fiscal_residual_rate)} ({formatMoney(a.fiscal_residual_value, 'PYG')})
+                      {a.fiscal_life_authorization && <span className="block text-sm text-ink-3">Autorizado por la DNIT: {a.fiscal_life_authorization}</span>}
                     </dd>
                   </div>
                   <div>

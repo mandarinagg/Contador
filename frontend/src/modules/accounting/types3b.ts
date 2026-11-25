@@ -71,6 +71,8 @@ export interface FixedAsset {
   fiscal_useful_life_months: number
   fiscal_residual_rate: string
   fiscal_residual_value: string
+  /** D-125: autorización de la DNIT para una vida útil o residual fiscal fuera de la categoría. */
+  fiscal_life_authorization: string | null
   acquisition_entry_id: string | null
   source_transaction_id: string | null
   status: AssetStatus
@@ -98,6 +100,7 @@ export interface FixedAssetIn {
   useful_life_months?: number
   fiscal_useful_life_months?: number
   fiscal_residual_rate?: string
+  fiscal_life_authorization?: string | null
   start_rule?: StartRule
   acquisition_entry_id?: string | null
 }

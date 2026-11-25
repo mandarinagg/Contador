@@ -596,6 +596,9 @@ class FixedAsset(TimestampMixin, Base):
     fiscal_useful_life_months: Mapped[int] = mapped_column(Integer, nullable=False)
     fiscal_residual_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
     fiscal_residual_value: Mapped[Decimal] = mapped_column(Money, nullable=False)
+    # D-125: autorización particular de la DNIT (Decreto 3182, art. 31, último párrafo) para
+    # una vida útil o un residual fiscal distintos de los de la categoría.
+    fiscal_life_authorization: Mapped[str | None] = mapped_column(String(100))
     acquisition_entry_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     source_transaction_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     source_context_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))

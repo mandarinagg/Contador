@@ -192,6 +192,7 @@ def _assets_out(
                 fiscal_useful_life_months=asset.fiscal_useful_life_months,
                 fiscal_residual_rate=_rate(asset.fiscal_residual_rate) or "0",
                 fiscal_residual_value=pyg(asset.fiscal_residual_value),
+                fiscal_life_authorization=asset.fiscal_life_authorization,
                 acquisition_entry_id=asset.acquisition_entry_id,
                 source_transaction_id=asset.source_transaction_id,
                 status=asset.status,

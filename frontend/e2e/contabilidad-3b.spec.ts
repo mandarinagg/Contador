@@ -155,6 +155,13 @@ test('alta de bienes: la notebook con su asiento de compra y la impresora; avisa
   await expect(page.getByText(/el primer año completo deja ₲\s?6\.600\.000 no deducibles/)).toBeVisible()
   await same.check()
 
+  // Una vida útil fiscal fuera de la tabla pide la autorización de la DNIT (D-125).
+  await expect(page.getByLabel('Autorización de la DNIT')).toHaveCount(0)
+  await page.getByLabel('Vida útil fiscal (meses)').fill('60')
+  await expect(page.getByLabel('Autorización de la DNIT')).toBeVisible()
+  await page.getByLabel('Vida útil fiscal (meses)').fill('24')
+  await expect(page.getByLabel('Autorización de la DNIT')).toHaveCount(0)
+
   await page.getByLabel('N° del asiento de compra').fill(String(acquisitionNumber))
   await expect(page.getByText(`Asiento N° ${acquisitionNumber} del 20/01/2026: Aporte de equipos de informática e2e.`)).toBeVisible()
   await page.getByRole('button', { name: 'Dar de alta el bien' }).click()

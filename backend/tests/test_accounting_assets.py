@@ -108,10 +108,53 @@ def test_residual_rate_above_20_percent_is_rejected(
     )
     assert res.status_code == 422 and error_code(res) == "RESIDUAL_RATE_INVALID"
     # En el bien, el residual fiscal también tiene el tope del 20 % (Ley 6380, art. 11).
-    res = new_asset(client, books, fiscal_residual_rate="25", expect=422)
+    res = new_asset(
+        client, books, fiscal_residual_rate="25", fiscal_life_authorization="CV 1", expect=422
+    )
     assert error_code(res) == "RESIDUAL_RATE_INVALID"
-    asset = new_asset(client, books, fiscal_residual_rate="20")
+    asset = new_asset(client, books, fiscal_residual_rate="20", fiscal_life_authorization="CV 1")
     assert asset["fiscal_residual_value"] == "2000000"
+
+
+def test_fiscal_life_off_the_table_needs_the_dnit_authorization(
+    client: TestClient, books: dict[str, Any]
+) -> None:
+    """D-125: solo la DNIT cambia la vida útil o el residual fiscal (Decreto 3182, art. 31)."""
+    headers = auth_header(books["token"])
+    res = new_asset(client, books, fiscal_useful_life_months=96, expect=422)
+    assert error_code(res) == "FISCAL_LIFE_NEEDS_AUTHORIZATION"
+    assert res.json()["error"]["details"] == {
+        "category_useful_life_months": 60,
+        "category_residual_rate": "10.00",
+    }
+    res = new_asset(client, books, fiscal_residual_rate="5", expect=422)
+    assert error_code(res) == "FISCAL_LIFE_NEEDS_AUTHORIZATION"
+    # Con la de la tabla no hace falta, y una autorización sobrante no se guarda.
+    asset = new_asset(client, books, fiscal_life_authorization="CV 99")
+    assert asset["fiscal_life_authorization"] is None
+    # Con el número de la autorización, sí.
+    authorized = new_asset(
+        client,
+        books,
+        fiscal_useful_life_months=96,
+        fiscal_life_authorization="  Consulta  N° 7340000519 ",
+    )
+    assert authorized["fiscal_useful_life_months"] == 96
+    assert authorized["fiscal_life_authorization"] == "Consulta N° 7340000519"
+    url = f"{ACC}/fixed-assets/{authorized['id']}"
+    # Se corrige el número, pero no se quita mientras el bien salga de la tabla.
+    fixed = ok(client.patch(url, json={"fiscal_life_authorization": "CV 800"}, headers=headers))
+    assert fixed["fiscal_life_authorization"] == "CV 800"
+    res = client.patch(url, json={"fiscal_life_authorization": None}, headers=headers)
+    assert res.status_code == 422 and error_code(res) == "FISCAL_LIFE_NEEDS_AUTHORIZATION"
+    # Otra categoría: los parámetros fiscales vuelven a los suyos y la autorización se va.
+    moved = ok(
+        client.patch(
+            url, json={"category_id": books["categories"][INFORMATICA]["id"]}, headers=headers
+        )
+    )
+    assert moved["fiscal_useful_life_months"] == 24
+    assert moved["fiscal_life_authorization"] is None
 
 
 def test_validation_requires_post_and_resets_on_structural_change(

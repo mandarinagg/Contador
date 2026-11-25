@@ -25,6 +25,8 @@ export interface AssetDraft {
   /** Vida útil fiscal en meses y porcentaje de residual fiscal (de la categoría, editables). */
   fiscal_life: string
   fiscal_rate: string
+  /** N° de la autorización de la DNIT, si la vida útil o el residual fiscal salen de la categoría (D-125). */
+  authorization: string
   /** Contables iguales a los fiscales (lo normal); si no, los de abajo. */
   same_params: boolean
   life: string
@@ -44,6 +46,7 @@ export function emptyDraft(startRule: StartRule): AssetDraft {
     start_rule: startRule,
     fiscal_life: '',
     fiscal_rate: '',
+    authorization: '',
     same_params: true,
     life: '',
     residual: '',
@@ -64,6 +67,7 @@ export function draftFromAsset(a: FixedAsset, acquisitionNumber: number | null):
     start_rule: a.start_rule,
     fiscal_life: String(a.fiscal_useful_life_months),
     fiscal_rate: a.fiscal_residual_rate.replace('.', ','),
+    authorization: a.fiscal_life_authorization ?? '',
     same_params: same,
     life: String(a.useful_life_months),
     residual: toInputText(a.residual_value, 'PYG'),
@@ -74,6 +78,19 @@ export function draftFromAsset(a: FixedAsset, acquisitionNumber: number | null):
 /** Los parámetros fiscales que propone la categoría al elegirla. */
 export function categoryDefaults(c: AssetCategory): Pick<AssetDraft, 'fiscal_life' | 'fiscal_rate'> {
   return { fiscal_life: c.useful_life_months ? String(c.useful_life_months) : '', fiscal_rate: (c.residual_rate ?? '').replace('.', ',') }
+}
+
+/**
+ * ¿La vida útil o el residual fiscal salen de la tabla de la categoría? Entonces hace falta la
+ * autorización de la DNIT (Decreto 3182, art. 31, último párrafo; D-125). Sin datos válidos, no.
+ */
+export function offTable(d: Pick<AssetDraft, 'fiscal_life' | 'fiscal_rate'>, c: AssetCategory | undefined): boolean {
+  if (!c || c.useful_life_months === null || c.residual_rate === null) return false
+  const life = parseMonths(d.fiscal_life)
+  const rate = parseRate(d.fiscal_rate)
+  const tableRate = parseRate(c.residual_rate)
+  if (!life.ok || !rate.ok || !tableRate.ok) return false
+  return life.value !== c.useful_life_months || compareRate(rate.value, tableRate.value) !== 0
 }
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string }
@@ -231,6 +248,12 @@ export function checkAsset(d: AssetDraft, category: AssetCategory | undefined): 
     }
   }
   if (d.acquisition_number.trim() && !/^\d{1,9}$/.test(d.acquisition_number.trim())) errors.acquisition_number = 'El número del asiento, sin letras.'
+  const needsAuthorization = offTable(d, category)
+  const authorization = d.authorization.trim().replace(/\s+/g, ' ')
+  if (needsAuthorization && !authorization)
+    errors.authorization =
+      'La vida útil o el residual fiscal difieren de la categoría: solo la DNIT los cambia, bien por bien (Decreto 3182, art. 31). Escribí el número de su autorización o usá los de la categoría.'
+  else if (authorization.length > 100) errors.authorization = 'Hasta 100 caracteres.'
 
   let nonDeductible: string | null = null
   if (fiscal && accounting) {
@@ -250,6 +273,7 @@ export function checkAsset(d: AssetDraft, category: AssetCategory | undefined): 
         start_rule: d.start_rule,
         fiscal_useful_life_months: fLife.value,
         fiscal_residual_rate: fRate.value,
+        fiscal_life_authorization: needsAuthorization ? authorization : null,
         useful_life_months: life as number,
         residual_value: residual as string,
       }
