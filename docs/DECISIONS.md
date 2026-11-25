@@ -289,4 +289,34 @@ Detalle en `docs/specs/FASE4_TRIBUTACION.md`.
     - 7 no tienen respuesta oficial vigente y solo las resolvería una consulta vinculante;
     - 3 ya tienen respuesta en la norma leída.
   - Las páginas HTML viejas de la DNIT (Ley 125 y Decreto 6359) no se usan.
+- **D-124 — CONTADOR AI controla el plan de cuentas contra la RG 49/2014 antes de validarlo.** **Aceptada · 2026-11-25.** Modifica la D-046 y la D-120.
+  - **Antes,** validar solo marcaba el plan como validado.
+  - **Ahora** `validate_chart` compara el plan de la base con los 305 códigos oficiales, extraídos del XLS de la DNIT con su SHA-256. Si algo no respeta el modelo, rechaza con 422 `CHART_NOT_VERIFIABLE` y lista los problemas, que la pantalla muestra.
+  - Qué controla:
+    - una cuenta con un código del modelo lleva su nombre oficial;
+    - una cuenta propia cuelga de una cuenta del modelo;
+    - en el balance, el grupo fija el tipo.
+  - Las archivadas no cuentan.
+  - Cambio a la D-046: renombrar una cuenta del modelo con otro nombre vuelve el plan a pendiente. Renombrar una cuenta propia, no.
+  - El plan propuesto pasa sin problemas, y una prueba lo controla en cada CI. Detalle en `docs/research/PLAN_DE_CUENTAS_PY.md`.
+- **D-125 — Vida útil fiscal fuera de la tabla: solo con la autorización de la DNIT.** **Aceptada · 2026-11-25.** Viene de la D-123.
+  - Base legal: Decreto 3182, art. 31, último párrafo (texto del Decreto 6105/2021). Solo la DNIT fija, a pedido del contribuyente, una vida útil o un sistema distintos de la tabla. Según sus consultas de 2025, lo hace bien por bien y con el informe técnico de un tercero.
+  - El bien suma `fiscal_life_authorization` (migración 0006). Si la vida útil o el residual fiscal difieren de los de la categoría, la API la exige, con 422 `FISCAL_LIFE_NEEDS_AUTHORIZATION` y los valores de la categoría.
+  - Si el bien vuelve a los valores de la tabla, la autorización no se guarda.
+  - Se puede corregir el número aunque el bien tenga depreciaciones, pero no quitarlo mientras el bien salga de la tabla.
+  - Si cambia la categoría, los parámetros fiscales vuelven a los de la nueva categoría, salvo que lleguen en el mismo cambio.
+  - La bajada de la 0006 se niega si hay alguna autorización cargada (D-080).
+  - En la pantalla, el campo aparece solo cuando hace falta, y el detalle del bien muestra la autorización.
+  - Los parámetros **contables** siguen libres: su diferencia con los fiscales es la cuota no deducible.
+- **D-126 — El bot de Marangatu sigue, con la guía paso a paso como alternativa.** **Decisión del propietario · 2026-11-25.** Viene de la D-119; la investigación está en `docs/research/BOT_MARANGATU.md`.
+  - La Resolución 568/2006, art. 11, prohíbe «intervenir o manipular, mediante la utilización de programas», el sitio web de la DNIT. El texto no aclara si eso alcanza a un navegador que llena los formularios. No se encontró una consulta de la DNIT sobre el tema.
+  - El propietario elige la **lectura amplia**: un navegador que usa su clave en su computadora y llena los mismos formularios que llenaría él no manipula el sitio. **El riesgo de otra interpretación lo asume el propietario.** Lo presentado vale como su firma manuscrita (art. 5 y art. 7).
+  - **El bot hace todo solo**, con las 12 condiciones de la D-119.
+  - **Además, la herramienta genera a pedido una guía paso a paso** con las mismas pantallas, los importes casilla por casilla y los archivos. La persona puede presentar a mano cuando quiera o cuando el bot se detenga.
+  - Lo que la norma suma al diseño:
+    - un solo intento de ingreso y nunca un captcha (aparece al tercer intento fallido);
+    - sin acuse inmediato, la presentación cuenta como **no hecha** (art. 8);
+    - el registro de pasos, la declaración y el acuse se conservan sin modificar durante la prescripción (art. 10).
+  - No hay servicio web oficial para presentar declaraciones juradas.
+  - La RG 04/2007 (la clave) no se pudo leer: el PDF es un escaneo.
 
