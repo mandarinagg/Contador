@@ -280,4 +280,13 @@ Detalle en `docs/specs/FASE4_TRIBUTACION.md`.
     - D-F4-3: rige la RG 90/2021, art. 9.
   - Las reglas `IVA-F120-ESTRUCTURA`, `IVA-CREDITO-REQUISITOS` y `CAL-DIA-INHABIL` pasan a versión 2, con la misma salvedad de la D-121 sobre las bases que ya tienen cargada la versión 1.
   - El aviso de vencimientos sigue usando la fecha fija sin correr (D-098), porque falta D-F4-12 (feriados).
+- **D-123 — Verificación de CONTADOR AI, bloque 3: depreciación.** **Aceptada · 2026-11-25.** Detalle en `docs/research/DEPRECIACION_PY.md` («Verificación de CONTADOR AI, bloque 3»).
+  - Tres consultas de la DNIT de 2025 confirman, con una fuente oficial independiente, las cifras de informática, maquinarias y muebles y equipos del art. 31 vigente (texto del Decreto 6105/2021).
+  - Confirman además que la DNIT no recategoriza bienes y que solo amplía la vida útil bien por bien, con informe técnico de un tercero.
+  - Las 17 dudas D-DEP quedan clasificadas:
+    - 5 son de política contable (las fija CONTADOR AI con un criterio por defecto);
+    - 2 dependen del régimen del IRE;
+    - 7 no tienen respuesta oficial vigente y solo las resolvería una consulta vinculante;
+    - 3 ya tienen respuesta en la norma leída.
+  - Las páginas HTML viejas de la DNIT (Ley 125 y Decreto 6359) no se usan.
 

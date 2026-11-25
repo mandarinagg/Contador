@@ -336,3 +336,56 @@ No toco código; esto es para quien lo implemente.
 - Un asistente de IA hizo esta lectura. Las cifras de la tabla del art. 31 se contrastaron entre el Decreto 3182 original y el Decreto 6105, pero no las valida ningún contador.
 - Algunas páginas de la DNIT las leí con un resumen automático de la página y no como texto completo (consultas vinculantes y Resolución de Actualización). Las cifras clave (art. 31, art. 30, art. 11) sí las leí del texto o de la imagen.
 - No verifiqué si existen normas posteriores a las encontradas (otras resoluciones de la DNIT de 2022 a 2026 sobre depreciación). Busqué por título en la lista de decretos y con búsquedas web.
+
+---
+
+## Verificación de CONTADOR AI, bloque 3 (2026-11-25)
+
+### Consultas de la DNIT bajo el Decreto 3182 (texto del Decreto 6105/2021)
+
+Son tres consultas no vinculantes publicadas por la DNIT. No son normas, pero las cifras que citan las toma la DNIT del propio art. 31 vigente. Confirman la tabla de este documento con una fuente oficial independiente.
+
+- **N.° 7340000519, del 16-12-2025** (equipos de informática, <https://www.dnit.gov.py/documents/20123/2741790/AMPLIAC.+DE+VIDA+%C3%9ATIL+DE+EQUIPOS+INFORM%C3%81T._ACTIVO+FIJO+A+UN+PLAZO+DE+5+A%C3%91OS.+N%C2%B0+800+CNV.pdf/f63b5c44-173c-e93a-ee13-329d02f8097e?t=1771246522439>):
+  - «numeral 1), literal b) iii […] el periodo de vida útil es de 2 años, y su valor residual es de 10%; lo que se aplica a los equipos de informática».
+  - Rechaza ampliarla a 5 años porque el informe técnico no estaba «sólidamente argumentado y debidamente respaldado».
+- **N.° 737, de 2025** (maquinarias, <https://www.dnit.gov.py/documents/20123/422349/DEPRECIACI%C3%93N+DE+BIENES+DEL+ACTIVO+FIJO.+N%C2%B0+737.pdf/2ff0490d-d14e-515e-424a-bbf1b7082a83?t=1764935663595>):
+  - «numeral 1), literal b) i) […] el periodo de vida útil es de 10 años, y su valor residual es de 20%; lo que se aplica a las maquinarias e implementos».
+  - El informe tiene que ser de «un tercero, ajeno a la firma recurrente» y en castellano.
+- **Consulta sobre equipos de tomografía**, de la SET antes de la DNIT (<https://www.dnit.gov.py/documents/47797/47809/IRE_Depreciaci%C3%B3n+bienes+del+activo+fijo.pdf/8caa69a5-3b98-4dd9-ce7a-0f8334f26abe?t=1680717914555>):
+  - «“Muebles y Equipos en general”, según lo establecido en el numeral 1, literal a) i […] el periodo de vida útil será de cinco (5) años y su valor residual del 10%».
+  - Autoriza 15 años con un informe técnico. La autorización «no es extensible a otros bienes de similar naturaleza».
+  - **«la norma reglamentaria no contempla la facultad de modificar la categoría de los bienes»**: cada bien se clasifica según el Anexo.
+- Las tres repiten la fórmula del art. 31: la cuota se aplica sobre el valor del activo fijo «de acuerdo con los años de vida útil, menos el porcentaje de valor residual».
+
+**Para la app:**
+- Confirmadas con fuente oficial independiente: informática (2 años, 10 %), maquinarias (10, 20 %) y muebles y equipos en general (5, 10 %).
+- Una vida útil distinta de la tabla solo vale con una autorización particular de la DNIT para ese bien. Por eso la app no debería aceptar vidas útiles fiscales fuera de la tabla sin el número de esa autorización. Queda como mejora (bloque 3, D-123).
+- **D-DEP-14 (clasificación):** sigue sin ejemplos oficiales. Lo único firme es que la DNIT no cambia la categoría: la elige el contribuyente según el Anexo.
+
+### Las páginas viejas de la DNIT no sirven
+
+Las páginas HTML de la DNIT sobre depreciación («Depreciación de período de vida útil…», «Amortización activo intangible…» de 2012 y «Depreciaciones y reservas de revalúo» de 2009) aplican la Ley 125/1991 y el Decreto 6359/2005, derogados. Por ejemplo, intangibles al 25 % anual y muebles a 10 años. **No se usan.**
+
+### Cómo quedan las 17 dudas D-DEP
+
+- **Decisiones de política contable.** Las toma CONTADOR AI con un criterio por defecto y el propietario puede cambiarlo:
+  - D-DEP-2 (mes siguiente o ejercicio siguiente);
+  - D-DEP-3 (bienes de bajo valor);
+  - D-DEP-5 (vida útil contable);
+  - D-DEP-7 (revalúo voluntario);
+  - D-DEP-12 (separar terreno y construcción, con el dato de la escritura).
+- **Dependen del perfil de la EAS:** D-DEP-8 y D-DEP-16 (régimen del IRE, D-1 y D-2).
+- **Sin respuesta oficial vigente, después de buscar:**
+  - D-DEP-1 (prorrata mensual del primer año);
+  - D-DEP-4 (software);
+  - D-DEP-9 (reformas de inmuebles);
+  - D-DEP-13 («utilitarios»);
+  - D-DEP-14 (clasificación);
+  - D-DEP-15 («restantes bienes»);
+  - D-DEP-17 (uso mixto).
+  - Solo se resuelven con una consulta vinculante a la DNIT (Ley 125/1991, art. 241), que la presenta el contribuyente.
+- **Con respuesta en la norma ya leída:**
+  - D-DEP-6: el bien queda con su valor residual y, al venderlo, el resultado es precio − costo + depreciaciones admitidas (Ley 6380, art. 8).
+  - D-DEP-10: la baja por obsolescencia exige el acta del contador o del auditor (art. 58).
+  - D-DEP-11: el art. 23 incluye los «gastos inherentes a dicha operación debidamente documentados».
+
