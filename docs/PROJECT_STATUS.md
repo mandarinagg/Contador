@@ -115,8 +115,8 @@ D-001 a D-133 en `DECISIONS.md` (D-127 a D-133: el B1 del bot de Marangatu). **D
 11. **Estatuto de la EAS** (D-3): el plazo que fija para poner las utilidades a disposición. De eso depende cuándo nace la retención del IDU.
 12. **Municipio de la EAS**, para la patente municipal.
 
-## Para retomar (traspaso, 2026-11-25)
-**Estado de `main`:** fases 0 a 3B y la fase 4 (tributación, backend e interfaz) integradas. Pruebas: backend 334 (pytest contra PostgreSQL real, incluidas las `slow`), Vitest 214, E2E 47 (`flujos`, `finanzas`, `contabilidad`, `contabilidad-3b`, `tributacion`). Migraciones hasta `0006_autorizacion_vida_util`. Último CI (`c936f30`, corrida 45674716546, con las D-124 a D-126) verde en los 5 jobs; el diario XLSX de 20.000 líneas tarda 0,48 s en el runner (antes 3,0 a 3,1 s): `secrets`, `test`, `e2e`, `performance` y `windows` (instalador NSIS generado y probado, ya con la tributación).
+## Para retomar (traspaso, 2026-11-25, actualizado con el B1)
+**Estado de `main`:** fases 0 a 3B, la fase 4 (tributación) y el B1 del bot de Marangatu (backend e interfaz) integrados. Pruebas: backend 387 (pytest contra PostgreSQL real, incluidas las `slow`), Vitest 219, E2E 50 (`flujos`, `finanzas`, `contabilidad`, `contabilidad-3b`, `tributacion`, `marangatu`). Migraciones hasta `0007_marangatu`. CI del B1 (`fc624d1`, corrida 45721250345) y de la pantalla (`bf5feb9`, corrida 45722000105) verdes en los 5 jobs, incluido `windows` con la prueba nueva de la clave en el Administrador de credenciales y del trabajador con Edge. El instalador pasó de 53 a 82 MB comprimido (Playwright).
 
 **Fase 4:** menú Impuestos (Resumen fiscal, Calendario, Comprobantes, IVA del mes, Perfil fiscal, Reglas y feriados, Configuración) y avisos en Inicio. Decisiones D-082 a D-116.
 - **Antes de usarlo en serio** (lo hace la herramienta con tu aprobación, D-118): cargar y verificar las reglas en uso y los feriados (Impuestos → Reglas y feriados), declarar y verificar el perfil fiscal con la constancia de RUC, y responder las dudas D-F4-1 a D-F4-14 de `docs/research/TRIBUTACION_FASE4.md`. Probar el archivo de Marangatu con uno o dos comprobantes antes de un mes entero.
@@ -153,22 +153,21 @@ D-001 a D-133 en `DECISIONS.md` (D-127 a D-133: el B1 del bot de Marangatu). **D
 - **Bot de Marangatu (D-119, D-126):** investigación en `docs/research/BOT_MARANGATU.md` y diseño en `docs/specs/BOT_MARANGATU.md`.
   - La Res. 568/2006, art. 11, prohíbe «intervenir o manipular, mediante la utilización de programas», el sitio de la DNIT. El propietario elige la lectura amplia y asume el riesgo (D-126). El bot hace todo solo y, a pedido, genera la guía paso a paso.
   - Ingreso: un intento; el captcha aparece al tercer fallo. No hay segundo factor ni servicio web para declarar.
-  - Orden de construcción: B1, la base (con el modo reconocimiento); el reconocimiento real con la clave del propietario en su PC; B2, `consulta`; B3, el registro de comprobantes; B4, el F120; B5, la guía.
+  - Orden de construcción: B1, la base (con el modo reconocimiento) — **hecho**; el reconocimiento real con la clave del propietario en su PC; B2, `consulta`; B3, el registro de comprobantes; B4, el F120; B5, la guía.
   - Falta confirmar si el bot paga. Por defecto no paga.
 - **Fase 4 (tributación)**: cargar el perfil fiscal real del propietario (régimen IRE General o SIMPLE, obligaciones, cierre del ejercicio) y probar con comprobantes reales de un mes. Lo presenta el bot de Marangatu cuando exista (D-119).
 - Fase 2: probar el importador con extractos reales anonimizados del propietario y guardar un mapeo por banco.
 - CI de Windows: si algo falla, el paso "Lanzador — registros si falló" muestra cada comando (`$ ...`) y su resultado (`→`); la prueba del instalador vuelca `%LOCALAPPDATA%\ContadorAI\logs` y su paso 4b informa si el cierre cayó durante el arranque. `gh run view --log` a veces sale vacío: usar `gh api repos/mandarinagg/Contador/actions/jobs/<id>/logs`.
 - Sigue abierto, decisión del propietario: tabla de totales mensuales para el resumen (solo si en la PC real se nota lento).
 
-**Limpieza pendiente:** el worktree `.claude/worktrees/agent-a2d82accdd256c977` (rama `worktree-agent-a2d82accdd256c977`, ya integrada en `main`) se puede borrar.
-
 **Entorno local:** Postgres de desarrollo en el proyecto docker `contador` (127.0.0.1:55433). Para probar el lanzador sin `sudo` se usan los binarios de PostgreSQL 18 de Ubuntu (`apt download` + `dpkg-deb -x`, con `LD_LIBRARY_PATH`) y las variables `CONTADOR_TEST_PGSQL_BIN` y `CONTADOR_TEST_BACKEND_EXE`. E2E en paralelo con otra corrida: `CONTADOR_E2E_DB_NAME`, `CONTADOR_E2E_API_PORT` y `CONTADOR_E2E_WEB_PORT`.
 
 ## Próximo objetivo recomendado
-- **B1 del bot de Marangatu: hecho en el backend (D-127 a D-133), sin interfaz todavía.**
+- **B1 del bot de Marangatu: hecho (D-127 a D-133), backend e interfaz (Impuestos → Marangatu).**
   - Módulo `backend/app/modules/marangatu/`, migración `0007_marangatu`, API `/api/v1/marangatu` (interruptor, clave, reconocimiento, corridas, pasos, capturas, verificación).
   - Trabajador en otro proceso (`contador-backend.exe marangatu-worker` en el instalador), Playwright con el Edge del sistema en Windows, clave en el Administrador de credenciales.
   - Catálogo **provisorio** (`docs/research/marangatu_pantallas.yaml`, regenerar la copia con `scripts/generar_pantallas_marangatu.py`) y portal simulado en `backend/tests/marangatu_fake/`.
-  - Falta: la pantalla Impuestos → Marangatu en la interfaz; incluir `<datos>/documentos` en la copia de seguridad (D-131).
+  - Falta: incluir `<datos>/documentos` en la copia de seguridad (D-131); un endpoint para cambiar la etapa de un tipo de tarea (hoy solo se muestra); la E2E usa el almacén de claves falso de `backend/tests/marangatu_fake`.
+  - Sin probar: un reconocimiento real, el detalle de corridas con capturas y «Verificar el registro» con datos vivos; si los menús de Marangatu usan JavaScript, el recorrido no los sigue (D-132).
 - **Hacer el reconocimiento real con el propietario en su PC.** Hace falta para escribir el catálogo: hoy no se conocen las pantallas por dentro.
 - **Instalar en la PC real del propietario** (cierra la fase 1B). Sirve para el reconocimiento.
