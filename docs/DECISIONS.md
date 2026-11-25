@@ -240,6 +240,19 @@ Detalle en `docs/specs/FASE4_TRIBUTACION.md`.
   - Cada paso queda registrado con su captura; la constancia o el acuse se guarda como documento respaldatorio de la obligación.
   - El bot se detiene ante cualquier pantalla que no reconozca, porque el portal puede cambiar.
   - Hay un modo de ensayo que llena todo sin presentar.
-  - **Regla 16 del prompt maestro** («la IA no ejecuta acciones críticas sin aprobación»): la recomendación es que el bot haga todo y que el propietario apruebe con un clic antes del botón final de cada presentación, que no se puede deshacer. **Falta que el propietario lo confirme.**
+  - **Presenta solo, sin pedir aprobación (decisión del propietario, 2026-11-25).** Para esto queda modificada la regla 16 del prompt maestro. A cambio, el bot sigue reglas estrictas. El principio es que **ante la menor duda no presenta: se detiene y avisa**. Es mejor una presentación que hay que hacer a mano que una mal hecha. Antes de presentar, se tienen que cumplir **todas** estas condiciones; si una falla, no presenta:
+    1. **Reglas verificadas:** cada regla, tasa, casilla y vencimiento que interviene está verificado contra su fuente oficial (D-118). Con una sola `pending` no presenta.
+    2. **Perfil fiscal confirmado:** RUC, DV, régimen y obligaciones coinciden con lo que muestra Marangatu. Si difieren en algo, se detiene.
+    3. **Cuadre con la contabilidad:** los totales de la declaración coinciden al guaraní con el cálculo de la herramienta (por ejemplo, el borrador del F120 de la D-097) y con los saldos del mayor de las cuentas de impuestos. Sin diferencias toleradas.
+    4. **Datos completos:** no hay comprobantes marcados para revisar (`counterparty_review_required`, avisos de la estimación), ni casillas `not_calculated` que la declaración necesite, ni movimientos del período sin clasificar.
+    5. **Sin duplicados:** antes de presentar consulta en Marangatu si el período ya está presentado. Si ya lo está, no presenta una original. Una rectificativa es otra operación, con sus propias reglas.
+    6. **Lectura de vuelta:** después de llenar el formulario, lee lo que quedó cargado en pantalla y lo compara casilla por casilla con lo calculado antes del clic final. Cualquier diferencia lo detiene.
+    7. **Pantallas conocidas:** el bot solo avanza por pantallas que reconoce (título, campos y botones esperados). Ante cualquier pantalla, mensaje o error inesperado se detiene sin presentar.
+    8. **Margen de tiempo:** presenta con días de anticipación al vencimiento, no el último día, para que si se detiene quede tiempo de resolverlo.
+    9. **Después de presentar:** descarga la constancia, comprueba que el número de la constancia, el período y los importes coinciden, la guarda como documento respaldatorio, marca la obligación como presentada y te avisa con el resumen.
+    10. **Registro completo:** cada paso queda con captura, hora y resultado, para poder auditarlo.
+    11. **Ensayos antes de lo real:** cada tipo de declaración primero se prueba en modo de ensayo (llena todo y lee de vuelta, sin el clic final) hasta que salga bien varias veces. Recién ahí se habilita para presentar sola.
+    12. **Pagos:** el bot no paga; solo informa el importe y el vencimiento. Esto todavía no se habló con el propietario y queda por confirmar.
+    - **Lo que no se puede garantizar:** que nunca se equivoque. Estas reglas apuntan a que, si algo no está claro, **no presente** en lugar de presentar mal. Si un error llegara a presentarse, la herramienta tiene que detectarlo al leer la constancia y preparar la rectificativa.
   - Por investigar: si el portal tiene captcha o segundo factor, si sus condiciones de uso admiten acceso automatizado, y si existe un servicio web oficial para alguna de estas operaciones (sería preferible a hacer clic).
   - Requisitos previos: las reglas verificadas (D-118), el perfil fiscal real, las credenciales y una primera prueba con uno o dos comprobantes.

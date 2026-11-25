@@ -443,8 +443,8 @@ Trabajar mediante fases y entregables verificables.
 12. No eliminar información sin autorización.
 13. No almacenar secretos en el repositorio.
 14. No ejecutar migraciones destructivas sin autorización.
-15. ~~No realizar operaciones tributarias oficiales automáticamente.~~ **Modificada por el propietario (D-119, 2026-11-25):** la herramienta opera Marangatu con un bot (revisa qué hay que presentar, presenta documentos y declaraciones), registrando cada paso; la aprobación antes de presentar sigue la regla 16 según la D-119.
-16. No permitir que la IA ejecute acciones críticas sin aprobación.
+15. ~~No realizar operaciones tributarias oficiales automáticamente.~~ **Modificada por el propietario (D-119, 2026-11-25):** la herramienta opera Marangatu con un bot (revisa qué hay que presentar, presenta documentos y declaraciones), registrando cada paso, y presenta solo, sin pedir aprobación, bajo las reglas estrictas de la D-119 (ante la menor duda no presenta y avisa).
+16. No permitir que la IA ejecute acciones críticas sin aprobación. *(Excepción del propietario, D-119: las presentaciones en Marangatu, con las condiciones de esa decisión.)*
 17. Mantener separación entre finanzas personales y empresariales.
 18. Mantener documentación actualizada.
 19. Escribir código limpio, modular y tipado.
