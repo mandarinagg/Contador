@@ -30,7 +30,15 @@ args=(git "$ROOT" --config "$ROOT/.gitleaks.toml" --redact --no-banner)
 # siga apuntando a un lugar válido. safe.directory: el contenedor corre con otro usuario.
 mounts=(-v "$ROOT:$ROOT")
 [[ "$GIT_COMMON" == "$ROOT/.git" ]] || mounts+=(-v "$GIT_COMMON:$GIT_COMMON")
-if ! docker run --rm "${mounts[@]}" \
+# `git commit -a` (y `commit <ruta>`) prepara los cambios en un índice temporal que git pasa
+# en GIT_INDEX_FILE: sin pasarlo al contenedor, gitleaks lee el índice normal y no ve nada.
+env_args=()
+if [[ -n "${GIT_INDEX_FILE:-}" ]]; then
+  index="$GIT_INDEX_FILE"
+  [[ "$index" == /* ]] || index="$ROOT/$index"
+  env_args+=(-e "GIT_INDEX_FILE=$index")
+fi
+if ! docker run --rm "${mounts[@]}" "${env_args[@]}" \
   -e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0='*' \
   "$IMAGE" "${args[@]}"; then
   echo "" >&2
