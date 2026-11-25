@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-**Última actualización:** 2026-11-24 · **Fase actual:** 1B — Instalador para Windows 11
+**Última actualización:** 2026-11-25 · **Fase actual:** 1B — Instalador para Windows 11
 
 ## Resumen
 
@@ -99,34 +99,37 @@
 | P-10 | ~~Los asientos traen el id de quien creó/contabilizó, no el nombre~~ | **Resuelto**: en la API (`test_accounting_entry_user_names.py`) y en la interfaz (asiento y libro diario, sin leer `/users`) |
 
 ## Decisiones tomadas en esta sesión
-D-001 a D-116 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requiere tu confirmación.**
+D-001 a D-119 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requiere tu confirmación.**
 
 ## Información requerida del propietario
 1. **Confirmar D-007**: reutilizar el núcleo SIFEN como servicio Node (recomendado) en lugar de portarlo a Python.
 2. **Repositorio original del CRM de Zestia** (el que contiene `@crm/contracts`, `test/helpers/certificate.ts`, etc.). El extracto no trae los helpers de prueba ni `contracts/invoicing.ts`; sin ellos hay que recrearlos.
 3. **Constancia de RUC** de la EAS: RUC, DV, obligaciones inscriptas, actividades económicas, fecha de cierre del ejercicio.
 4. **Facturación electrónica**: estado de la habilitación, timbrado de pruebas, certificado de firma (prestador habilitado), IdCSC/CSC de pruebas.
-5. **Contador/a responsable** que validará las reglas tributarias (nombre/matrícula para el campo "revisado por").
+5. ~~Contador/a responsable~~ **No hay (D-118):** la herramienta cumple ese rol y verifica contra las fuentes oficiales, con tu aprobación.
 6. **Bancos** con los que opera (para preparar los adaptadores de extractos) y un extracto de ejemplo anonimizado.
 7. **Probar el instalador** en la PC con Windows 11 y avisar el resultado (y si el nombre de usuario de Windows tiene tildes o ñ).
 8. Revisar los hallazgos R-10 y R-11 de `DISCOVERY.md` (repositorio git en la carpeta personal con `.git-credentials`).
+9. **Credenciales de Marangatu** para el bot (D-119), cuando lleguemos a esa fase. Se guardan en el almacén de credenciales de Windows, nunca en el repositorio.
+10. **Confirmar la D-119:** si el bot te pide un clic de aprobación antes del botón final de cada presentación (recomendado) o presenta sin preguntar.
 
 ## Para retomar (traspaso, 2026-11-24)
 **Estado de `main`:** fases 0 a 3B y la fase 4 (tributación, backend e interfaz) integradas. Pruebas: backend 322 (pytest contra PostgreSQL real, incluidas las `slow`), Vitest 212, E2E 47 (`flujos`, `finanzas`, `contabilidad`, `contabilidad-3b`, `tributacion`). Migraciones hasta `0005_tributacion`. Último CI (`dda67e4`, corrida 45470092886) verde en los 5 jobs: `secrets`, `test`, `e2e`, `performance` y `windows` (instalador NSIS generado y probado, ya con la tributación).
 
 **Fase 4:** menú Impuestos (Resumen fiscal, Calendario, Comprobantes, IVA del mes, Perfil fiscal, Reglas y feriados, Configuración) y avisos en Inicio. Decisiones D-082 a D-116.
-- **Antes de usarlo en serio** (contador): cargar y verificar las reglas en uso y los feriados (Impuestos → Reglas y feriados), declarar y verificar el perfil fiscal con la constancia de RUC, y responder las dudas D-F4-1 a D-F4-14 de `docs/research/TRIBUTACION_FASE4.md`. Probar el archivo de Marangatu con uno o dos comprobantes antes de un mes entero.
+- **Antes de usarlo en serio** (lo hace la herramienta con tu aprobación, D-118): cargar y verificar las reglas en uso y los feriados (Impuestos → Reglas y feriados), declarar y verificar el perfil fiscal con la constancia de RUC, y responder las dudas D-F4-1 a D-F4-14 de `docs/research/TRIBUTACION_FASE4.md`. Probar el archivo de Marangatu con uno o dos comprobantes antes de un mes entero.
 - Abierto: sábados como inhábiles (D-F4-11); redondeo del IVA por comprobante (D-F4-7); casillas 33/36/39 y 164 del F120 vacías hasta saber del prorrateo (D-F4-14); la nota de débito electrónica no controla el tipo del CDC (D-107).
-- **CI `performance` intermitente** (no frena el instalador): `test_journal_xlsx_with_20000_lines` (3B) tarda 3,0 a 3,1 s en el runner contra un límite de 3 s; falló en 3 de las 6 corridas del 2026-11-24 (pasó en la última). Decisión pendiente del propietario: usar el escritor propio de `tax/fast_xlsx.py` (D-100) para el diario o revisar el límite.
+- ~~**CI `performance` intermitente**~~ **Resuelto (D-117, 2026-11-25):** el diario en XLSX usa el escritor propio (`accounting/fast_xlsx.py`). En esta PC bajó de 2,2 s a 0,6 s; en el runner tardaba de 3,0 a 3,1 s contra un límite de 3 s.
 - Windows no distingue mayúsculas: dos archivos como `VoucherForm.tsx` y `voucherForm.ts` rompen el build del instalador. El job `secrets` del CI ya lo rechaza en Linux.
 - Sin E2E (probado solo con pruebas unitarias y del backend): presentar, pagar y reabrir obligaciones; anular y proponer el asiento de un comprobante; descarga del archivo de Marangatu; deprecar reglas; excepciones de vencimiento.
 
 **Lo primero:**
 1. El propietario prueba el instalador NSIS (artefacto `contador-ai-windows-instalador` del último CI verde, vence a los 30 días) en su PC con Windows 11: P-8 (usuario con tildes o ñ) y P-12 (descarga de Excel dentro de la app).
-2. **Validación del contador** (bloquea usar la contabilidad y la tributación "en serio"): plan de cuentas propuesto (173 cuentas, `docs/research/PLAN_DE_CUENTAS_PY.md`), las 34 categorías de activo fijo y sus vidas útiles y residuales, las 17 dudas D-DEP de `docs/research/DEPRECIACION_PY.md`, y en la fase 4 las reglas, el perfil y las dudas D-F4. En la app se marca con nombre y matrícula (`accounting.post`, `tax.verify`).
+2. **Rol del contador → la herramienta (D-118):** adaptar los flujos que piden nombre y matrícula (`chart/validate`, `tax.verify`, la verificación de reglas, feriados y perfil) para que registren «verificado por CONTADOR AI contra <fuente>» con la aprobación del propietario. Después, la herramienta verifica contra la fuente oficial el plan de cuentas (173 cuentas, `docs/research/PLAN_DE_CUENTAS_PY.md`), las 34 categorías de activo fijo, las dudas D-DEP de `docs/research/DEPRECIACION_PY.md` y, en la fase 4, las reglas, el perfil y las dudas D-F4. Hay que investigar si alguna presentación exige por ley la firma de un contador matriculado.
 
 **Después:**
-- **Fase 4 (tributación)**: cargar el perfil fiscal real del propietario (régimen IRE General o SIMPLE, obligaciones, cierre del ejercicio) y probar con comprobantes reales de un mes. Sin presentación automática (regla 15 del prompt maestro).
+- **Bot de Marangatu (D-119, nuevo objetivo del propietario):** la herramienta revisa si hay algo para presentar, presenta los registros de comprobantes y los documentos, hace las declaraciones juradas y descarga las constancias, con un bot de navegador (Playwright) que hace los clics. Antes: investigar el portal (captcha, segundo factor, condiciones de uso, servicios web oficiales), las credenciales en el almacén de Windows, un modo de ensayo y la confirmación del propietario sobre la aprobación antes de presentar.
+- **Fase 4 (tributación)**: cargar el perfil fiscal real del propietario (régimen IRE General o SIMPLE, obligaciones, cierre del ejercicio) y probar con comprobantes reales de un mes. Lo presenta el bot de Marangatu cuando exista (D-119).
 - Fase 2: probar el importador con extractos reales anonimizados del propietario y guardar un mapeo por banco.
 - CI de Windows: si algo falla, el paso "Lanzador — registros si falló" muestra cada comando (`$ ...`) y su resultado (`→`); la prueba del instalador vuelca `%LOCALAPPDATA%\ContadorAI\logs` y su paso 4b informa si el cierre cayó durante el arranque. `gh run view --log` a veces sale vacío: usar `gh api repos/mandarinagg/Contador/actions/jobs/<id>/logs`.
 - Sigue abierto, decisión del propietario: tabla de totales mensuales para el resumen (solo si en la PC real se nota lento).
@@ -136,4 +139,4 @@ D-001 a D-116 en `DECISIONS.md`. **D-007 (facturación como servicio Node) requi
 **Entorno local:** Postgres de desarrollo en el proyecto docker `contador` (127.0.0.1:55433). Para probar el lanzador sin `sudo` se usan los binarios de PostgreSQL 18 de Ubuntu (`apt download` + `dpkg-deb -x`, con `LD_LIBRARY_PATH`) y las variables `CONTADOR_TEST_PGSQL_BIN` y `CONTADOR_TEST_BACKEND_EXE`. E2E en paralelo con otra corrida: `CONTADOR_E2E_DB_NAME`, `CONTADOR_E2E_API_PORT` y `CONTADOR_E2E_WEB_PORT`.
 
 ## Próximo objetivo recomendado
-Instalar en la PC real del propietario (cierra la fase 1B) y hacer validar por el contador la contabilidad y la tributación (reglas, perfil fiscal, dudas D-F4) con datos reales.
+Instalar en la PC real del propietario (cierra la fase 1B). En el código: adaptar la verificación al rol de la herramienta (D-118) y verificar las reglas contra las fuentes oficiales; después, diseñar el bot de Marangatu (D-119).

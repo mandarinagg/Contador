@@ -9,7 +9,8 @@ Cada archivo trae:
   Paraguay se muestra con punto de miles, `#.##0` (D-076);
 - totales iguales a los del JSON del mismo reporte.
 
-El diario y el mayor salen completos, sin paginar.
+El diario y el mayor salen completos, sin paginar. El diario usa el escritor propio de
+`fast_xlsx` (D-117).
 """
 
 import io
@@ -29,6 +30,7 @@ from app.modules.organizations.models import Organization
 
 XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 MONEY_FORMAT = "#,##0"
+DATE_FORMAT = "yyyy-mm-dd"  # el que pone openpyxl a las fechas; `fast_xlsx` usa el mismo
 UNVALIDATED_NOTICE = "Plan de cuentas sin validar por un contador"
 
 
@@ -145,7 +147,13 @@ def _blank(width: int, *values: Any) -> list[Any]:
 def journal_xlsx(
     db: Session, organization_id: uuid.UUID, date_from: date, date_to: date, chart_status: str
 ) -> bytes:
-    """Libro diario completo: una fila por línea, en orden de fecha, número y línea."""
+    """Libro diario completo: una fila por línea, en orden de fecha, número y línea.
+
+    Con el escritor propio (D-117): el diario de un año puede tener decenas de miles de líneas.
+    """
+    # Diferida: `fast_xlsx` importa piezas de este módulo.
+    from app.modules.accounting import fast_xlsx
+
     page = reports.journal(db, organization_id, date_from, date_to, limit=1, after=None)
     columns = [
         Column("Fecha", width=11),
@@ -176,7 +184,7 @@ def journal_xlsx(
             ]
         yield Styled([*_blank(8, "Totales"), page.total_debit, page.total_credit])
 
-    return workbook(
+    return fast_xlsx.workbook(
         db,
         organization_id,
         title="Libro diario",

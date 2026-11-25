@@ -1,11 +1,12 @@
-"""XLSX de una hoja escrito a mano, para el registro de comprobantes de un año (D-100).
+"""XLSX de una hoja escrito a mano, para los libros con muchas filas (D-100, D-117).
 
-Mismo contenido y formato que `accounting.exports.workbook()` (encabezado, títulos en
-negrita, importes como enteros con `#,##0`, totales destacados), pero arma el XML de la hoja
-como texto. Motivo: con 20.000 comprobantes por 24 columnas son unas 480.000 celdas, y
-`openpyxl` sin `lxml` (que no se agrega: no hay dependencias nuevas de producción) tarda más
-de 5 s en escribirlas; la spec pide menos de 3 s (§5.12). El resto de los XLSX sigue con
-`openpyxl`.
+Mismo contenido y formato que `exports.workbook()` (encabezado, títulos en negrita,
+importes como enteros con `#,##0`, fechas como fechas de Excel, totales destacados), pero
+arma el XML de la hoja como texto. Motivo: `openpyxl` sin `lxml` (que no se agrega: no hay
+dependencias nuevas de producción) es lento con cientos de miles de celdas. Lo usan el
+registro de comprobantes de un año (20.000 comprobantes por 24 columnas, spec 4 §5.12) y el
+libro diario (20.000 líneas, spec 3B §5.10), los dos con un límite de 3 s. El resto de los
+XLSX sigue con `openpyxl`.
 
 Formato: Office Open XML mínimo (tipos de contenido, relaciones, libro, estilos y una hoja),
 con las cadenas en línea (`inlineStr`). Las pruebas lo abren con `openpyxl`.
@@ -16,7 +17,7 @@ import re
 import uuid
 import zipfile
 from collections.abc import Iterable, Sequence
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 from xml.sax.saxutils import escape, quoteattr
@@ -24,6 +25,7 @@ from xml.sax.saxutils import escape, quoteattr
 from sqlalchemy.orm import Session
 
 from app.modules.accounting.exports import (
+    DATE_FORMAT,
     MONEY_FORMAT,
     UNVALIDATED_NOTICE,
     Column,
@@ -40,7 +42,9 @@ HEADER = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
 _ILLEGAL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
 # Índices de `cellXfs` en styles.xml.
-PLAIN, BOLD, MONEY, MONEY_BOLD = 0, 1, 2, 3
+PLAIN, BOLD, MONEY, MONEY_BOLD, DATE, DATE_BOLD = range(6)
+# Día 0 de las fechas de Excel (sistema 1900, con el 29/02/1900 inexistente ya descontado).
+EXCEL_EPOCH = date(1899, 12, 30)
 
 CONTENT_TYPES = (
     HEADER + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
@@ -68,18 +72,24 @@ WORKBOOK_RELS = (
 )
 STYLES = (
     HEADER + f'<styleSheet xmlns="{MAIN}">'
-    f'<numFmts count="1"><numFmt numFmtId="164" formatCode={quoteattr(MONEY_FORMAT)}/></numFmts>'
+    '<numFmts count="2">'
+    f'<numFmt numFmtId="164" formatCode={quoteattr(MONEY_FORMAT)}/>'
+    f'<numFmt numFmtId="165" formatCode={quoteattr(DATE_FORMAT)}/>'
+    "</numFmts>"
     '<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font>'
     '<font><b/><sz val="11"/><name val="Calibri"/></font></fonts>'
     '<fills count="2"><fill><patternFill patternType="none"/></fill>'
     '<fill><patternFill patternType="gray125"/></fill></fills>'
     '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
     '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-    '<cellXfs count="4">'
+    '<cellXfs count="6">'
     '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
     '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
     '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
     '<xf numFmtId="164" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"'
+    ' applyFont="1"/>'
+    '<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
+    '<xf numFmtId="165" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"'
     ' applyFont="1"/>'
     "</cellXfs>"
     '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
@@ -126,6 +136,13 @@ class _Sheet:
             is_money = index < len(money) and money[index]
             if isinstance(value, bool):
                 raise TypeError("Booleano en un XLSX: usá S/N")  # pragma: no cover
+            if isinstance(value, datetime):
+                raise TypeError("Fecha y hora en un XLSX: pasala como texto")  # pragma: no cover
+            if isinstance(value, date):
+                style = DATE_BOLD if strong else DATE
+                serial = (value - EXCEL_EPOCH).days
+                cells.append(f'<c r="{ref}" s="{style}"><v>{serial}</v></c>')
+                continue
             if isinstance(value, int | Decimal):
                 if is_money:
                     style = MONEY_BOLD if strong else MONEY
@@ -153,7 +170,7 @@ def workbook(
     notes: Sequence[str] = (),
     sheet: str = "Reporte",
 ) -> bytes:
-    """Igual que `accounting.exports.workbook()`, más rápido para muchas filas."""
+    """Igual que `exports.workbook()`, más rápido para muchas filas."""
     ws = _Sheet(len(columns))
     no_money: list[bool] = []
     for i, line in enumerate(_organization_lines(db, organization_id)):

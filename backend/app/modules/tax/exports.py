@@ -38,10 +38,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, aliased
 
 from app.core.errors import AppError
+from app.modules.accounting import fast_xlsx
 from app.modules.accounting.exports import Column, Styled, workbook
 from app.modules.organizations.models import Organization
-from app.modules.tax import fast_xlsx, rules
 from app.modules.tax import profile as profiles
+from app.modules.tax import rules
 from app.modules.tax.common import ZERO, month_end
 from app.modules.tax.models import Voucher
 

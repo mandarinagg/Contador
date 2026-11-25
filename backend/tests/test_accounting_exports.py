@@ -6,7 +6,7 @@ formato `#,##0`), nunca texto.
 """
 
 import io
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -16,7 +16,12 @@ from openpyxl import load_workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
 from app.modules.accounting.asset_schedule import MONEY_COLUMNS
-from app.modules.accounting.exports import MONEY_FORMAT, UNVALIDATED_NOTICE, XLSX_MEDIA_TYPE
+from app.modules.accounting.exports import (
+    DATE_FORMAT,
+    MONEY_FORMAT,
+    UNVALIDATED_NOTICE,
+    XLSX_MEDIA_TYPE,
+)
 from tests.accounting_utils import ACC, BANCOS, CAPITAL, HONORARIOS, VENTAS, posted
 from tests.assets_utils import months, new_asset, run_and_post, setup_books
 from tests.conftest import auth_header
@@ -100,6 +105,13 @@ def test_journal_xlsx(client: TestClient, books: dict[str, Any]) -> None:
     lines = [r for r in ws.iter_rows(min_row=10) if isinstance(r[8].value, int)]
     assert len(lines) == sum(len(e["lines"]) for e in data["entries"])
     _no_text_amounts(ws, 8)
+    # Escritor propio (D-117): fechas de Excel, no texto, y los totales en negrita.
+    first = data["entries"][0]
+    assert lines[0][0].value == datetime.fromisoformat(first["entry_date"])
+    assert lines[0][0].number_format == DATE_FORMAT
+    assert lines[0][1].value == first["number"]
+    assert all(cell.font.b for cell in _row(ws, "Totales") if cell.value is not None)
+    assert ws.title == "Libro diario"
 
 
 def test_ledger_xlsx(client: TestClient, books: dict[str, Any]) -> None:
