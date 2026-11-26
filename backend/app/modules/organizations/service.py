@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.errors import Conflict
+from app.core.errors import AppError, Conflict
 from app.core.permissions import Role
 from app.modules.finance import service as finance
 from app.modules.identity.models import User
@@ -83,23 +83,51 @@ def is_active_owner_somewhere(db: Session, user_id: uuid.UUID) -> bool:
     )
 
 
+def person_legal_name(first_names: str | None, last_names: str | None) -> str:
+    """La razón social de una persona física, única fuente: «Apellidos, Nombres» (D-141)."""
+    return f"{last_names}, {first_names}"
+
+
+def check_identity_patch(org: Organization, sent: dict[str, object]) -> None:
+    """422 si el cambio mezcla empresa y persona física: la forma jurídica no pasa de una a
+    la otra, los nombres son solo de la persona y su razón social se calcula (D-141)."""
+
+    def refuse(message: str) -> AppError:
+        return AppError("VALIDATION_ERROR", message, status_code=422)
+
+    is_person = org.legal_form == "PERSONA_FISICA"
+    form = sent.get("legal_form", org.legal_form)
+    if (form == "PERSONA_FISICA") != is_person:
+        raise refuse("La forma jurídica no pasa de empresa a persona física ni al revés.")
+    if is_person and "legal_name" in sent:
+        raise refuse("La razón social de una persona física se calcula de su nombre.")
+    if not is_person and ("first_names" in sent or "last_names" in sent):
+        raise refuse("Los nombres y apellidos son solo de una persona física.")
+
+
 def create_organization(
     db: Session,
     *,
     owner_user_id: uuid.UUID,
-    legal_name: str,
+    legal_name: str | None,
     trade_name: str | None,
     legal_form: str,
+    first_names: str | None = None,
+    last_names: str | None = None,
     ruc: str | None = None,
     ruc_check_digit: str | None = None,
 ) -> tuple[Organization, OrganizationMember]:
     """Organización, su propietario y su contexto financiero empresarial (D-023), en la
     transacción del que llama (no hace `commit` ni audita: cada llamador deja su registro)."""
     ensure_ruc_available(db, ruc, exclude_id=None)
+    if legal_form == "PERSONA_FISICA":
+        legal_name = person_legal_name(first_names, last_names)
     org = Organization(
-        legal_name=legal_name,
+        legal_name=legal_name or "",
         trade_name=trade_name,
         legal_form=legal_form,
+        first_names=first_names,
+        last_names=last_names,
         ruc=ruc,
         ruc_check_digit=ruc_check_digit,
     )

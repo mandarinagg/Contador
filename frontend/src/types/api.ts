@@ -5,7 +5,7 @@ export interface ApiErrorBody {
 }
 
 export type RoleCode = 'owner' | 'admin' | 'accountant' | 'viewer'
-export type LegalForm = 'EAS' | 'SA' | 'SRL' | 'UNIPERSONAL' | 'OTRA'
+export type LegalForm = 'EAS' | 'SA' | 'SRL' | 'UNIPERSONAL' | 'PERSONA_FISICA' | 'OTRA'
 
 export interface User {
   id: string
@@ -48,6 +48,8 @@ export interface LoginResponse extends Me {
 }
 
 export interface Organization extends OrganizationSummary {
+  first_names: string | null
+  last_names: string | null
   ruc: string | null
   ruc_check_digit: string | null
   base_currency: string

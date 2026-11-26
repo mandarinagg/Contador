@@ -10,6 +10,7 @@ import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router'
 import { Button, EmptyState, Skeleton } from '../../components/ui'
 import { useToast } from '../../components/ui/toast'
 import { cx } from '../../lib/cx'
+import { businessContextLabel } from '../../lib/format'
 import { post } from '../../services/api'
 import { useSession } from '../../stores/session'
 import { errorMessage } from './forms'
@@ -77,7 +78,7 @@ export function ContextSwitcher({ current }: { current: string }) {
       {business && (
         <TabLink to={target(business)} active={current === business.id} tone="business">
           <Building2 size={15} className={current === business.id ? 'text-ledger' : ''} aria-hidden />
-          Empresa
+          {businessContextLabel(me.organization.legal_form)}
         </TabLink>
       )}
       {personal ? (

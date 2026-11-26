@@ -4,7 +4,7 @@ import { Button, Notice } from '../../components/ui'
 import { ApiError, post } from '../../services/api'
 import type { Organization } from '../../types/api'
 import { OrganizationFields } from '../auth/OrganizationFields'
-import { EMPTY_ORGANIZATION, hasCheckDigitMismatch, newOrganizationMessage, type OrganizationDraft } from '../auth/organizationDraft'
+import { EMPTY_ORGANIZATION, hasCheckDigitMismatch, identityBody, identityProblems, newOrganizationMessage, type OrganizationDraft } from '../auth/organizationDraft'
 
 /**
  * Alta de otra organización (D-136). No cambia de organización: al terminar ofrece pasar a la nueva
@@ -13,14 +13,13 @@ import { EMPTY_ORGANIZATION, hasCheckDigitMismatch, newOrganizationMessage, type
 export function NewOrganizationForm({ onDone, onSwitch }: { onDone: () => void; onSwitch: (org: Organization) => Promise<void> }) {
   const qc = useQueryClient()
   const [draft, setDraft] = useState<OrganizationDraft>(EMPTY_ORGANIZATION)
+  const [touched, setTouched] = useState(false)
   const [created, setCreated] = useState<Organization | null>(null)
 
   const create = useMutation({
     mutationFn: () =>
       post<Organization>('/organizations', {
-        legal_name: draft.legal_name,
-        trade_name: draft.trade_name.trim() || null,
-        legal_form: draft.legal_form,
+        ...identityBody(draft),
         ...(draft.ruc ? { ruc: draft.ruc, ruc_check_digit: draft.ruc_check_digit } : {}),
       }),
     onSuccess: (org) => {
@@ -56,6 +55,8 @@ export function NewOrganizationForm({ onDone, onSwitch }: { onDone: () => void; 
 
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
+    setTouched(true)
+    if (Object.keys(identityProblems(draft)).length > 0) return
     if (hasCheckDigitMismatch(draft) || (draft.ruc && !draft.ruc_check_digit)) return
     create.mutate()
   }
@@ -63,7 +64,7 @@ export function NewOrganizationForm({ onDone, onSwitch }: { onDone: () => void; 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
       {error && (error.status !== 422 || Object.keys(fe).length === 0) && <Notice tone="bad" title={newOrganizationMessage(error)} />}
-      <OrganizationFields value={draft} onChange={setDraft} errors={fe} withRuc autoFocus />
+      <OrganizationFields value={draft} onChange={setDraft} errors={{ ...fe, ...(touched ? identityProblems(draft) : {}) }} withRuc autoFocus />
       <div className="flex justify-end gap-2 border-t border-line pt-4">
         <Button type="button" variant="ghost" onClick={onDone}>
           Cancelar

@@ -1,9 +1,9 @@
 """Salud del servicio y configuración inicial (primer arranque)."""
 
-from typing import Annotated, Literal
+from typing import Literal
 
 from fastapi import APIRouter, Request, status
-from pydantic import BaseModel, EmailStr, StringConstraints
+from pydantic import BaseModel, EmailStr
 from sqlalchemy import func, select, text
 
 from app.api.deps import DbSession, client_ip
@@ -15,10 +15,9 @@ from app.modules.identity import service as identity
 from app.modules.identity.models import User
 from app.modules.identity.schemas import FullName, LoginResponse, Password
 from app.modules.organizations import service as organizations
+from app.modules.organizations.schemas import OrganizationIdentity
 
 router = APIRouter(prefix="/system", tags=["system"])
-
-Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=200)]
 
 
 class HealthOut(BaseModel):
@@ -31,10 +30,8 @@ class SetupStatus(BaseModel):
     needs_setup: bool
 
 
-class SetupOrganization(BaseModel):
-    legal_name: Name
-    trade_name: Name | None = None
-    legal_form: Literal["EAS", "SA", "SRL", "UNIPERSONAL", "OTRA"] = "EAS"
+class SetupOrganization(OrganizationIdentity):
+    pass
 
 
 class SetupOwner(BaseModel):
@@ -88,6 +85,8 @@ def run_setup(body: SetupRequest, request: Request, db: DbSession) -> LoginRespo
         legal_name=body.organization.legal_name,
         trade_name=body.organization.trade_name,
         legal_form=body.organization.legal_form,
+        first_names=body.organization.first_names,
+        last_names=body.organization.last_names,
     )
     audit.record(
         db,

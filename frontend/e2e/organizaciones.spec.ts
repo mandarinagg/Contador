@@ -91,3 +91,31 @@ test('volver a la primera muestra lo suyo; al ingresar se elige la organización
 })
 
 
+
+test('una persona física se da de alta con nombres y apellidos y aparece como «Apellidos, Nombres»', async ({ page }) => {
+  await signInTo(page, firstName)
+  await orgButton(page).click()
+  await page.getByRole('menuitem', { name: 'Nueva organización' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Nueva organización' })
+  await dialog.getByLabel('Persona física').check()
+  await expect(dialog.getByLabel('Razón social')).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Crear organización' }).click()
+  await expect(dialog.getByText('Escribí los nombres.')).toBeVisible()
+  await dialog.getByLabel('Nombres').fill('María José')
+  await dialog.getByLabel('Apellidos').fill('Benítez Duarte')
+  await dialog.getByRole('button', { name: 'Crear organización' }).click()
+  await dialog.getByRole('button', { name: 'Pasar a Benítez Duarte, María José' }).click()
+  await expect(orgButton(page)).toContainText('Benítez Duarte, María José')
+
+  // Su contexto del negocio se llama «Actividad» y sus datos muestran nombres y apellidos.
+  await page.goto('/finanzas')
+  await expect(page.getByRole('navigation', { name: 'Contexto financiero' }).getByRole('link', { name: 'Actividad' })).toBeVisible()
+  await page.goto('/empresa')
+  await expect(page.getByLabel('Nombres')).toHaveValue('María José')
+  await expect(page.getByLabel('Apellidos')).toHaveValue('Benítez Duarte')
+
+  // Se deja la primera como la última usada para no alterar nada más.
+  await orgButton(page).click()
+  await page.getByRole('menuitemradio', { name: new RegExp(firstName) }).click()
+  await expect(orgButton(page)).toContainText(firstName)
+})

@@ -7,7 +7,7 @@ import { useSession } from '../../stores/session'
 import type { LoginResponse } from '../../types/api'
 import { AuthFrame } from './AuthFrame'
 import { OrganizationFields } from './OrganizationFields'
-import { EMPTY_ORGANIZATION, type OrganizationDraft } from './organizationDraft'
+import { EMPTY_ORGANIZATION, identityBody, identityProblems, type OrganizationDraft } from './organizationDraft'
 import { PASSWORD_HINT, passwordProblem } from './password'
 
 export function SetupPage() {
@@ -21,7 +21,7 @@ export function SetupPage() {
   const setup = useMutation({
     mutationFn: () =>
       post<LoginResponse>('/system/setup', {
-        organization: { legal_name: org.legal_name, legal_form: org.legal_form, trade_name: org.trade_name.trim() || null },
+        organization: identityBody(org),
         owner: { full_name: owner.full_name, email: owner.email, password: owner.password },
       }),
     onSuccess: (res) => {
@@ -39,6 +39,7 @@ export function SetupPage() {
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     setTouched(true)
+    if (Object.keys(identityProblems(org)).length > 0) return
     if (pwProblem || mismatch || owner.confirm === '') return
     setup.mutate()
   }
@@ -46,18 +47,24 @@ export function SetupPage() {
   return (
     <AuthFrame
       title="Configurar Contador AI"
-      intro="Primer arranque: registrá la empresa y el usuario propietario. Los datos fiscales (RUC, régimen) se cargan después, cuando estén verificados."
+      intro="Primer arranque: registrá la empresa o la persona física y el usuario propietario. Los datos fiscales (RUC, régimen) se cargan después, cuando estén verificados."
     >
       <form onSubmit={onSubmit} className="flex flex-col gap-7" noValidate>
         {error && error.status !== 422 && <Notice tone="bad" title={error.message} />}
 
         <fieldset className="flex flex-col gap-4">
-          <legend className="mb-3 font-semibold">1. Empresa</legend>
+          <legend className="mb-3 font-semibold">1. Empresa o persona física</legend>
           <OrganizationFields
             value={org}
             onChange={setOrg}
             autoFocus
-            errors={{ legal_name: fieldErrors['organization.legal_name'], trade_name: fieldErrors['organization.trade_name'] }}
+            errors={{
+              legal_name: fieldErrors['organization.legal_name'],
+              trade_name: fieldErrors['organization.trade_name'],
+              first_names: fieldErrors['organization.first_names'],
+              last_names: fieldErrors['organization.last_names'],
+              ...(touched ? identityProblems(org) : {}),
+            }}
           />
         </fieldset>
 

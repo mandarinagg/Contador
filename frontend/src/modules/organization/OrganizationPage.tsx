@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 import { Button, Field, Input, Notice, PageHeader, Select, Sheet, Skeleton } from '../../components/ui'
 import { useToast } from '../../components/ui/toast'
-import { formatDateTime, LEGAL_FORM_LABELS } from '../../lib/format'
+import { COMPANY_LEGAL_FORMS, formatDateTime } from '../../lib/format'
 import { rucCheckDigit } from '../../lib/ruc'
 import { ApiError, get, patch } from '../../services/api'
 import { useSession } from '../../stores/session'
@@ -12,6 +12,8 @@ interface Form {
   legal_name: string
   trade_name: string
   legal_form: LegalForm
+  first_names: string
+  last_names: string
   ruc: string
   ruc_check_digit: string
 }
@@ -20,6 +22,8 @@ const toForm = (o: Organization): Form => ({
   legal_name: o.legal_name,
   trade_name: o.trade_name ?? '',
   legal_form: o.legal_form,
+  first_names: o.first_names ?? '',
+  last_names: o.last_names ?? '',
   ruc: o.ruc ?? '',
   ruc_check_digit: o.ruc_check_digit ?? '',
 })
@@ -50,14 +54,15 @@ function OrganizationForm({ org }: { org: Organization }) {
   const toast = useToast()
   const editable = can('organization.manage')
   const [form, setForm] = useState<Form>(() => toForm(org))
+  const [missing, setMissing] = useState(false)
+  const person = org.legal_form === 'PERSONA_FISICA'
 
   const save = useMutation({
     mutationFn: (f: Form) => {
-      const body: Record<string, unknown> = {
-        legal_name: f.legal_name,
-        trade_name: f.trade_name.trim() || null,
-        legal_form: f.legal_form,
-      }
+      // Una persona física no manda razón social (se arma de sus nombres) ni cambia de forma (D-141).
+      const body: Record<string, unknown> = person
+        ? { trade_name: f.trade_name.trim() || null, first_names: f.first_names.trim(), last_names: f.last_names.trim() }
+        : { legal_name: f.legal_name, trade_name: f.trade_name.trim() || null, legal_form: f.legal_form }
       if (f.ruc || f.ruc_check_digit) {
         body.ruc = f.ruc
         body.ruc_check_digit = f.ruc_check_digit
@@ -80,6 +85,10 @@ function OrganizationForm({ org }: { org: Organization }) {
   const onSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (dvMismatch) return
+    if (person && (!form.first_names.trim() || !form.last_names.trim())) {
+      setMissing(true)
+      return
+    }
     save.mutate(form)
   }
 
@@ -93,26 +102,44 @@ function OrganizationForm({ org }: { org: Organization }) {
               </Notice>
             </div>
           )}
-          <div className="col-span-2">
-            <Field label="Razón social">
-              {(p) => <Input {...p} disabled={!editable} value={form.legal_name} onChange={(e) => setForm({ ...form, legal_name: e.target.value })} />}
-            </Field>
-          </div>
-          <Field label="Nombre de fantasía">
-            {(p) => <Input {...p} disabled={!editable} value={form.trade_name} onChange={(e) => setForm({ ...form, trade_name: e.target.value })} />}
-          </Field>
-          <Field label="Forma jurídica">
-            {(p) => (
-              <Select {...p} disabled={!editable} value={form.legal_form} onChange={(e) => setForm({ ...form, legal_form: e.target.value as LegalForm })}>
-                {Object.entries(LEGAL_FORM_LABELS).map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-          <Field label="RUC" hint="Sin puntos ni dígito verificador.">
+          {person ? (
+            <>
+              <Field label="Nombres" error={missing && !form.first_names.trim() ? 'Escribí los nombres.' : undefined}>
+                {(p) => <Input {...p} disabled={!editable} value={form.first_names} onChange={(e) => setForm({ ...form, first_names: e.target.value })} />}
+              </Field>
+              <Field label="Apellidos" error={missing && !form.last_names.trim() ? 'Escribí los apellidos.' : undefined}>
+                {(p) => <Input {...p} disabled={!editable} value={form.last_names} onChange={(e) => setForm({ ...form, last_names: e.target.value })} />}
+              </Field>
+              <div className="col-span-2">
+                <Field label="Nombre de fantasía">
+                  {(p) => <Input {...p} disabled={!editable} value={form.trade_name} onChange={(e) => setForm({ ...form, trade_name: e.target.value })} />}
+                </Field>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="col-span-2">
+                <Field label="Razón social">
+                  {(p) => <Input {...p} disabled={!editable} value={form.legal_name} onChange={(e) => setForm({ ...form, legal_name: e.target.value })} />}
+                </Field>
+              </div>
+              <Field label="Nombre de fantasía">
+                {(p) => <Input {...p} disabled={!editable} value={form.trade_name} onChange={(e) => setForm({ ...form, trade_name: e.target.value })} />}
+              </Field>
+              <Field label="Forma jurídica">
+                {(p) => (
+                  <Select {...p} disabled={!editable} value={form.legal_form} onChange={(e) => setForm({ ...form, legal_form: e.target.value as LegalForm })}>
+                    {COMPANY_LEGAL_FORMS.map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {l}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+            </>
+          )}
+          <Field label={person ? 'RUC (es tu cédula)' : 'RUC'} hint="Sin puntos ni dígito verificador.">
             {(p) => (
               <Input
                 {...p}

@@ -23,14 +23,21 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base, TimestampMixin
 
-LEGAL_FORMS = ("EAS", "SA", "SRL", "UNIPERSONAL", "OTRA")
+LEGAL_FORMS = ("EAS", "SA", "SRL", "UNIPERSONAL", "PERSONA_FISICA", "OTRA")
 
 
 class Organization(TimestampMixin, Base):
     __tablename__ = "organizations"
     __table_args__ = (
         CheckConstraint(
-            "legal_form IN ('EAS','SA','SRL','UNIPERSONAL','OTRA')", name="legal_form_valid"
+            "legal_form IN ('EAS','SA','SRL','UNIPERSONAL','PERSONA_FISICA','OTRA')",
+            name="legal_form_valid",
+        ),
+        # Persona física: nombres y apellidos; cualquier otra forma: ninguno (D-141).
+        CheckConstraint(
+            "(legal_form = 'PERSONA_FISICA' AND first_names IS NOT NULL AND last_names IS NOT NULL)"
+            " OR (legal_form <> 'PERSONA_FISICA' AND first_names IS NULL AND last_names IS NULL)",
+            name="person_names",
         ),
         # RUC paraguayo: hasta 8 dígitos + DV. Opcional hasta verificarlo documentalmente.
         CheckConstraint("ruc IS NULL OR ruc ~ '^[0-9]{1,8}$'", name="ruc_digits"),
@@ -51,6 +58,8 @@ class Organization(TimestampMixin, Base):
     legal_name: Mapped[str] = mapped_column(String(200), nullable=False)
     trade_name: Mapped[str | None] = mapped_column(String(200))
     legal_form: Mapped[str] = mapped_column(String(20), nullable=False)
+    first_names: Mapped[str | None] = mapped_column(String(100))
+    last_names: Mapped[str | None] = mapped_column(String(100))
     ruc: Mapped[str | None] = mapped_column(String(8))
     ruc_check_digit: Mapped[str | None] = mapped_column(String(1))
     base_currency: Mapped[str] = mapped_column(String(3), nullable=False, server_default="PYG")

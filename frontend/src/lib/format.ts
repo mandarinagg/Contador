@@ -20,6 +20,7 @@ export const LEGAL_FORM_LABELS: Record<string, string> = {
   SA: 'Sociedad Anónima (S.A.)',
   SRL: 'Sociedad de Responsabilidad Limitada (S.R.L.)',
   UNIPERSONAL: 'Empresa unipersonal',
+  PERSONA_FISICA: 'Persona física',
   OTRA: 'Otra forma jurídica',
 }
 
@@ -197,3 +198,9 @@ export function formatFieldValue(field: string, value: unknown): string {
 }
 
 export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+
+/** Formas jurídicas de una empresa (todas menos la persona física, que se elige aparte). */
+export const COMPANY_LEGAL_FORMS = Object.entries(LEGAL_FORM_LABELS).filter(([v]) => v !== 'PERSONA_FISICA')
+
+/** Cómo se llama el contexto financiero del negocio: para una persona física es su «Actividad». */
+export const businessContextLabel = (legalForm: string | undefined): string => (legalForm === 'PERSONA_FISICA' ? 'Actividad' : 'Empresa')

@@ -3,8 +3,10 @@ import { Building2, LockKeyhole } from 'lucide-react'
 import type { InputHTMLAttributes, ReactNode } from 'react'
 import { Input, Notice, Skeleton } from '../../components/ui'
 import { cx } from '../../lib/cx'
+import { businessContextLabel } from '../../lib/format'
 import { CURRENCY_DECIMALS, formatMoney, isNegative, isZeroAmount, parseAmountInput, toInputText } from '../../lib/money'
 import { ApiError } from '../../services/api'
+import { useSession } from '../../stores/session'
 import type { FinanceContext } from './types'
 
 /**
@@ -100,6 +102,7 @@ export function ApiErrorNotice({ error, title }: { error: unknown; title?: strin
 /** Identidad del contexto: icono + nombre (+ "privado") con su color. Nunca solo el color. */
 export function ContextTag({ context, size = 'sm' }: { context: FinanceContext; size?: 'sm' | 'md' }) {
   const personal = context.kind === 'personal'
+  const businessLabel = businessContextLabel(useSession().me?.organization.legal_form)
   return (
     <span
       className={cx(
@@ -109,7 +112,7 @@ export function ContextTag({ context, size = 'sm' }: { context: FinanceContext; 
       )}
     >
       {personal ? <LockKeyhole size={size === 'md' ? 15 : 12} aria-hidden /> : <Building2 size={size === 'md' ? 15 : 12} aria-hidden />}
-      {personal ? 'Personal' : 'Empresa'}
+      {personal ? 'Personal' : businessLabel}
       {personal && <span className="font-normal opacity-80">· privado</span>}
     </span>
   )

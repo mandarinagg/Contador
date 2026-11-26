@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel, ConfigDict, StringConstraints, model_validator
@@ -11,13 +11,16 @@ from app.core.permissions import Perm
 from app.modules.audit import service as audit
 from app.modules.organizations import service
 from app.modules.organizations.ruc import ruc_check_digit
+from app.modules.organizations.schemas import (
+    LegalForm,
+    Name,
+    OrganizationIdentity,
+    PersonName,
+)
 
 # `/organization`: la de la sesión. `/organizations`: el alta de otra (D-136).
 router = APIRouter(prefix="/organization", tags=["organization"])
 organizations_router = APIRouter(prefix="/organizations", tags=["organization"])
-
-LegalForm = Literal["EAS", "SA", "SRL", "UNIPERSONAL", "OTRA"]
-Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=200)]
 
 
 class OrganizationOut(BaseModel):
@@ -27,6 +30,8 @@ class OrganizationOut(BaseModel):
     legal_name: str
     trade_name: str | None
     legal_form: str
+    first_names: str | None
+    last_names: str | None
     ruc: str | None
     ruc_check_digit: str | None
     base_currency: str
@@ -49,6 +54,8 @@ class OrganizationUpdate(BaseModel):
     legal_name: Name | None = None
     trade_name: Name | None = None
     legal_form: LegalForm | None = None
+    first_names: PersonName | None = None
+    last_names: PersonName | None = None
     ruc: Ruc | None = None
     ruc_check_digit: RucCheckDigit | None = None
 
@@ -58,9 +65,7 @@ class OrganizationUpdate(BaseModel):
         return self
 
 
-class OrganizationCreate(BaseModel):
-    legal_name: Name
-    trade_name: Name | None = None
+class OrganizationCreate(OrganizationIdentity):
     legal_form: LegalForm
     ruc: Ruc | None = None
     ruc_check_digit: RucCheckDigit | None = None
@@ -86,7 +91,13 @@ def update_organization(
 ) -> OrganizationOut:
     org = auth.organization
     # Solo se auditan los campos que realmente cambian.
-    changes = {k: v for k, v in body.model_dump(exclude_unset=True).items() if getattr(org, k) != v}
+    sent = body.model_dump(exclude_unset=True)
+    service.check_identity_patch(org, sent)
+    changes = {k: v for k, v in sent.items() if getattr(org, k) != v}
+    if org.legal_form == "PERSONA_FISICA" and ({"first_names", "last_names"} & changes.keys()):
+        changes["legal_name"] = service.person_legal_name(
+            changes.get("first_names", org.first_names), changes.get("last_names", org.last_names)
+        )
     before = {k: getattr(org, k) for k in changes}
     if "ruc" in changes:
         service.ensure_ruc_changeable(org.ruc)
@@ -127,6 +138,8 @@ def create_organization(body: OrganizationCreate, auth: Auth, db: DbSession) -> 
         legal_name=body.legal_name,
         trade_name=body.trade_name,
         legal_form=body.legal_form,
+        first_names=body.first_names,
+        last_names=body.last_names,
         ruc=body.ruc,
         ruc_check_digit=body.ruc_check_digit,
     )
@@ -141,6 +154,8 @@ def create_organization(body: OrganizationCreate, auth: Auth, db: DbSession) -> 
             "legal_name": org.legal_name,
             "trade_name": org.trade_name,
             "legal_form": org.legal_form,
+            "first_names": org.first_names,
+            "last_names": org.last_names,
             "ruc": org.ruc,
             "ruc_check_digit": org.ruc_check_digit,
         },

@@ -6,6 +6,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router'
 import { EmptyState, PageHeader, Sheet, Skeleton } from '../../components/ui'
 import { cx } from '../../lib/cx'
+import { businessContextLabel } from '../../lib/format'
 import { CURRENCY_NAMES } from '../../lib/money'
 import { get, qs } from '../../services/api'
 import { useSession } from '../../stores/session'
@@ -63,7 +64,7 @@ export function ConsolidatedPage() {
                   <h2 className="font-semibold">{context.kind === 'business' ? org : 'Tus finanzas personales'}</h2>
                 </div>
                 <Link to={`/finanzas/${context.id}`} className="text-sm font-medium text-ledger hover:underline">
-                  Abrir {context.kind === 'business' ? 'Empresa' : 'Personal'}
+                  Abrir {context.kind === 'business' ? businessContextLabel(me?.organization.legal_form) : 'Personal'}
                 </Link>
               </header>
               {totals.length === 0 ? (
@@ -71,7 +72,7 @@ export function ConsolidatedPage() {
               ) : (
                 <table className="w-full">
                   <caption className="sr-only">
-                    Totales de {context.kind === 'business' ? 'la empresa' : 'tus finanzas personales'} por moneda
+                    Totales de {context.kind === 'business' ? (me?.organization.legal_form === 'PERSONA_FISICA' ? 'la actividad' : 'la empresa') : 'tus finanzas personales'} por moneda
                   </caption>
                   <thead className="border-b border-line bg-sunken text-sm text-ink-2">
                     <tr>
