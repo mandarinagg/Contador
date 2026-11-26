@@ -416,6 +416,11 @@ Casillas leídas del formulario y de su instructivo. Oficial leída.
 > - **D-PF-6 y D-PF-7:** la 956 exige la 715 y no va con la 211; la 716 sin IVA no tiene registro.
 > - **D-PF-11:** la contabilidad se muestra como opcional para la persona física sin IRE General (un aviso, nunca un bloqueo).
 > - **D-PF-17 (nueva):** el perfil rechaza la 211 con el RESIMPLE.
+>
+> **Fase M7 (D-143, 2026-11-26).** El registro de ingresos y egresos depende de:
+> - **D-PF-6 y D-PF-7:** los ingresos y egresos se cargan solo con la 956 en el perfil vigente al cierre del año; la 716 sin IVA no carga nada y, si aparece el IVA, el año siguiente es de la 955.
+> - **D-PF-15:** confirmar tarde la 956 no calcula multa.
+> - **D-PF-18 (nueva):** cómo se cargan los importes y qué identifica a un comprobante sin número.
 
 **D-PF-1. ¿La empresa unipersonal usa el RUC de su dueño?**
 
@@ -485,6 +490,11 @@ Casillas leídas del formulario y de su instructivo. Oficial leída.
 
 - La Ley 6380, art. 27, último párrafo, saca del IVA a la unipersonal del RESIMPLE. El art. 82, num. 1, inc. a), hace contribuyente del IVA a la persona física por sus servicios personales.
 - Si las dos cosas están en el mismo RUC (D-PF-1), no está claro cuál prevalece. Hoy el perfil rechaza la 211 junto con el RESIMPLE (D-142).
+
+**D-PF-18. Importes y anti duplicado del registro anual (956).** Lo que la aplicación interpreta del formato, sin texto que lo diga:
+
+- En INGRESOS, «monto gravado» es lo que grava el IRP y «no gravado o exonerado», el resto; en EGRESOS va solo el total. El cobro de una venta a crédito (203) va por lo cobrado en el año, con el número y el timbrado de la factura.
+- Un comprobante sin número (205 a 208) se identifica por tipo, contraparte y fecha o período; el extracto de IPS, además, por el número de empleador. Si el IPS emite dos extractos del mismo mes para el mismo empleador, el segundo necesita un número.
 
 ---
 

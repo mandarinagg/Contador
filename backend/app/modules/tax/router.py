@@ -42,6 +42,7 @@ from app.modules.tax import (
 )
 from app.modules.tax.common import pyg
 from app.modules.tax.models import Obligation, RuleVersion, Voucher
+from app.modules.tax.schemas import Direction as VoucherDirection
 from app.modules.tax.schemas import (
     ExceptionIn,
     ExceptionOut,
@@ -73,6 +74,7 @@ from app.modules.tax.schemas import (
     SyncOut,
     VoucherIn,
     VoucherOut,
+    VoucherType,
     VoucherUpdate,
 )
 
@@ -524,17 +526,21 @@ def _whole(value: Any, name: str) -> Any:
 
 def _vouchers_out(db: Session, organization_id: uuid.UUID, rows: list[Voucher]) -> list[VoucherOut]:
     entry_map = vouchers.entries_of(db, rows)
-    rule_ids = {v.vat_rule_version_id for v in rows}
+    rule_ids = {v.vat_rule_version_id for v in rows if v.vat_rule_version_id is not None}
     rule_map = {
         r.id: r for r in db.scalars(select(RuleVersion).where(RuleVersion.id.in_(rule_ids)))
     }
     confirmed = vouchers.confirmed_months(
         db, organization_id, {v.issued_on.replace(day=1) for v in rows}
     )
+    confirmed_years = vouchers.confirmed_years(
+        db, organization_id, {v.issued_on.year for v in rows}
+    )
     result = []
     for v in rows:
         entry = entry_map.get(v.journal_entry_id) if v.journal_entry_id else None
-        rule = rule_map[v.vat_rule_version_id]
+        # Un ingreso o un egreso no tiene regla de tasas (D-143).
+        rule = rule_map.get(v.vat_rule_version_id) if v.vat_rule_version_id else None
         result.append(
             VoucherOut(
                 id=v.id,
@@ -565,17 +571,24 @@ def _vouchers_out(db: Session, organization_id: uuid.UUID, rows: list[Voucher]) 
                 imputes_ire=v.imputes_ire,
                 imputes_irp=v.imputes_irp,
                 related_voucher_id=v.related_voucher_id,
+                account_number=v.account_number,
+                bank_name=v.bank_name,
+                ips_employer_number=v.ips_employer_number,
+                document_description=v.document_description,
+                related_number=v.related_number,
+                related_timbrado=v.related_timbrado,
                 finance_counterparty_id=v.finance_counterparty_id,
                 transaction_id=v.transaction_id,
                 journal_entry_id=v.journal_entry_id,
                 journal_entry_status=entry.status if entry is not None else None,
-                period_confirmed=v.issued_on.replace(day=1) in confirmed,
+                period_confirmed=v.issued_on.replace(day=1) in confirmed
+                or v.issued_on.year in confirmed_years,
                 notes=v.notes,
                 voided_at=v.voided_at,
                 void_reason=v.void_reason,
                 created_at=v.created_at,
-                rules_applied=[rules.applied(rule)],
-                rule_status=rule.validation_status,
+                rules_applied=[rules.applied(rule)] if rule is not None else [],
+                rule_status=rule.validation_status if rule is not None else None,
             )
         )
     return result
@@ -593,7 +606,9 @@ def list_vouchers(
     limit: Limit = 50,
     before: uuid.UUID | None = None,
     month: Annotated[date | None, Query(description="Cualquier día del mes")] = None,
-    direction: Literal["purchase", "sale"] | None = None,
+    year: Year | None = None,
+    direction: VoucherDirection | None = None,
+    voucher_type: VoucherType | None = None,
     counterparty_ruc: Annotated[str | None, Query(max_length=9)] = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
     voided: Literal["exclude", "include", "only"] = "exclude",
@@ -602,7 +617,9 @@ def list_vouchers(
     query = vouchers.list_query(
         auth.organization_id,
         month=month,
+        year=year,
         direction=direction,
+        voucher_type=voucher_type,
         counterparty_ruc=counterparty_ruc,
         q=q,
         voided=voided,
@@ -669,6 +686,36 @@ def preview_marangatu(
     return exports.marangatu_preview(plan, first_id)
 
 
+@router.get("/vouchers/export/annual")
+def export_annual_register(
+    auth: Reader,
+    db: DbSession,
+    year: Year,
+    separator: Separator = "semicolon",
+    first_id: FirstId = 1,
+    limit: Annotated[int | None, Query(ge=1, le=exports.MAX_ROWS)] = None,
+) -> Response:
+    """Archivo de importación del registro anual (956, D-143): compras, ventas, ingresos y
+    egresos del año, `<RUC>_REG_<AAAA>_<id>.zip`. Borrador, como el mensual."""
+    plan = exports.annual_plan(db, auth.organization_id, year, separator=separator, limit=limit)
+    name, content = exports.marangatu_file(plan, first_id)
+    return _file(content, name, "application/zip")
+
+
+@router.get("/vouchers/export/annual-preview")
+def preview_annual_register(
+    auth: Reader,
+    db: DbSession,
+    year: Year,
+    separator: Separator = "semicolon",
+    first_id: FirstId = 1,
+    limit: Annotated[int | None, Query(ge=1, le=exports.MAX_ROWS)] = None,
+) -> dict[str, Any]:
+    """Qué iría en el archivo anual (956): filas, lotes, excluidos y avisos."""
+    plan = exports.annual_plan(db, auth.organization_id, year, separator=separator, limit=limit)
+    return exports.marangatu_preview(plan, first_id)
+
+
 @router.get("/vouchers/{voucher_id}", response_model=VoucherOut)
 def get_voucher(voucher_id: uuid.UUID, auth: Reader, db: DbSession) -> VoucherOut:
     voucher = vouchers.get_voucher(db, auth.organization_id, voucher_id)
@@ -680,15 +727,14 @@ def update_voucher(
     voucher_id: uuid.UUID, body: VoucherUpdate, auth: Manager, db: DbSession
 ) -> VoucherOut:
     changes = body.model_dump(exclude_unset=True)
+    # El timbrado, el número y la contraparte pueden faltar en un ingreso o un egreso: los
+    # controla el servicio según el registro (D-143).
     for key in (
         "voucher_type",
         "is_electronic",
-        "timbrado",
-        "number",
         "issued_on",
         "condition",
         "currency",
-        "counterparty_doc_type",
         "imputes_vat",
         "imputes_ire",
         "imputes_irp",

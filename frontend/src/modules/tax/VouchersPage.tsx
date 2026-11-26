@@ -15,18 +15,23 @@ import { fetchAll } from '../finance/data'
 import { formatBookDate, todayIso } from '../finance/labels'
 import { taxKeys, useConfirmedRegister, useTaxAlerts, useTaxPerms, useTaxProfile } from './data'
 import { DIRECTION_PLURAL, monthTitle, VOUCHER_TYPE_LABELS } from './labels'
-import { canProposeVoucher, hasLiveEntry, shiftMonth, type Totals, voucherTotals } from './logic'
-import type { Direction, Voucher } from './types'
-import { MarangatuButton, ProposeVoucherEntryForm, VoidVoucherForm, VoucherEntryBadge, XlsxButton } from './VoucherDialogs'
+import { canProposeVoucher, hasAnnualRegister, hasLiveEntry, shiftMonth, type Totals, voucherTotals } from './logic'
+import { isRegister, REGISTER_TYPES, registerDate, voucherLabel } from './registerDraft'
+import type { Direction, Voucher, VoucherType } from './types'
+import { AnnualRegisterButton, MarangatuButton, ProposeVoucherEntryForm, VoidVoucherForm, VoucherEntryBadge, XlsxButton } from './VoucherDialogs'
 
 const signed = (v: Voucher, amount: string) => (v.voucher_type === 'credit_note' && amount !== '0' ? `-${amount}` : amount)
 
-function TotalsRow({ label, t }: { label: string; t: Totals }) {
+function TotalsRow({ label, t, register }: { label: string; t: Totals; register?: boolean }) {
   return (
     <tr className="border-t border-line-strong bg-sunken/60">
       <th scope="row" colSpan={4} className="px-4 py-2.5 text-left font-semibold">
         {label} <span className="font-normal text-ink-2">({t.count})</span>
       </th>
+      {register ? (
+        <td colSpan={4} />
+      ) : (
+        <>
       <td className="px-4 py-2.5 text-right">
         <Pyg value={t.taxed10.toString()} strong />
       </td>
@@ -39,6 +44,8 @@ function TotalsRow({ label, t }: { label: string; t: Totals }) {
       <td className="px-4 py-2.5 text-right">
         <Pyg value={t.vat.toString()} strong />
       </td>
+        </>
+      )}
       <td className="px-4 py-2.5 text-right">
         <span className="ledger-rule">
           <Pyg value={t.total.toString()} strong />
@@ -58,6 +65,8 @@ export function VouchersPage() {
   const today = alerts.data?.as_of ?? todayIso()
   const month = /^\d{4}-\d{2}$/.test(params.get('mes') ?? '') ? (params.get('mes') as string) : today.slice(0, 7)
   const direction = (params.get('dir') as Direction | null) || null
+  const voucherType = (params.get('tipo') as VoucherType | null) || null
+  const annualRegister = hasAnnualRegister(profile.data)
   const ruc = params.get('ruc') ?? ''
   const q = params.get('q') ?? ''
   const voided = params.get('anulados') === 'solo' ? 'only' : params.get('anulados') === 'si' ? 'include' : 'exclude'
@@ -86,12 +95,13 @@ export function VouchersPage() {
 
   const filters: Record<string, string> = { month: `${month}-01`, voided }
   if (direction) filters.direction = direction
+  if (voucherType) filters.voucher_type = voucherType
   if (ruc) filters.counterparty_ruc = ruc
   if (q) filters.q = q
   const list = useQuery({ queryKey: [...taxKeys.vouchers(), 'list', filters], queryFn: () => fetchAll<Voucher>('/tax/vouchers', filters) })
-  const rows = [...(list.data ?? [])].sort((a, b) => (a.issued_on === b.issued_on ? a.number.localeCompare(b.number) : a.issued_on < b.issued_on ? -1 : 1))
+  const rows = [...(list.data ?? [])].sort((a, b) => (a.issued_on === b.issued_on ? (a.number ?? '').localeCompare(b.number ?? '') : a.issued_on < b.issued_on ? -1 : 1))
   const totals = voucherTotals(rows)
-  const filtered = Boolean(direction || ruc || q || voided !== 'exclude')
+  const filtered = Boolean(direction || voucherType || ruc || q || voided !== 'exclude')
   const [year, monthNumber] = month.split('-').map(Number)
 
   const close = (changed: boolean, message: string) => {
@@ -103,14 +113,14 @@ export function VouchersPage() {
     const buttons: ReactNode[] = []
     if (perms.canProposeEntry && canProposeVoucher(v)) {
       buttons.push(
-        <Button key="p" variant="ghost" className="h-7 px-2 text-sm" onClick={() => setDialog({ kind: 'propose', v })} aria-label={`Proponer asiento del comprobante ${v.number}`}>
+        <Button key="p" variant="ghost" className="h-7 px-2 text-sm" onClick={() => setDialog({ kind: 'propose', v })} aria-label={`Proponer asiento del comprobante ${v.number ?? registerDate(v)}`}>
           Proponer asiento
         </Button>,
       )
     }
     if (perms.canManage && !v.voided_at && !v.period_confirmed && !hasLiveEntry(v)) {
       buttons.push(
-        <Button key="v" variant="ghost" className="h-7 px-2 text-sm text-debit" onClick={() => setDialog({ kind: 'void', v })} aria-label={`Anular el comprobante ${v.number}`}>
+        <Button key="v" variant="ghost" className="h-7 px-2 text-sm text-debit" onClick={() => setDialog({ kind: 'void', v })} aria-label={`Anular el comprobante ${v.number ?? registerDate(v)}`}>
           Anular
         </Button>,
       )
@@ -122,7 +132,11 @@ export function VouchersPage() {
     <>
       <PageHeader
         title="Comprobantes"
-        description="Registro de compras y ventas del mes. Es la base del IVA y del archivo para Marangatu; los electrónicos se cargan igual para tu control."
+        description={
+          annualRegister
+            ? 'Compras, ventas, ingresos y egresos del mes. Con el registro anual (956), los del año van en un solo archivo para Marangatu.'
+            : 'Registro de compras y ventas del mes. Es la base del IVA y del archivo para Marangatu; los electrónicos se cargan igual para tu control.'
+        }
         actions={
           perms.canManage &&
           !confirmed && (
@@ -156,13 +170,33 @@ export function VouchersPage() {
         </div>
         <Field label="Dirección">
           {(p) => (
-            <Select {...p} className="w-36" value={direction ?? ''} onChange={(e) => setParam({ dir: e.target.value || null })}>
-              <option value="">Compras y ventas</option>
+            <Select {...p} className="w-36" value={direction ?? ''} onChange={(e) => setParam({ dir: e.target.value || null, tipo: null })}>
+              <option value="">{annualRegister ? 'Todos' : 'Compras y ventas'}</option>
               <option value="purchase">{DIRECTION_PLURAL.purchase}</option>
               <option value="sale">{DIRECTION_PLURAL.sale}</option>
+              {(annualRegister || isRegister(direction ?? 'purchase')) && (
+                <>
+                  <option value="income">{DIRECTION_PLURAL.income}</option>
+                  <option value="expense">{DIRECTION_PLURAL.expense}</option>
+                </>
+              )}
             </Select>
           )}
         </Field>
+        {direction && isRegister(direction) && (
+          <Field label="Tipo">
+            {(p) => (
+              <Select {...p} className="w-72" value={voucherType ?? ''} onChange={(e) => setParam({ tipo: e.target.value || null })}>
+                <option value="">Todos los tipos</option>
+                {REGISTER_TYPES[direction].map((t) => (
+                  <option key={t} value={t}>
+                    {VOUCHER_TYPE_LABELS[t]}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+        )}
         <Field label="RUC de la contraparte">
           {(p) => <Input {...p} className="w-36 tabular-nums" inputMode="numeric" maxLength={9} placeholder="Sin el DV" value={rucText} onChange={(e) => setRucText(e.target.value.toUpperCase())} />}
         </Field>
@@ -185,7 +219,7 @@ export function VouchersPage() {
         </Field>
         <div className="ml-auto flex flex-wrap gap-2">
           <XlsxButton year={year} month={monthNumber} direction={direction} />
-          <MarangatuButton year={year} month={monthNumber} ruc={profile.data?.ruc ?? null} />
+          {annualRegister ? <AnnualRegisterButton defaultYear={year} ruc={profile.data?.ruc ?? null} /> : <MarangatuButton year={year} month={monthNumber} ruc={profile.data?.ruc ?? null} />}
         </div>
       </form>
 
@@ -258,7 +292,7 @@ export function VouchersPage() {
                   </Th>
                 </tr>
               </thead>
-              {(['purchase', 'sale'] as const)
+              {(['purchase', 'sale', 'income', 'expense'] as const)
                 .filter((dir) => rows.some((v) => v.direction === dir))
                 .map((dir) => (
                   <tbody key={dir} className="divide-y divide-line">
@@ -274,11 +308,12 @@ export function VouchersPage() {
                           <td className="px-4 py-2 whitespace-nowrap tabular-nums">{formatBookDate(v.issued_on)}</td>
                           <td className="px-4 py-2">
                             <Link to={`/impuestos/comprobantes/${v.id}`} className="font-medium whitespace-nowrap tabular-nums hover:text-ledger hover:underline">
-                              {v.number}
+                              {v.number ?? (isRegister(v.direction) ? registerDate(v) : '')}
                             </Link>
                             <span className="block text-xs text-ink-2 no-underline">
                               {VOUCHER_TYPE_LABELS[v.voucher_type]}
-                              {v.is_electronic ? ' electrónica' : ''} · timbrado {v.timbrado}
+                              {v.is_electronic ? ' electrónica' : ''}
+                              {v.timbrado ? ` · timbrado ${v.timbrado}` : ''}
                             </span>
                           </td>
                           <td className="max-w-56 px-4 py-2">
@@ -294,10 +329,21 @@ export function VouchersPage() {
                             <span className="flex flex-wrap gap-1 no-underline">
                               {v.voided_at && <Badge tone="bad">Anulado</Badge>}
                               {v.counterparty_review_required && <Badge tone="warn">RUC a revisar</Badge>}
-                              {!v.imputes_vat && <Badge tone="neutral">No imputa IVA</Badge>}
+                              {!v.imputes_vat && !isRegister(v.direction) && <Badge tone="neutral">No imputa IVA</Badge>}
                               <VoucherEntryBadge voucher={v} />
                             </span>
                           </td>
+                          {isRegister(v.direction) ? (
+                            // Sin IVA: en un ingreso, gravado y no gravado; en un egreso, solo el total (D-143).
+                            <td colSpan={4} className="px-4 py-2 text-right text-xs text-ink-2 tabular-nums">
+                              {v.direction === 'income' && v.exempt !== '0' ? (
+                                <>
+                                  Gravado <Pyg value={v.taxed_10} /> · no gravado <Pyg value={v.exempt} />
+                                </>
+                              ) : null}
+                            </td>
+                          ) : (
+                            <>
                           <td className="px-4 py-2 text-right">
                             <Pyg value={signed(v, v.taxed_10)} />
                           </td>
@@ -310,13 +356,15 @@ export function VouchersPage() {
                           <td className="px-4 py-2 text-right">
                             <Pyg value={signed(v, (BigInt(v.vat_10) + BigInt(v.vat_5)).toString())} />
                           </td>
+                            </>
+                          )}
                           <td className="px-4 py-2 text-right font-medium">
                             <Pyg value={signed(v, v.total)} />
                           </td>
                           <td className="px-2 py-1 text-right whitespace-nowrap">{action(v)}</td>
                         </tr>
                       ))}
-                    <TotalsRow label={`Total ${DIRECTION_PLURAL[dir].toLowerCase()}`} t={totals[dir]} />
+                    <TotalsRow label={`Total ${DIRECTION_PLURAL[dir].toLowerCase()}`} t={totals[dir]} register={isRegister(dir)} />
                   </tbody>
                 ))}
             </table>
@@ -329,7 +377,7 @@ export function VouchersPage() {
         {dialog?.kind === 'propose' && <ProposeVoucherEntryForm voucher={dialog.v} onDone={() => setDialog(null)} />}
       </Modal>
       <Modal open={dialog?.kind === 'void'} title="Anular el comprobante" onClose={() => setDialog(null)}>
-        {dialog?.kind === 'void' && <VoidVoucherForm voucher={dialog.v} onDone={(changed) => close(changed, `Comprobante ${dialog.v.number} anulado.`)} />}
+        {dialog?.kind === 'void' && <VoidVoucherForm voucher={dialog.v} onDone={(changed) => close(changed, `${voucherLabel(dialog.v, 'Comprobante')} anulado.`)} />}
       </Modal>
     </>
   )

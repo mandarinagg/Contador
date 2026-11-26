@@ -71,13 +71,25 @@ export const CONFIDENCE_LABELS: Record<string, string> = {
   no_encontrada: 'Fuente no encontrada',
 }
 
-export const DIRECTION_LABELS: Record<Direction, string> = { purchase: 'Compra', sale: 'Venta' }
-export const DIRECTION_PLURAL: Record<Direction, string> = { purchase: 'Compras', sale: 'Ventas' }
+export const DIRECTION_LABELS: Record<Direction, string> = { purchase: 'Compra', sale: 'Venta', income: 'Ingreso', expense: 'Egreso' }
+export const DIRECTION_PLURAL: Record<Direction, string> = { purchase: 'Compras', sale: 'Ventas', income: 'Ingresos', expense: 'Egresos' }
 
 export const VOUCHER_TYPE_LABELS: Record<VoucherType, string> = {
   invoice: 'Factura',
   credit_note: 'Nota de crédito',
   debit_note: 'Nota de débito',
+  // Tabla 4 de la RG 90/2021: sin timbrado, del registro de ingresos y egresos (D-143).
+  credit_purchase: 'Egreso por compra a crédito (201)',
+  foreign_voucher: 'Comprobante del exterior legalizado (202)',
+  credit_sale: 'Ingreso por venta a crédito (203)',
+  public_entity: 'Entidad pública, religiosa o de beneficio público (204)',
+  e_ticketing: 'Extracto de billetaje electrónico (205)',
+  ips_statement: 'Extracto de cuenta de IPS (206)',
+  card_statement: 'Extracto de tarjeta de crédito o débito (207)',
+  payslip: 'Liquidación de salario (208)',
+  other_expense: 'Otro comprobante de egreso (209)',
+  other_income: 'Otro comprobante de ingreso (210)',
+  bank_transfer: 'Transferencia, giro o boleta de depósito (211)',
 }
 
 /** Tipos de identificación de la Tabla 3 de la RG 90 (D-099), con su código oficial. */
@@ -101,6 +113,10 @@ export const DOUBTS: Record<string, string> = {
   'D-F4-8': 'Tipo de cambio: comprador o vendedor del BCP del día anterior, o la cotización del comprobante.',
   'D-F4-10': 'El algoritmo del DV coincide con los ejemplos oficiales, pero no se encontró el documento oficial que lo describe. Hay RUC antiguos con letra.',
   'D-F4-12': 'No está claro si un feriado nacional corre los vencimientos de la DNIT.',
+  // Persona física (`docs/research/TRIBUTACION_PERSONA_FISICA.md` §9).
+  'D-PF-7': 'Si aparece el IVA, la 956 pasa a la 955 en enero del año siguiente (RG 90/2021, art. 14); falta leer el texto de la RG 132/2023.',
+  'D-PF-18':
+    'Cómo se cargan los importes: en un ingreso, «gravado» y «no gravado o exonerado»; en un egreso, solo el total. El cobro de una venta a crédito (203) va por lo cobrado, y lo que identifica a un comprobante sin número es su período, su contraparte y, en el IPS, el número de empleador.',
 }
 
 export const doubtText = (code: string) => DOUBTS[code] ?? 'Duda abierta: ver la investigación de la fase 4.'

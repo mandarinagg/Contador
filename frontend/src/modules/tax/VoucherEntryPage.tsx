@@ -15,7 +15,8 @@ import { formatBookDate, todayIso } from '../finance/labels'
 import { RulesApplied, UnverifiedMark } from './components'
 import { taxKeys, useConfirmedRegister, useInvalidateTax, useRulesById, useTaxPerms, useTaxProfile } from './data'
 import { CONDITION_LABELS, DIRECTION_LABELS, DOC_TYPE_LABELS, monthTitle, VOUCHER_TYPE_LABELS } from './labels'
-import { canProposeVoucher, hasLiveEntry } from './logic'
+import { canProposeVoucher, hasAnnualRegister, hasLiveEntry } from './logic'
+import { isRegister, registerDate, voucherLabel } from './registerDraft'
 import type { Direction, Voucher, VoucherIn } from './types'
 import { ProposeVoucherEntryForm, VoidVoucherForm, VoucherEntryBadge } from './VoucherDialogs'
 import { useRatesAt, VoucherForm } from './VoucherForm'
@@ -68,7 +69,7 @@ function SessionList({ items }: { items: Voucher[] }) {
           <li key={v.id} className="flex items-baseline gap-3 px-4 py-2">
             <span className="w-16 shrink-0 text-ink-2">{DIRECTION_LABELS[v.direction]}</span>
             <Link to={`/impuestos/comprobantes/${v.id}`} className="min-w-0 flex-1 truncate hover:text-ledger hover:underline">
-              <span className="tabular-nums">{v.number}</span> · {v.counterparty_name}
+              <span className="tabular-nums">{v.number ?? registerDate(v)}</span> · {v.counterparty_name}
             </Link>
             <span className="tabular-nums">{formatMoney(v.voucher_type === 'credit_note' ? `-${v.total}` : v.total, 'PYG')}</span>
           </li>
@@ -94,7 +95,13 @@ function NewVoucher() {
   const direction = (params.get('dir') as Direction | null) ?? memory.direction ?? 'purchase'
   const initialDate = month && /^\d{4}-\d{2}$/.test(month) ? (todayIso().startsWith(month) ? todayIso() : `${month}-01`) : (memory.issued_on ?? todayIso())
   const imputesIre = profile.data?.current?.ire_regime === 'ire_simple'
-  const [draft, setDraft] = useState<VoucherDraft>(() => emptyDraft(direction, initialDate, imputesIre))
+  const annualRegister = hasAnnualRegister(profile.data)
+  // Sin IVA (registro anual, D-143): las compras y ventas imputan al IRP, no al IVA.
+  const newDraft = (dir: Direction, issuedOn: string, ire: boolean): VoucherDraft => {
+    const next = emptyDraft(dir, issuedOn, ire)
+    return annualRegister && !isRegister(dir) ? { ...next, imputes_vat: false, imputes_irp: true } : next
+  }
+  const [draft, setDraft] = useState<VoucherDraft>(() => newDraft(direction, initialDate, imputesIre))
   const [loaded, setLoaded] = useState<Voucher[]>([])
   const first = useRef<HTMLInputElement>(null)
   const { rates } = useRatesAt(draft.issued_on || '9999-12-31')
@@ -107,10 +114,15 @@ function NewVoucher() {
       invalidate()
       setLoaded((prev) => [v, ...prev])
       remember(v.direction, v.issued_on)
-      toast('ok', `${VOUCHER_TYPE_LABELS[v.voucher_type]} ${v.number} cargada: ${formatMoney(v.total, 'PYG')}.`)
-      const next = emptyDraft(v.direction, v.issued_on, draft.imputes_ire)
+      toast(
+        'ok',
+        isRegister(v.direction)
+          ? `${DIRECTION_LABELS[v.direction]} cargado: ${voucherLabel(v, VOUCHER_TYPE_LABELS[v.voucher_type])}, ${formatMoney(v.total, 'PYG')}.`
+          : `${VOUCHER_TYPE_LABELS[v.voucher_type]} ${v.number} cargada: ${formatMoney(v.total, 'PYG')}.`,
+      )
+      const next = newDraft(v.direction, v.issued_on, draft.imputes_ire)
       // En ventas el talonario es propio: queda listo el número siguiente.
-      if (v.direction === 'sale' && !v.is_electronic) {
+      if (v.direction === 'sale' && !v.is_electronic && v.timbrado && v.number) {
         next.timbrado = v.timbrado
         next.number = nextNumber(v.number)
       }
@@ -131,7 +143,11 @@ function NewVoucher() {
     <>
       <PageHeader
         title="Cargar comprobantes"
-        description="Facturas de compra y de venta, una tras otra con el teclado. Los importes van con IVA incluido, como en la factura; el IVA se calcula solo."
+        description={
+          annualRegister
+            ? 'Compras y ventas con timbrado, e ingresos y egresos sin timbrado (recibos, liquidaciones de salario, extractos de IPS o de tarjeta) para el registro anual (956).'
+            : 'Facturas de compra y de venta, una tras otra con el teclado. Los importes van con IVA incluido, como en la factura; el IVA se calcula solo.'
+        }
         actions={
           <Link to={`/impuestos/comprobantes${draft.issued_on ? `?mes=${draft.issued_on.slice(0, 7)}` : ''}`} className="inline-flex h-9 items-center gap-1.5 rounded-sm px-3 font-medium text-ledger hover:bg-ledger-soft">
             <ArrowLeft size={15} aria-hidden />
@@ -150,7 +166,8 @@ function NewVoucher() {
               }}
               mode="new"
               organizationRuc={{ ruc: profile.data?.ruc ?? null, dv: profile.data?.ruc_check_digit ?? null }}
-              confirmedMonth={confirmed}
+              confirmedMonth={isRegister(draft.direction) ? null : confirmed}
+              annualRegister={annualRegister}
               busy={create.isPending}
               apiError={create.error}
               fieldErrors={apiFieldErrors(create.error)}
@@ -241,6 +258,7 @@ function VoucherDetail({ id }: { id: string }) {
   const locked = v.period_confirmed || Boolean(confirmed)
   const voided = Boolean(v.voided_at)
   const negative = v.voucher_type === 'credit_note'
+  const register = isRegister(v.direction)
   const canEdit = perms.canManage && !voided && !locked
   const canVoid = perms.canManage && !voided && !locked && !hasLiveEntry(v)
   const canPropose = perms.canProposeEntry && canProposeVoucher(v)
@@ -249,7 +267,7 @@ function VoucherDetail({ id }: { id: string }) {
   return (
     <>
       <PageHeader
-        title={`${VOUCHER_TYPE_LABELS[v.voucher_type]} ${v.number}`}
+        title={voucherLabel(v, VOUCHER_TYPE_LABELS[v.voucher_type])}
         description={`${DIRECTION_LABELS[v.direction]} del ${formatBookDate(v.issued_on)} · ${v.counterparty_name}`}
         actions={
           <div className="flex flex-wrap gap-2">
@@ -292,7 +310,16 @@ function VoucherDetail({ id }: { id: string }) {
             Motivo: {v.void_reason}. No cuenta en el IVA, el libro ni el archivo de Marangatu.
           </Notice>
         )}
-        {locked && !voided && (
+        {locked && !voided && register && (
+          <Notice tone="warn" title="Registro anual confirmado en Marangatu: solo lectura">
+            El registro anual de comprobantes (956) de {v.issued_on.slice(0, 4)} está confirmado.{' '}
+            <Link to={`/impuestos/calendario?codigo=REG-COMPROB-ANUAL`} className="font-medium underline">
+              Reabrir el registro
+            </Link>{' '}
+            para corregirlo (con motivo, como una rectificativa).
+          </Notice>
+        )}
+        {locked && !voided && !register && (
           <Notice tone="warn" title="Mes confirmado en Marangatu: solo lectura">
             El registro de comprobantes de {monthTitle(month).toLowerCase()} está confirmado.{' '}
             {confirmed ? (
@@ -329,6 +356,7 @@ function VoucherDetail({ id }: { id: string }) {
               }}
               mode="edit"
               editing={v}
+              annualRegister={register}
               notesOnly={hasLiveEntry(v)}
               organizationRuc={{ ruc: profile.data?.ruc ?? null, dv: profile.data?.ruc_check_digit ?? null }}
               confirmedMonth={null}
@@ -361,17 +389,47 @@ function VoucherDetail({ id }: { id: string }) {
               <Detail label="Contraparte">
                 <span className="font-medium">{v.counterparty_name}</span>
                 <span className="block text-sm text-ink-2 tabular-nums">
-                  {v.counterparty_doc_type === 'ruc'
-                    ? `RUC ${v.counterparty_ruc}${v.counterparty_ruc_dv ? `-${v.counterparty_ruc_dv}` : ''}`
-                    : `${DOC_TYPE_LABELS[v.counterparty_doc_type]}${v.counterparty_document ? ` ${v.counterparty_document}` : ''}`}
+                  {v.counterparty_doc_type === null
+                    ? 'Sin identificación'
+                    : v.counterparty_doc_type === 'ruc'
+                      ? `RUC ${v.counterparty_ruc}${v.counterparty_ruc_dv ? `-${v.counterparty_ruc_dv}` : ''}`
+                      : `${DOC_TYPE_LABELS[v.counterparty_doc_type]}${v.counterparty_document ? ` ${v.counterparty_document}` : ''}`}
                 </span>
               </Detail>
-              <Detail label="Timbrado y número">
-                <span className="tabular-nums">
-                  {v.timbrado} · {v.number}
-                </span>
-              </Detail>
-              <Detail label="Condición">{CONDITION_LABELS[v.condition]}</Detail>
+              {register ? (
+                <>
+                  <Detail label={v.voucher_type === 'payslip' || v.voucher_type === 'ips_statement' ? 'Período y número' : 'Fecha y número'}>
+                    <span className="tabular-nums">
+                      {registerDate(v)}
+                      {v.number ? ` · ${v.number}` : ' · sin número'}
+                    </span>
+                  </Detail>
+                  <Detail label="Registro">Anual (956), {DIRECTION_LABELS[v.direction].toLowerCase()}</Detail>
+                  {v.account_number && (
+                    <Detail label="Cuenta o tarjeta">
+                      {v.account_number} · {v.bank_name}
+                    </Detail>
+                  )}
+                  {v.ips_employer_number && <Detail label="Número de empleador en IPS">{v.ips_employer_number}</Detail>}
+                  {v.document_description && <Detail label="Tipo de documento">{v.document_description}</Detail>}
+                  {v.related_number && (
+                    <Detail label="Comprobante asociado">
+                      <span className="tabular-nums">
+                        {v.related_number} · timbrado {v.related_timbrado}
+                      </span>
+                    </Detail>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Detail label="Timbrado y número">
+                    <span className="tabular-nums">
+                      {v.timbrado} · {v.number}
+                    </span>
+                  </Detail>
+                  <Detail label="Condición">{CONDITION_LABELS[v.condition]}</Detail>
+                </>
+              )}
               {v.is_electronic && (
                 <div className="col-span-3">
                   <Detail label="CDC">
@@ -410,6 +468,39 @@ function VoucherDetail({ id }: { id: string }) {
               )}
             </dl>
 
+            {register ? (
+              <table className="w-full border-t border-line text-sm">
+                <caption className="sr-only">Importes del comprobante</caption>
+                <tbody className="divide-y divide-line border-b border-line tabular-nums">
+                  {v.direction === 'income' && (
+                    <>
+                      <tr>
+                        <th scope="row" className="px-5 py-2 text-left font-normal">
+                          Monto gravado
+                        </th>
+                        <td className="px-5 py-2 text-right">{formatMoney(v.taxed_10, 'PYG')}</td>
+                      </tr>
+                      <tr>
+                        <th scope="row" className="px-5 py-2 text-left font-normal">
+                          No gravado o exonerado
+                        </th>
+                        <td className="px-5 py-2 text-right">{formatMoney(v.exempt, 'PYG')}</td>
+                      </tr>
+                    </>
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th scope="row" className="px-5 py-3 text-left font-semibold">
+                      Total
+                    </th>
+                    <td className="px-5 py-3 text-right font-semibold tabular-nums">
+                      <span className="ledger-rule">{formatMoney(v.total, 'PYG')}</span>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            ) : (
             <table className="w-full border-t border-line text-sm">
               <caption className="sr-only">Importes del comprobante</caption>
               <thead>
@@ -459,6 +550,7 @@ function VoucherDetail({ id }: { id: string }) {
                 </tr>
               </tfoot>
             </table>
+            )}
           </Sheet>
 
           <aside className="flex flex-col gap-4">
@@ -467,11 +559,12 @@ function VoucherDetail({ id }: { id: string }) {
               <div className="flex flex-col gap-3 p-4 text-sm">
                 <p className="flex flex-wrap gap-1.5">
                   {voided ? <Badge tone="bad">Anulado</Badge> : <Badge tone="ok">Vigente</Badge>}
-                  {locked && <Badge tone="neutral">Mes confirmado</Badge>}
+                  {locked && <Badge tone="neutral">{register ? 'Año confirmado' : 'Mes confirmado'}</Badge>}
                   {v.is_electronic && <Badge tone="neutral">Electrónico</Badge>}
                   <VoucherEntryBadge voucher={v} />
                 </p>
                 {!v.journal_entry_id && !voided && <p className="text-ink-2">Sin asiento todavía.</p>}
+                {!register && (
                 <div className="flex flex-col gap-1">
                   <span className="text-ink-2">Regla de las tasas</span>
                   <span className="flex items-center gap-2">
@@ -479,6 +572,7 @@ function VoucherDetail({ id }: { id: string }) {
                     <UnverifiedMark status={v.rule_status} />
                   </span>
                 </div>
+                )}
                 <p className="text-ink-3">Cargado el {formatBookDate(v.created_at.slice(0, 10))}.</p>
               </div>
             </Sheet>
@@ -501,7 +595,7 @@ function VoucherDetail({ id }: { id: string }) {
             onDone={(changed) => {
               setDialog(null)
               if (changed) {
-                toast('ok', `Comprobante ${v.number} anulado.`)
+                toast('ok', `${voucherLabel(v, 'Comprobante')} anulado.`)
                 qc.invalidateQueries({ queryKey: [...taxKeys.vouchers(), 'one', id] })
                 navigate(`/impuestos/comprobantes/${id}`, { replace: true })
               }

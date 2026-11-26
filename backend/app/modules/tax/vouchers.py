@@ -27,6 +27,14 @@ Validaciones (el servicio da el error legible; la base vuelve a validar lo esenc
   comprobantes no se crean, modifican ni anulan;
 - con asiento vivo (D-091), el comprobante no se modifica ni se anula: primero se descarta o
   se revierte el asiento.
+
+INGRESOS y EGRESOS del IRP-RSP (D-143, `_validated_register`): los tipos 201 a 211 de la Tabla 4
+del formato oficial, sin timbrado ni IVA, solo si el perfil vigente al cierre del año incluye
+la 956 (la misma regla que genera la obligación). Cada tipo pide sus columnas (número salvo en
+205 a 208, período en 206 y 208, cuenta y banco en 207 y 211, empleador en 206, descripción en
+209 y 210, comprobante asociado en 201 y 203) y rechaza las que no usa. Anti duplicado: tipo,
+contraparte, cuenta y número; sin número, la fecha o el período (y el empleador en 206). El
+registro anual confirmado bloquea su año, como el mensual su mes.
 """
 
 import math
@@ -48,6 +56,7 @@ from app.modules.finance.money import CURRENCY_DECIMALS, AmountError, check_amou
 from app.modules.finance.service import escape_like
 from app.modules.organizations.models import Organization
 from app.modules.organizations.ruc import ruc_check_digit
+from app.modules.tax import profile as profiles
 from app.modules.tax import rule_params, rules
 from app.modules.tax.common import (
     ZERO,
@@ -59,14 +68,53 @@ from app.modules.tax.common import (
     record,
     snapshot,
 )
-from app.modules.tax.models import DOCUMENT_TYPES, Obligation, RuleVersion, Voucher
+from app.modules.tax.models import (
+    ACCOUNT_TYPES,
+    CREDIT_TYPES,
+    DESCRIBED_TYPES,
+    DOCUMENT_TYPES,
+    EXPENSE_TYPES,
+    INCOME_TYPES,
+    NO_COUNTERPARTY_TYPES,
+    PERIOD_TYPES,
+    REGISTER_DIRECTIONS,
+    TIMBRADO_TYPES,
+    UNNUMBERED,
+    Obligation,
+    RuleVersion,
+    Voucher,
+)
 
 VAT_RULE = "IVA-GENERAL-TASAS"
 REGISTER_RULE = "REG-COMPROB-MENSUAL"
+ANNUAL_REGISTER_RULE = "REG-COMPROB-ANUAL"
+ANNUAL_REGISTER = "956"
+REGISTER_MIN_DATE = date(2021, 1, 1)
+IPS_NAME = "Instituto de Previsión Social"
 VAT_TOLERANCE = Decimal(1)
 UNNAMED = "Sin nombre"
 CDC_DOCUMENT_TYPES = {"invoice": "01", "credit_note": "05"}
 
+# Columnas propias de INGRESOS y EGRESOS (D-143).
+REGISTER_FIELDS = (
+    "account_number",
+    "bank_name",
+    "ips_employer_number",
+    "document_description",
+    "related_number",
+    "related_timbrado",
+)
+FIELD_LABELS = {
+    "account_number": "el número de cuenta o tarjeta",
+    "bank_name": "el banco, financiera o cooperativa",
+    "ips_employer_number": "el número de empleador en IPS",
+    "document_description": "qué tipo de documento es",
+    "related_number": "el número del comprobante asociado",
+    "related_timbrado": "el timbrado del comprobante asociado",
+    "timbrado": "el timbrado",
+    "cdc": "el CDC",
+    "related_voucher_id": "la factura que corrige",
+}
 FIELDS = (
     "direction",
     "voucher_type",
@@ -96,6 +144,7 @@ FIELDS = (
     "finance_counterparty_id",
     "transaction_id",
     "notes",
+    *REGISTER_FIELDS,
 )
 # Con asiento vivo solo cambian estos (no alteran lo que contabilizó el asiento).
 EDITABLE_WITH_ENTRY = frozenset({"notes", "finance_counterparty_id"})
@@ -174,6 +223,21 @@ def confirmed_months(db: Session, organization_id: uuid.UUID, months: set[date])
     )
 
 
+def confirmed_years(db: Session, organization_id: uuid.UUID, years: set[int]) -> set[int]:
+    """Años con el registro anual (956) presentado: bloquea sus comprobantes (D-143)."""
+    if not years:
+        return set()
+    starts = db.scalars(
+        select(Obligation.period_start).where(
+            Obligation.organization_id == organization_id,
+            Obligation.code == ANNUAL_REGISTER_RULE,
+            Obligation.period_start.in_({date(y, 1, 1) for y in years}),
+            Obligation.status.in_(("filed", "paid")),
+        )
+    )
+    return {start.year for start in starts}
+
+
 def _check_not_confirmed(db: Session, organization_id: uuid.UUID, *days: date) -> None:
     for day in {month_start(d) for d in days}:
         if month_confirmed(db, organization_id, day):
@@ -183,6 +247,24 @@ def _check_not_confirmed(db: Session, organization_id: uuid.UUID, *days: date) -
                 "comprobantes, reabrí primero la obligación del registro (con motivo).",
                 details={"month": day.isoformat()},
             )
+    years = sorted(confirmed_years(db, organization_id, {d.year for d in days}))
+    if years:
+        raise Conflict(
+            "PERIOD_CONFIRMED",
+            f"El registro anual de comprobantes (956) de {years[0]} está confirmado: para "
+            "cambiar sus comprobantes, reabrí primero la obligación del registro (con motivo).",
+            details={"year": years[0]},
+        )
+
+
+def annual_register_applies(db: Session, organization_id: uuid.UUID, year: int) -> bool:
+    """Si el año lleva el registro anual (956): el perfil vigente al cierre la incluye, con el
+    alta a esa fecha. Es la misma regla que genera la obligación (D-087, D-142)."""
+    end = date(year, 12, 31)
+    current = profiles.vigente(profiles.versions(db, organization_id), end)
+    return current is not None and any(
+        o.code == ANNUAL_REGISTER and o.registered_on <= end for o in current.obligations
+    )
 
 
 def live_entry(db: Session, voucher: Voucher) -> JournalEntry | None:
@@ -510,6 +592,275 @@ def _duplicate(db: Session, organization_id: uuid.UUID, data: dict[str, Any], ow
         )
 
 
+def _register_label(data: dict[str, Any]) -> str:
+    when = data["issued_on"]
+    period = f"{when:%m/%Y}" if data["voucher_type"] in PERIOD_TYPES else f"{when:%d/%m/%Y}"
+    if data["number"] is not None:
+        return f"El comprobante {data['number']} de {data['counterparty_name']}"
+    return f"El comprobante de {data['counterparty_name']} del {period}"
+
+
+def _duplicate_register(
+    db: Session, organization_id: uuid.UUID, data: dict[str, Any], own_id: Any
+) -> None:
+    """D-143: los que no tienen timbrado se identifican por el tipo, la contraparte (como se
+    cargó), la cuenta y el número; sin número, por la fecha o el período y el empleador. Igual
+    que los índices `uq_vouchers_register_*` (NULL igual a NULL)."""
+    query = select(Voucher.id).where(
+        Voucher.organization_id == organization_id,
+        Voucher.direction == data["direction"],
+        Voucher.voucher_type == data["voucher_type"],
+        Voucher.voided_at.is_(None),
+        Voucher.counterparty_doc_type.is_not_distinct_from(data["counterparty_doc_type"]),
+        Voucher.counterparty_ruc.is_not_distinct_from(data["counterparty_ruc"]),
+        Voucher.counterparty_document.is_not_distinct_from(data["counterparty_document"]),
+        Voucher.account_number.is_not_distinct_from(data["account_number"]),
+    )
+    if data["number"] is not None:
+        query = query.where(Voucher.number == data["number"])
+    else:
+        query = query.where(
+            Voucher.number.is_(None),
+            Voucher.ips_employer_number.is_not_distinct_from(data["ips_employer_number"]),
+            Voucher.issued_on == data["issued_on"],
+        )
+    if own_id is not None:
+        query = query.where(Voucher.id != own_id)
+    existing = db.scalar(query)
+    if existing is not None:
+        raise Conflict(
+            "VOUCHER_DUPLICATE",
+            f"{_register_label(data)} ya está cargado.",
+            details={"voucher_id": str(existing)},
+        )
+
+
+def _text(value: Any) -> str | None:
+    text = " ".join(str(value).split()) if value is not None else ""
+    return text or None
+
+
+_NUMBER = re.compile(r"^[0-9]{3}-[0-9]{3}-[0-9]{7}$")
+_TIMBRADO = re.compile(r"^[0-9]{8}$")
+# Tipos de identificación que admite cada tipo (columna 5 de INGRESOS y EGRESOS).
+_REGISTER_DOC_TYPES: dict[tuple[str, str], tuple[str, ...]] = {
+    ("income", "payslip"): ("ruc",),
+    ("income", "other_income"): ("ruc", "identity_card", "passport"),
+    ("expense", "public_entity"): ("ruc",),
+    ("expense", "e_ticketing"): ("ruc",),
+    ("expense", "foreign_voucher"): ("tax_id",),
+}
+
+
+def _not_applicable(name: str, why: str) -> AppError:
+    return AppError(
+        "FIELD_NOT_APPLICABLE",
+        f"{why} no lleva {FIELD_LABELS.get(name, name)}.",
+        details={"field": name},
+        status_code=422,
+    )
+
+
+def _validated_register(
+    db: Session,
+    organization_id: uuid.UUID,
+    ctx: FinancialContext,
+    data: dict[str, Any],
+    own_id: uuid.UUID | None,
+) -> dict[str, Any]:
+    """Un ingreso o un egreso del registro anual (D-143). Ver el docstring del módulo."""
+    direction, vtype = data["direction"], data["voucher_type"]
+    register = "INGRESOS" if direction == "income" else "EGRESOS"
+    if vtype not in (INCOME_TYPES if direction == "income" else EXPENSE_TYPES):
+        raise AppError(
+            "VOUCHER_TYPE_INVALID",
+            f"Ese tipo de comprobante no va en {register} (Tabla 4 del formato de la RG 90/2021).",
+            details={"field": "voucher_type"},
+            status_code=422,
+        )
+    if vtype in PERIOD_TYPES:
+        data["issued_on"] = data["issued_on"].replace(day=1)
+    issued: date = data["issued_on"]
+    if issued < REGISTER_MIN_DATE:
+        raise AppError(
+            "DATE_BEFORE_REGISTER",
+            "El registro de comprobantes no admite fechas anteriores al 01/01/2021.",
+            details={"field": "issued_on"},
+            status_code=422,
+        )
+    if not annual_register_applies(db, organization_id, issued.year):
+        raise AppError(
+            "REGISTER_NOT_AVAILABLE",
+            f"Los ingresos y egresos son del registro anual de comprobantes (956), y el perfil "
+            f"fiscal vigente al cierre de {issued.year} no la incluye. Con IVA, todo va en "
+            "compras y ventas del registro mensual (955).",
+            details={"year": issued.year},
+            status_code=422,
+        )
+    why = "Un ingreso o un egreso (sin timbrado)"
+    for name in ("timbrado", "cdc", "related_voucher_id"):
+        if data.get(name) is not None:
+            raise _not_applicable(name, why)
+    if data.get("is_electronic"):
+        raise AppError(
+            "CDC_NOT_APPLICABLE",
+            "Los ingresos y egresos no son comprobantes electrónicos: los que tienen CDC van "
+            "como compra o venta.",
+            status_code=422,
+        )
+    data.update(is_electronic=False, condition=data.get("condition") or "cash")
+    data["number"] = _text(data.get("number"))
+    if data["number"] is None and (direction, vtype) not in UNNUMBERED:
+        raise AppError(
+            "VOUCHER_NUMBER_REQUIRED",
+            "Indicá el número del comprobante o de la transacción.",
+            details={"field": "number"},
+            status_code=422,
+        )
+    needed = {
+        "account_number": direction == "expense" and vtype in ACCOUNT_TYPES,
+        "bank_name": direction == "expense" and vtype in ACCOUNT_TYPES,
+        "ips_employer_number": vtype == "ips_statement",
+        "document_description": vtype in DESCRIBED_TYPES,
+        "related_number": vtype in CREDIT_TYPES,
+        "related_timbrado": vtype in CREDIT_TYPES,
+    }
+    for name, need in needed.items():
+        value = _text(data.get(name))
+        if need and value is None:
+            raise AppError(
+                "FIELD_REQUIRED",
+                f"Este tipo de comprobante lleva {FIELD_LABELS[name]}.",
+                details={"field": name},
+                status_code=422,
+            )
+        if not need and value is not None:
+            raise _not_applicable(name, "Este tipo de comprobante")
+        data[name] = value
+    if data["related_number"] is not None and not _NUMBER.match(data["related_number"]):
+        raise AppError(
+            "VOUCHER_NUMBER_INVALID",
+            "El número del comprobante asociado va como 001-001-0000001.",
+            details={"field": "related_number"},
+            status_code=422,
+        )
+    if data["related_timbrado"] is not None and not _TIMBRADO.match(data["related_timbrado"]):
+        raise AppError(
+            "TIMBRADO_INVALID",
+            "El timbrado del comprobante asociado tiene 8 dígitos.",
+            details={"field": "related_timbrado"},
+            status_code=422,
+        )
+
+    doc_type = data.get("counterparty_doc_type")
+    if vtype == "ips_statement":
+        data["counterparty_name"] = data.get("counterparty_name") or IPS_NAME
+    if doc_type is None:
+        if not (direction == "expense" and vtype in NO_COUNTERPARTY_TYPES):
+            raise AppError(
+                "COUNTERPARTY_REQUIRED",
+                "Este tipo de comprobante lleva la identificación de la contraparte.",
+                details={"field": "counterparty_doc_type"},
+                status_code=422,
+            )
+        data["counterparty_ruc"] = data["counterparty_ruc_dv"] = None
+        data["counterparty_document"] = None
+        if not data.get("counterparty_name"):
+            raise AppError(
+                "COUNTERPARTY_NAME_REQUIRED",
+                "Indicá el nombre de la contraparte o una descripción.",
+                status_code=422,
+            )
+    else:
+        allowed = _REGISTER_DOC_TYPES.get((direction, vtype))
+        if doc_type == "unnamed" or (allowed is not None and doc_type not in allowed):
+            raise AppError(
+                "COUNTERPARTY_DOC_TYPE_INVALID",
+                "Ese tipo de identificación no corresponde a este comprobante (columna 5 del "
+                "formato de la RG 90/2021).",
+                details={"field": "counterparty_doc_type", "allowed": list(allowed or ())},
+                status_code=422,
+            )
+        _check_counterparty(data)
+
+    for name in ("taxed_5", "vat_10", "vat_5"):
+        if data.get(name):
+            raise AppError(
+                "AMOUNT_NOT_APPLICABLE",
+                "Un ingreso o un egreso no lleva IVA ni importes por tasa.",
+                details={"field": name},
+                status_code=422,
+            )
+    taxed = _pyg(data.get("taxed_10") or ZERO, "taxed_10")
+    exempt = _pyg(data.get("exempt") or ZERO, "exempt")
+    if direction == "expense" and exempt:
+        raise AppError(
+            "AMOUNT_NOT_APPLICABLE",
+            "Un egreso lleva solo el monto total (`taxed_10`).",
+            details={"field": "exempt"},
+            status_code=422,
+        )
+    data.update(taxed_10=taxed, exempt=exempt, taxed_5=ZERO, vat_10=ZERO, vat_5=ZERO)
+    if taxed + exempt <= 0:
+        raise AppError(
+            "VOUCHER_TOTAL_ZERO", "El comprobante tiene que tener algún importe.", status_code=422
+        )
+    if data.get("imputes_vat"):
+        raise AppError(
+            "IMPUTES_VAT_NOT_APPLICABLE",
+            "Con el registro anual (956) no hay IVA: la 956 no va con la 211 (RG 90/2021, "
+            "art. 7°).",
+            details={"field": "imputes_vat"},
+            status_code=422,
+        )
+    data["imputes_vat"] = False
+    data["imputes_ire"] = bool(data.get("imputes_ire"))
+    data["imputes_irp"] = True if data.get("imputes_irp") is None else data["imputes_irp"]
+    _check_currency(data, taxed + exempt)
+    _check_links(db, ctx, data)
+    _duplicate_register(db, organization_id, data, own_id)
+    return {k: data.get(k) for k in FIELDS}
+
+
+def _check_timbrado_fields(data: dict[str, Any]) -> None:
+    """Compras y ventas: timbrado, número `EEE-PPP-NNNNNNN`, contraparte identificada y sin
+    las columnas de INGRESOS y EGRESOS."""
+    if data["voucher_type"] not in TIMBRADO_TYPES:
+        raise AppError(
+            "VOUCHER_TYPE_INVALID",
+            "Una compra o una venta es una factura o una nota de crédito o de débito.",
+            details={"field": "voucher_type"},
+            status_code=422,
+        )
+    if data.get("timbrado") is None or not _TIMBRADO.match(data["timbrado"]):
+        raise AppError(
+            "TIMBRADO_REQUIRED",
+            "Una compra o una venta lleva el timbrado (8 dígitos).",
+            details={"field": "timbrado"},
+            status_code=422,
+        )
+    if data.get("number") is None or not _NUMBER.match(data["number"]):
+        raise AppError(
+            "VOUCHER_NUMBER_INVALID",
+            "El número va como 001-001-0000001 (establecimiento, punto y número).",
+            details={"field": "number"},
+            status_code=422,
+        )
+    if data.get("counterparty_doc_type") is None:
+        raise AppError(
+            "COUNTERPARTY_REQUIRED",
+            "Indicá la identificación de la contraparte.",
+            details={"field": "counterparty_doc_type"},
+            status_code=422,
+        )
+    for name in REGISTER_FIELDS:
+        if data.get(name) is not None:
+            raise _not_applicable(name, "Una compra o una venta")
+    data["imputes_vat"] = True if data.get("imputes_vat") is None else data["imputes_vat"]
+    data["imputes_ire"] = bool(data.get("imputes_ire"))
+    data["imputes_irp"] = bool(data.get("imputes_irp"))
+
+
 def validated(
     db: Session,
     organization_id: uuid.UUID,
@@ -517,12 +868,15 @@ def validated(
     data: dict[str, Any],
     *,
     own_id: uuid.UUID | None = None,
-) -> tuple[dict[str, Any], RuleVersion]:
+) -> tuple[dict[str, Any], RuleVersion | None]:
     """Normaliza y valida los datos completos de un comprobante. Devuelve los campos a
-    guardar y la regla de tasas aplicada."""
+    guardar y la regla de tasas aplicada (ninguna en un ingreso o un egreso)."""
     org = db.get(Organization, organization_id)
     assert org is not None
     data = dict(data)
+    if data["direction"] in REGISTER_DIRECTIONS:
+        return _validated_register(db, organization_id, ctx, data, own_id), None
+    _check_timbrado_fields(data)
     if data["direction"] == "sale" and org.ruc is None:
         raise AppError(
             "ORGANIZATION_RUC_REQUIRED",
@@ -559,7 +913,7 @@ def create(
         organization_id=organization_id,
         context_id=ctx.id,
         context_kind="business",
-        vat_rule_version_id=rule.id,
+        vat_rule_version_id=rule.id if rule is not None else None,
         created_by=actor_id,
         **values,
     )
@@ -591,7 +945,8 @@ def update(
     if "direction" in changes and changes["direction"] != voucher.direction:
         raise AppError(
             "VOUCHER_DIRECTION_FIXED",
-            "Un comprobante no cambia de compra a venta: anulalo y cargalo de nuevo.",
+            "Un comprobante no cambia de registro (compra, venta, ingreso o egreso): anulalo "
+            "y cargalo de nuevo.",
             status_code=422,
         )
     merged = {k: getattr(voucher, k) for k in FIELDS} | changes
@@ -607,7 +962,7 @@ def update(
     values, rule = validated(
         db, organization_id, business_context(db, organization_id), merged, own_id=voucher.id
     )
-    values["vat_rule_version_id"] = rule.id
+    values["vat_rule_version_id"] = rule.id if rule is not None else None
     before, after = apply_changes(voucher, values)
     if after:
         flush_translated(db)
@@ -672,6 +1027,8 @@ def list_query(
     month: date | None,
     direction: str | None,
     counterparty_ruc: str | None,
+    voucher_type: str | None = None,
+    year: int | None = None,
     q: str | None,
     voided: str,
 ) -> Select[Voucher]:
@@ -680,8 +1037,14 @@ def list_query(
         query = query.where(
             Voucher.issued_on >= month_start(month), Voucher.issued_on <= month_end(month)
         )
+    if year is not None:
+        query = query.where(
+            Voucher.issued_on >= date(year, 1, 1), Voucher.issued_on <= date(year, 12, 31)
+        )
     if direction:
         query = query.where(Voucher.direction == direction)
+    if voucher_type:
+        query = query.where(Voucher.voucher_type == voucher_type)
     if counterparty_ruc:
         query = query.where(Voucher.counterparty_ruc == counterparty_ruc)
     if q:

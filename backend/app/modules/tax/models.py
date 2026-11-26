@@ -50,9 +50,44 @@ EXCEPTION_GROUPS = ("determinative",)
 IRE_REGIMES = ("ire_general", "ire_simple", "resimple", "none", "unknown")
 PROFILE_ORIGINS = ("declared", "verified")
 OBLIGATION_STATUSES = ("pending", "filed", "paid", "not_applicable")
-DIRECTIONS = ("purchase", "sale")
-VOUCHER_TYPES = ("invoice", "credit_note", "debit_note")
+# COMPRAS y VENTAS (con timbrado, D-088) e INGRESOS y EGRESOS del IRP-RSP (sin timbrado, con
+# la 956; migración 0013, D-143). Tipos de registro 1 a 4 de la Tabla 1 del formato oficial.
+TIMBRADO_DIRECTIONS = ("purchase", "sale")
+REGISTER_DIRECTIONS = ("income", "expense")
+DIRECTIONS = (*TIMBRADO_DIRECTIONS, *REGISTER_DIRECTIONS)
+TIMBRADO_TYPES = ("invoice", "credit_note", "debit_note")
 NOTE_TYPES = ("credit_note", "debit_note")
+# Tipos 201 a 211 de la Tabla 4, con el registro donde se admite cada uno
+# (`docs/research/formato_registro_comprobantes.yaml`). El código oficial está en
+# `exports.VOUCHER_CODES`.
+INCOME_TYPES = ("credit_sale", "payslip", "other_income")  # 203, 208, 210
+EXPENSE_TYPES = (
+    "credit_purchase",  # 201
+    "foreign_voucher",  # 202
+    "public_entity",  # 204
+    "e_ticketing",  # 205
+    "ips_statement",  # 206
+    "card_statement",  # 207
+    "payslip",  # 208
+    "other_expense",  # 209
+    "bank_transfer",  # 211
+)
+VOUCHER_TYPES = (*TIMBRADO_TYPES, *dict.fromkeys((*INCOME_TYPES, *EXPENSE_TYPES)))
+# Sin número obligatorio (columna 4 de INGRESOS y EGRESOS).
+UNNUMBERED = (
+    ("income", "payslip"),
+    ("expense", "e_ticketing"),
+    ("expense", "ips_statement"),
+    ("expense", "card_statement"),
+    ("expense", "payslip"),
+)
+# Fecha como período mm/aaaa: se guarda el día 1 del mes.
+PERIOD_TYPES = ("ips_statement", "payslip")
+# Sin contraparte obligatoria (columnas 5 y 6 de EGRESOS).
+NO_COUNTERPARTY_TYPES = ("ips_statement", "card_statement", "bank_transfer")
+ACCOUNT_TYPES = ("card_statement", "bank_transfer")  # cuenta o tarjeta y banco
+DESCRIBED_TYPES = ("other_expense", "other_income")  # «especificar tipo de documento»
+CREDIT_TYPES = ("credit_purchase", "credit_sale")  # comprobante asociado (número y timbrado)
 # Tipos de identificación de la contraparte: los de la Tabla 3 del formato oficial de
 # importación del registro de comprobantes (11 a 17, D-099). El código oficial está en
 # `marangatu.IDENTIFICATION_CODES`.
@@ -74,6 +109,18 @@ Pyg = Numeric(18, 0)
 
 def _in(column_name: str, values: tuple[str, ...]) -> str:
     return f"{column_name} IN ({', '.join(repr(v) for v in values)})"
+
+
+def _pairs(values: tuple[tuple[str, str], ...]) -> str:
+    return ", ".join(f"({a!r}, {b!r})" for a, b in values)
+
+
+_TIMBRADO = _in("direction", TIMBRADO_DIRECTIONS)
+TYPE_BY_DIRECTION = (
+    f"({_TIMBRADO} AND {_in('voucher_type', TIMBRADO_TYPES)})"
+    f" OR (direction = 'income' AND {_in('voucher_type', INCOME_TYPES)})"
+    f" OR (direction = 'expense' AND {_in('voucher_type', EXPENSE_TYPES)})"
+)
 
 
 def _uuid_pk() -> Mapped[uuid.UUID]:
@@ -427,16 +474,104 @@ class Obligation(TimestampMixin, Base):
 
 
 class Voucher(TimestampMixin, Base):
-    """Comprobante de compra o de venta (D-088). Se anula, nunca se borra."""
+    """Comprobante de compra o de venta (D-088), o de ingreso o egreso del IRP-RSP (D-143).
+    Se anula, nunca se borra."""
 
     __tablename__ = "vouchers"
     __table_args__ = (
         CheckConstraint(_in("direction", DIRECTIONS), name="direction_valid"),
-        CheckConstraint(_in("voucher_type", VOUCHER_TYPES), name="type_valid"),
+        # Cada tipo, solo en los registros que lo admiten (Tabla 4).
+        CheckConstraint(TYPE_BY_DIRECTION, name="type_valid"),
         CheckConstraint(_in("counterparty_doc_type", DOC_TYPES), name="doc_type_valid"),
         CheckConstraint(_in("condition", CONDITIONS), name="condition_valid"),
+        # Timbrado solo en COMPRAS y VENTAS: INGRESOS y EGRESOS no tienen esa columna.
+        CheckConstraint(f"({_TIMBRADO}) = (timbrado IS NOT NULL)", name="timbrado_when_timbrado"),
         CheckConstraint("timbrado ~ '^[0-9]{8}$'", name="timbrado_format"),
-        CheckConstraint("number ~ '^[0-9]{3}-[0-9]{3}-[0-9]{7}$'", name="number_format"),
+        CheckConstraint(
+            f"CASE WHEN {_TIMBRADO} THEN number ~ '^[0-9]{{3}}-[0-9]{{3}}-[0-9]{{7}}$'"
+            " ELSE char_length(btrim(number)) > 0 END",
+            name="number_format",
+        ),
+        CheckConstraint(
+            f"number IS NOT NULL OR (direction, voucher_type) IN ({_pairs(UNNUMBERED)})",
+            name="number_required",
+        ),
+        # INGRESOS y EGRESOS: sin CDC, sin IVA ni regla de tasas; el importe gravado del
+        # ingreso va en `taxed_10` y el no gravado en `exempt`; el del egreso, en `taxed_10`.
+        CheckConstraint(f"{_TIMBRADO} OR NOT is_electronic", name="register_not_electronic"),
+        CheckConstraint(
+            f"({_TIMBRADO}) = (vat_rule_version_id IS NOT NULL)", name="vat_rule_when_vat"
+        ),
+        CheckConstraint(
+            f"{_TIMBRADO} OR (taxed_5 = 0 AND vat_10 = 0 AND vat_5 = 0"
+            " AND (direction = 'income' OR exempt = 0))",
+            name="register_amounts",
+        ),
+        # «Imputa IVA = S» solo se admite en el extracto de tarjeta (207).
+        CheckConstraint(
+            f"{_TIMBRADO} OR NOT imputes_vat"
+            " OR (direction = 'expense' AND voucher_type = 'card_statement')",
+            name="register_imputes_vat",
+        ),
+        CheckConstraint(
+            f"voucher_type NOT IN ({', '.join(repr(t) for t in PERIOD_TYPES)})"
+            " OR extract(day FROM issued_on) = 1",
+            name="period_first_day",
+        ),
+        # Contraparte: opcional solo en 206, 207 y 211 de EGRESOS; con su tipo según la tabla.
+        CheckConstraint(
+            "counterparty_doc_type IS NOT NULL OR (direction = 'expense'"
+            f" AND {_in('voucher_type', NO_COUNTERPARTY_TYPES)})",
+            name="counterparty_required",
+        ),
+        CheckConstraint(
+            "counterparty_doc_type IS NOT NULL"
+            " OR (counterparty_ruc IS NULL AND counterparty_document IS NULL)",
+            name="counterparty_ids_with_type",
+        ),
+        CheckConstraint(
+            "((direction, voucher_type) NOT IN (('income', 'payslip'),"
+            " ('expense', 'public_entity'), ('expense', 'e_ticketing'))"
+            " OR counterparty_doc_type = 'ruc')"
+            " AND ((direction, voucher_type) <> ('expense', 'foreign_voucher')"
+            " OR counterparty_doc_type = 'tax_id')"
+            " AND ((direction, voucher_type) <> ('income', 'other_income')"
+            " OR counterparty_doc_type IN ('ruc', 'identity_card', 'passport'))"
+            f" AND ({_TIMBRADO} OR counterparty_doc_type IS DISTINCT FROM 'unnamed')",
+            name="counterparty_by_type",
+        ),
+        # Columnas propias de algunos tipos: van en esos tipos y en ningún otro.
+        CheckConstraint(
+            f"(direction = 'expense' AND {_in('voucher_type', ACCOUNT_TYPES)})"
+            " = (account_number IS NOT NULL)"
+            f" AND (direction = 'expense' AND {_in('voucher_type', ACCOUNT_TYPES)})"
+            " = (bank_name IS NOT NULL)",
+            name="account_when_account",
+        ),
+        CheckConstraint(
+            "(voucher_type = 'ips_statement') = (ips_employer_number IS NOT NULL)",
+            name="ips_employer_when_ips",
+        ),
+        CheckConstraint(
+            f"({_in('voucher_type', DESCRIBED_TYPES)}) = (document_description IS NOT NULL)",
+            name="description_when_other",
+        ),
+        CheckConstraint(
+            f"({_in('voucher_type', CREDIT_TYPES)}) = (related_number IS NOT NULL)"
+            f" AND ({_in('voucher_type', CREDIT_TYPES)}) = (related_timbrado IS NOT NULL)",
+            name="related_when_credit",
+        ),
+        CheckConstraint(
+            "(related_number IS NULL OR related_number ~ '^[0-9]{3}-[0-9]{3}-[0-9]{7}$')"
+            " AND (related_timbrado IS NULL OR related_timbrado ~ '^[0-9]{8}$')",
+            name="related_format",
+        ),
+        CheckConstraint(
+            "char_length(btrim(account_number)) > 0 AND char_length(btrim(bank_name)) > 0"
+            " AND char_length(btrim(ips_employer_number)) > 0"
+            " AND char_length(btrim(document_description)) > 0",
+            name="register_texts_not_blank",
+        ),
         # CDC: 44 dígitos, solo en los electrónicos, con su dígito verificador módulo 11.
         CheckConstraint("is_electronic = (cdc IS NOT NULL)", name="cdc_when_electronic"),
         CheckConstraint(
@@ -561,6 +696,44 @@ class Voucher(TimestampMixin, Base):
             unique=True,
             postgresql_where=text("direction = 'sale' AND voided_at IS NULL"),
         ),
+        # D-143: INGRESOS y EGRESOS no tienen timbrado. Con número, lo identifican el tipo, el
+        # emisor (la contraparte, como se cargó) y el número; en los extractos y las
+        # transferencias, además la cuenta o tarjeta. Sin número (205 a 208), el período o la
+        # fecha en lugar del número, y en el extracto de IPS el número de empleador. Los NULL
+        # cuentan como iguales: dos extractos de IPS del mismo mes y empleador chocan.
+        Index(
+            "uq_vouchers_register_numbered_live",
+            "organization_id",
+            "direction",
+            "voucher_type",
+            "counterparty_doc_type",
+            "counterparty_ruc",
+            "counterparty_document",
+            "account_number",
+            "number",
+            unique=True,
+            postgresql_nulls_not_distinct=True,
+            postgresql_where=text(
+                "direction IN ('income', 'expense') AND voided_at IS NULL AND number IS NOT NULL"
+            ),
+        ),
+        Index(
+            "uq_vouchers_register_unnumbered_live",
+            "organization_id",
+            "direction",
+            "voucher_type",
+            "counterparty_doc_type",
+            "counterparty_ruc",
+            "counterparty_document",
+            "account_number",
+            "ips_employer_number",
+            "issued_on",
+            unique=True,
+            postgresql_nulls_not_distinct=True,
+            postgresql_where=text(
+                "direction IN ('income', 'expense') AND voided_at IS NULL AND number IS NULL"
+            ),
+        ),
         Index("ix_vouchers_org_issued", "organization_id", "issued_on"),
         Index("ix_vouchers_transaction", "transaction_id"),
         Index("ix_vouchers_journal_entry", "journal_entry_id"),
@@ -573,13 +746,13 @@ class Voucher(TimestampMixin, Base):
     context_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     context_kind: Mapped[str] = mapped_column(String(10), nullable=False, server_default="business")
     direction: Mapped[str] = mapped_column(String(10), nullable=False)
-    voucher_type: Mapped[str] = mapped_column(String(12), nullable=False)
+    voucher_type: Mapped[str] = mapped_column(String(20), nullable=False)
     is_electronic: Mapped[bool] = mapped_column(Boolean, nullable=False)
     cdc: Mapped[str | None] = mapped_column(CHAR(44))
-    timbrado: Mapped[str] = mapped_column(CHAR(8), nullable=False)
-    number: Mapped[str] = mapped_column(String(15), nullable=False)
+    timbrado: Mapped[str | None] = mapped_column(CHAR(8))
+    number: Mapped[str | None] = mapped_column(String(20))
     issued_on: Mapped[date] = mapped_column(Date, nullable=False)
-    counterparty_doc_type: Mapped[str] = mapped_column(String(15), nullable=False)
+    counterparty_doc_type: Mapped[str | None] = mapped_column(String(15))
     counterparty_ruc: Mapped[str | None] = mapped_column(String(8))
     counterparty_ruc_dv: Mapped[str | None] = mapped_column(CHAR(1))
     counterparty_document: Mapped[str | None] = mapped_column(String(20))
@@ -596,10 +769,17 @@ class Voucher(TimestampMixin, Base):
     imputes_vat: Mapped[bool] = mapped_column(Boolean, nullable=False)
     imputes_ire: Mapped[bool] = mapped_column(Boolean, nullable=False)
     imputes_irp: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    vat_rule_version_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("tax.rule_versions.id"), nullable=False
+    vat_rule_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("tax.rule_versions.id")
     )
     related_voucher_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # INGRESOS y EGRESOS (D-143): columnas 13 a 18 del formato oficial.
+    account_number: Mapped[str | None] = mapped_column(String(30))
+    bank_name: Mapped[str | None] = mapped_column(String(250))
+    ips_employer_number: Mapped[str | None] = mapped_column(String(30))
+    document_description: Mapped[str | None] = mapped_column(String(50))
+    related_number: Mapped[str | None] = mapped_column(String(15))
+    related_timbrado: Mapped[str | None] = mapped_column(CHAR(8))
     finance_counterparty_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     transaction_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     journal_entry_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))

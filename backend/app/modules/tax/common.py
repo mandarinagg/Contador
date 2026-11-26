@@ -116,7 +116,7 @@ _DB_ERRORS: Mapping[str, tuple[str, str, int]] = {
     ),
     "trg_vouchers_period_locked": (
         "PERIOD_CONFIRMED",
-        "El registro de comprobantes del mes está confirmado: reabrilo para cambiar sus "
+        "El registro de comprobantes del período está confirmado: reabrilo para cambiar sus "
         "comprobantes.",
         409,
     ),
@@ -139,6 +139,17 @@ _DB_ERRORS: Mapping[str, tuple[str, str, int]] = {
     "uq_vouchers_sale_live": (
         "VOUCHER_DUPLICATE",
         "Ya hay un comprobante de venta vivo con ese tipo, timbrado y número.",
+        409,
+    ),
+    "uq_vouchers_register_numbered_live": (
+        "VOUCHER_DUPLICATE",
+        "Ya hay un ingreso o egreso vivo con ese tipo, contraparte, cuenta y número.",
+        409,
+    ),
+    "uq_vouchers_register_unnumbered_live": (
+        "VOUCHER_DUPLICATE",
+        "Ya hay un ingreso o egreso vivo sin número con ese tipo, contraparte, cuenta, "
+        "empleador y fecha o período.",
         409,
     ),
     "trg_profiles_verified_final": (

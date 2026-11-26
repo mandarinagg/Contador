@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BookPlus, Download, FileArchive, FileSpreadsheet, TriangleAlert } from 'lucide-react'
 import { type FormEvent, type ReactNode, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { Badge, Button, Field, Input, Modal, Notice } from '../../components/ui'
+import { Badge, Button, Field, Input, Modal, Notice, Select } from '../../components/ui'
 import { useToast } from '../../components/ui/toast'
 import { cx } from '../../lib/cx'
 import { saveBlob } from '../../lib/download'
@@ -22,6 +22,7 @@ import { DoubtNote, ReasonForm, UnverifiedMark } from './components'
 import { useInvalidateTax } from './data'
 import { CONDITION_LABELS, DIRECTION_LABELS, monthTitle, VOUCHER_TYPE_LABELS } from './labels'
 import { marangatuName, voucherXlsxName } from './logic'
+import { annualRegisterName, registerDate } from './registerDraft'
 import type { Direction, ExcludedVoucher, MarangatuPreview, Voucher } from './types'
 
 // --- Proponer asiento --------------------------------------------------------------------
@@ -220,7 +221,7 @@ function ExcludedList({ title, items, children }: { title: string; items: Exclud
         {items.map((v) => (
           <li key={v.id} className="flex flex-wrap gap-x-3 py-1.5">
             <Link to={`/impuestos/comprobantes/${v.id}`} className="font-medium tabular-nums hover:text-ledger hover:underline">
-              {v.number}
+              {v.number ?? registerDate(v)}
             </Link>
             <span>{v.counterparty_name}</span>
             <span className="text-ink-2">
@@ -234,7 +235,9 @@ function ExcludedList({ title, items, children }: { title: string; items: Exclud
   )
 }
 
-function MarangatuDialogBody({ year, month, ruc, onClose }: { year: number; month: number; ruc: string | null; onClose: () => void }) {
+/** Vista previa y descarga del registro mensual (955, con `month`) o del anual (956, `month` null; D-143). */
+function MarangatuDialogBody({ year, month, ruc, onClose, yearPicker }: { year: number; month: number | null; ruc: string | null; onClose: () => void; yearPicker?: ReactNode }) {
+  const annual = month === null
   const toast = useToast()
   const [separator, setSeparator] = useState<'semicolon' | 'comma'>('semicolon')
   const [limitText, setLimitText] = useState('')
@@ -243,16 +246,17 @@ function MarangatuDialogBody({ year, month, ruc, onClose }: { year: number; mont
   const firstId = /^\d{1,5}$/.test(firstIdText) && Number(firstIdText) > 0 ? Number(firstIdText) : null
   const params = { year, month, separator, limit, first_id: firstId ?? 1 }
   const preview = useQuery({
-    queryKey: ['tax', 'marangatu-preview', params],
-    queryFn: () => get<MarangatuPreview>(`/tax/vouchers/export/marangatu-preview${qs(params)}`),
+    queryKey: ['tax', annual ? 'annual-preview' : 'marangatu-preview', params],
+    queryFn: () => get<MarangatuPreview>(annual ? `/tax/vouchers/export/annual-preview${qs({ year, separator, limit, first_id: firstId ?? 1 })}` : `/tax/vouchers/export/marangatu-preview${qs(params)}`),
     retry: false,
   })
   const download = useMutation({
-    mutationFn: () => getBlob(`/tax/vouchers/export${qs({ ...params, format: 'marangatu' })}`),
+    mutationFn: () => getBlob(annual ? `/tax/vouchers/export/annual${qs({ year, separator, limit, first_id: firstId ?? 1 })}` : `/tax/vouchers/export${qs({ ...params, format: 'marangatu' })}`),
     onSuccess: ({ blob, filename }) => {
-      const name = filename ?? marangatuName(ruc ?? 'RUC', year, month, firstId ?? 1, preview.data?.batches.length ?? 1)
+      const batches = preview.data?.batches.length ?? 1
+      const name = filename ?? (month === null ? annualRegisterName(ruc ?? 'RUC', year, firstId ?? 1, batches) : marangatuName(ruc ?? 'RUC', year, month, firstId ?? 1, batches))
       saveBlob(blob, name)
-      toast('ok', `Archivo para Marangatu descargado: ${name}`)
+      toast('ok', `${annual ? 'Registro anual' : 'Archivo para Marangatu'} descargado: ${name}`)
     },
   })
   const p = preview.data
@@ -265,7 +269,8 @@ function MarangatuDialogBody({ year, month, ruc, onClose }: { year: number; mont
           'Borrador del archivo de importación de Marangatu, sin verificar contra la fuente oficial. Probá primero con un archivo de uno o dos comprobantes y usá un identificador distinto en cada archivo.'}
       </Notice>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_9rem_9rem] items-start gap-4">
+      <div className={cx('grid items-start gap-4', yearPicker ? 'grid-cols-[7rem_minmax(0,1fr)_9rem_9rem]' : 'grid-cols-[minmax(0,1fr)_9rem_9rem]')}>
+        {yearPicker}
         <fieldset>
           <legend className="text-sm font-medium text-ink-2">Separador del CSV</legend>
           <div className="mt-1.5 flex gap-2">
@@ -295,7 +300,7 @@ function MarangatuDialogBody({ year, month, ruc, onClose }: { year: number; mont
         <Field label="Solo los primeros" hint="Vacío: todos. Para probar, 1 o 2.">
           {(fp) => <Input {...fp} inputMode="numeric" placeholder="Todos" value={limitText} onChange={(e) => setLimitText(e.target.value.replace(/\D/g, '').slice(0, 4))} />}
         </Field>
-        <Field label="N° de archivo" hint="Uno distinto en cada envío del mes." error={firstId ? undefined : 'De 1 a 99999.'}>
+        <Field label="N° de archivo" hint={`Uno distinto en cada envío ${annual ? 'del año' : 'del mes'}.`} error={firstId ? undefined : 'De 1 a 99999.'}>
           {(fp) => <Input {...fp} inputMode="numeric" value={firstIdText} onChange={(e) => setFirstIdText(e.target.value.replace(/\D/g, '').slice(0, 5))} />}
         </Field>
       </div>
@@ -309,7 +314,7 @@ function MarangatuDialogBody({ year, month, ruc, onClose }: { year: number; mont
           <div className="flex flex-wrap items-baseline justify-between gap-3 rounded-sm border border-line px-4 py-3">
             <p>
               <span className="text-lg font-semibold tabular-nums">{p.rows}</span> {p.rows === 1 ? 'comprobante va' : 'comprobantes van'} en el archivo de{' '}
-              {monthTitle(`${year}-${String(month).padStart(2, '0')}`).toLowerCase()}
+              {month === null ? `${year} (registro anual)` : monthTitle(`${year}-${String(month).padStart(2, '0')}`).toLowerCase()}
               {p.batches.length > 0 && (
                 <span className="block text-sm text-ink-2">
                   {p.batches.map((b) => `${b.name} (${b.rows} filas)`).join(', ')} · CSV {p.encoding}, sin encabezado, separador {p.separator === 'semicolon' ? '«;»' : '«,»'}
@@ -342,7 +347,7 @@ function MarangatuDialogBody({ year, month, ruc, onClose }: { year: number; mont
         {nothing && (
           <p className="mr-auto flex items-center gap-1.5 text-sm text-ink-2">
             <TriangleAlert size={14} aria-hidden />
-            No hay comprobantes para importar en ese mes.
+            No hay comprobantes para importar en ese {annual ? 'año' : 'mes'}.
           </p>
         )}
         <Button type="button" variant="ghost" onClick={onClose}>
@@ -372,6 +377,56 @@ export function MarangatuButton({ year, month, ruc }: { year: number; month: num
       </Button>
       <Modal open={open} size="lg" title="Archivo para Marangatu" onClose={() => setOpen(false)}>
         {open && month !== null && <MarangatuDialogBody year={year} month={month} ruc={ruc} onClose={() => setOpen(false)} />}
+      </Modal>
+    </>
+  )
+}
+
+/**
+ * Registro anual de comprobantes (956) del IRP-RSP: compras, ventas, ingresos y egresos del
+ * año en un archivo, con el mismo formato y nombre `<RUC>_REG_<AAAA>_<N>` (D-143).
+ */
+export function AnnualRegisterButton({ defaultYear, ruc }: { defaultYear: number; ruc: string | null }) {
+  const [open, setOpen] = useState(false)
+  const [year, setYear] = useState(defaultYear)
+  // El registro rige desde 2021 (RG 90/2021).
+  const years = Array.from({ length: Math.max(1, defaultYear - 2020) }, (_, i) => defaultYear - i)
+  return (
+    <>
+      <Button
+        variant="secondary"
+        title="Vista previa y descarga del registro anual de comprobantes (956)"
+        onClick={() => {
+          setYear(defaultYear)
+          setOpen(true)
+        }}
+      >
+        <FileArchive size={15} aria-hidden />
+        Descargar registro anual (956)
+      </Button>
+      <Modal open={open} size="lg" title="Registro anual de comprobantes (956)" onClose={() => setOpen(false)}>
+        {open && (
+          <MarangatuDialogBody
+            key={year}
+            year={year}
+            month={null}
+            ruc={ruc}
+            onClose={() => setOpen(false)}
+            yearPicker={
+              <Field label="Año">
+                {(fp) => (
+                  <Select {...fp} value={String(year)} onChange={(e) => setYear(Number(e.target.value))}>
+                    {years.map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+            }
+          />
+        )}
       </Modal>
     </>
   )

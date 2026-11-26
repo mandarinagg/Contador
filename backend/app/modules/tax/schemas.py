@@ -17,8 +17,24 @@ from app.modules.accounting.schemas import (
 )
 from app.modules.finance.schemas import AmountIn, Currency
 
-Direction = Literal["purchase", "sale"]
-VoucherType = Literal["invoice", "credit_note", "debit_note"]
+# Compras y ventas (con timbrado) e ingresos y egresos del IRP-RSP (sin timbrado, D-143).
+Direction = Literal["purchase", "sale", "income", "expense"]
+VoucherType = Literal[
+    "invoice",
+    "credit_note",
+    "debit_note",
+    "credit_purchase",
+    "foreign_voucher",
+    "credit_sale",
+    "public_entity",
+    "e_ticketing",
+    "ips_statement",
+    "card_statement",
+    "payslip",
+    "other_expense",
+    "other_income",
+    "bank_transfer",
+]
 DocType = Literal[
     "ruc", "identity_card", "passport", "foreign_id", "unnamed", "diplomatic", "tax_id"
 ]
@@ -36,6 +52,20 @@ Name200 = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, 
 Timbrado = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[0-9]{8}$")]
 VoucherNumber = Annotated[
     str, StringConstraints(strip_whitespace=True, pattern=r"^[0-9]{3}-[0-9]{3}-[0-9]{7}$")
+]
+# Número de una compra o venta (`EEE-PPP-NNNNNNN`, lo controla el servicio) o de un ingreso o
+# egreso: hasta 20 posiciones con números, letras, «/» y «-» (columna 4, tipo ALF).
+AnyVoucherNumber = Annotated[
+    str, StringConstraints(strip_whitespace=True, pattern=r"^[0-9A-Za-z./\- ]{1,20}$")
+]
+RegisterText30 = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=30)
+]
+RegisterText50 = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=50)
+]
+RegisterText250 = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=250)
 ]
 Cdc = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^[0-9]{44}$")]
 # RUC sin DV: hasta 8 dígitos, o un RUC antiguo terminado en letra (D-099, sin DV).
@@ -318,14 +348,18 @@ class PayIn(_Strict):
 
 
 class VoucherIn(_Strict):
+    """Compras y ventas llevan timbrado y número `EEE-PPP-NNNNNNN`; los ingresos y egresos, no
+    (D-143): sus columnas propias van solo en los tipos que las usan. Sin `imputes_*`, una
+    compra o venta imputa al IVA y un ingreso o egreso al IRP."""
+
     direction: Direction
     voucher_type: VoucherType = "invoice"
     is_electronic: bool = False
     cdc: Cdc | None = None
-    timbrado: Timbrado
-    number: VoucherNumber
+    timbrado: Timbrado | None = None
+    number: AnyVoucherNumber | None = None
     issued_on: date
-    counterparty_doc_type: DocType = "ruc"
+    counterparty_doc_type: DocType | None = "ruc"
     counterparty_ruc: RucText | None = None
     counterparty_ruc_dv: CheckDigit | None = None
     counterparty_document: DocumentText | None = None
@@ -339,13 +373,19 @@ class VoucherIn(_Strict):
     exempt: AmountIn | None = None
     vat_10: AmountIn | None = None
     vat_5: AmountIn | None = None
-    imputes_vat: bool = True
-    imputes_ire: bool = False
-    imputes_irp: bool = False
+    imputes_vat: bool | None = None
+    imputes_ire: bool | None = None
+    imputes_irp: bool | None = None
     related_voucher_id: uuid.UUID | None = None
     finance_counterparty_id: uuid.UUID | None = None
     transaction_id: uuid.UUID | None = None
     notes: Text500 | None = None
+    account_number: RegisterText30 | None = None
+    bank_name: RegisterText250 | None = None
+    ips_employer_number: RegisterText30 | None = None
+    document_description: RegisterText50 | None = None
+    related_number: VoucherNumber | None = None
+    related_timbrado: Timbrado | None = None
 
 
 class VoucherUpdate(_Strict):
@@ -355,7 +395,7 @@ class VoucherUpdate(_Strict):
     is_electronic: bool | None = None
     cdc: Cdc | None = None
     timbrado: Timbrado | None = None
-    number: VoucherNumber | None = None
+    number: AnyVoucherNumber | None = None
     issued_on: date | None = None
     counterparty_doc_type: DocType | None = None
     counterparty_ruc: RucText | None = None
@@ -378,6 +418,12 @@ class VoucherUpdate(_Strict):
     finance_counterparty_id: uuid.UUID | None = None
     transaction_id: uuid.UUID | None = None
     notes: Text500 | None = None
+    account_number: RegisterText30 | None = None
+    bank_name: RegisterText250 | None = None
+    ips_employer_number: RegisterText30 | None = None
+    document_description: RegisterText50 | None = None
+    related_number: VoucherNumber | None = None
+    related_timbrado: Timbrado | None = None
 
 
 class VoucherOut(BaseModel):
@@ -386,10 +432,10 @@ class VoucherOut(BaseModel):
     voucher_type: str
     is_electronic: bool
     cdc: str | None
-    timbrado: str
-    number: str
+    timbrado: str | None
+    number: str | None
     issued_on: date
-    counterparty_doc_type: str
+    counterparty_doc_type: str | None
     counterparty_ruc: str | None
     counterparty_ruc_dv: str | None
     counterparty_document: str | None
@@ -409,6 +455,12 @@ class VoucherOut(BaseModel):
     imputes_ire: bool
     imputes_irp: bool
     related_voucher_id: uuid.UUID | None
+    account_number: str | None
+    bank_name: str | None
+    ips_employer_number: str | None
+    document_description: str | None
+    related_number: str | None
+    related_timbrado: str | None
     finance_counterparty_id: uuid.UUID | None
     transaction_id: uuid.UUID | None
     journal_entry_id: uuid.UUID | None

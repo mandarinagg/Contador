@@ -53,5 +53,5 @@ vez, cada una con sus datos separados y un selector para elegir con cuál trabaj
 | M4 | Identidad de la persona física: migración con `PERSONA_FISICA`, nombres y apellidos; setup y alta con empresa o persona. **Hecho (2026-11-26):** migración 0011, `first_names` y `last_names`, «Actividad» en las finanzas; D-141 | M2 |
 | M5 | Bot: una corrida en toda la PC, documentos por organización, 409 al cambiar el RUC con una clave guardada. **Hecho (2026-11-26):** migración 0010, `BOT_BUSY`, `MARANGATU_CREDENTIALS_EXIST`; D-140 | M2 |
 | M6 | Perfil y calendario de la persona física: `ire_regime` con `none` y `resimple`, las reglas 715, 716, 956 y 702. **Hecho (2026-11-26):** migración 0012, coherencia por forma jurídica, día fijo del RESIMPLE; D-142 | F0, M4 |
-| M7 | Registro de INGRESOS y EGRESOS y archivo anual 956 | F0, M6 |
+| M7 | Registro de INGRESOS y EGRESOS y archivo anual 956. **Hecho (2026-11-26):** migración 0013, tipos 201 a 211 sin timbrado, anti duplicado sin número, `GET /tax/vouchers/export/annual`; D-143 | F0, M6 |
 | M8 | Borrador de la declaración del IRP; reconocimiento del bot para persona física; cambio de la D-119 (respuesta 5) | F0, M7 |

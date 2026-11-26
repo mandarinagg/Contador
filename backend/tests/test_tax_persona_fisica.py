@@ -13,6 +13,7 @@ import pytest
 import yaml
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -292,6 +293,7 @@ def _exec(engine: Engine, sql: str, params: dict[str, Any] | None = None) -> Non
 
 def test_migration_0012(migration_db: tuple[Config, Engine]) -> None:  # noqa: F811
     cfg, engine = migration_db
+    head = ScriptDirectory.from_config(cfg).get_current_head()
     command.upgrade(cfg, "head")
     command.check(cfg)
     command.downgrade(cfg, "0011")
@@ -322,7 +324,7 @@ def test_migration_0012(migration_db: tuple[Config, Engine]) -> None:  # noqa: F
     with pytest.raises(RuntimeError, match=r"2 versión\(es\) del perfil fiscal"):
         command.downgrade(cfg, "0011")
     with engine.connect() as conn:
-        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == "0012"
+        assert conn.scalar(text("SELECT version_num FROM alembic_version")) == head
     _exec(engine, "UPDATE tax.profiles SET ire_regime = 'unknown'")
     command.downgrade(cfg, "0011")
     command.upgrade(cfg, "head")

@@ -41,6 +41,7 @@ from tests.finance_utils import (
     ok,
 )
 from tests.marangatu_utils import MARANGATU, BotEnv, bot_env, enable_bot  # noqa: F401 - fixture
+from tests.register_utils import income_body, ips_body, person_profile, post_voucher
 from tests.tax_utils import (
     TAX,
     create_voucher,
@@ -1052,3 +1053,63 @@ def test_other_org_fixture_logs_in_with_its_own_session(
     assert b["user"]["email"] == other_org.email
     contexts = ok(client.get(f"{FIN}/contexts", headers=auth_header(other_org.token)))
     assert [c["id"] for c in contexts] == [other_org.business_context_id]
+
+
+# --- Registro anual 956 (fase M7, D-143) -------------------------------------------------------
+
+
+def test_annual_register_of_another_organization(
+    client: TestClient,
+    db: Session,
+    owner_token: str,
+    other_org: OtherOrg,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Dos personas físicas con la 956: los ingresos y egresos de A no se ven, no se tocan ni
+    entran en el archivo anual de B; B no vincula un movimiento de A."""
+    db.execute(
+        text(
+            "UPDATE core.organizations SET legal_form = 'PERSONA_FISICA', first_names = 'Ana',"
+            " last_names = 'Uno', legal_name = 'Uno, Ana'"
+        )
+    )
+    db.commit()
+    person_profile(client, owner_token, monkeypatch, ruc="1234567")
+    person_profile(client, other_org.token, monkeypatch, ruc="7654321")
+    a_cid = next(
+        c["id"]
+        for c in ok(client.get(f"{FIN}/contexts", headers=auth_header(owner_token)))
+        if c["kind"] == "business"
+    )
+    a_tx = create_tx(
+        client, owner_token, a_cid, create_account(client, owner_token, a_cid)["id"], "350000"
+    )
+    a_ids = [
+        ok(post_voucher(client, owner_token, income_body()), 201)["id"],
+        ok(post_voucher(client, owner_token, ips_body()), 201)["id"],
+    ]
+    b = auth_header(other_org.token)
+    for voucher_id in a_ids:
+        assert client.get(f"{TAX}/vouchers/{voucher_id}", headers=b).status_code == 404
+        res = client.patch(f"{TAX}/vouchers/{voucher_id}", json={"notes": "B"}, headers=b)
+        assert res.status_code == 404
+        res = client.post(
+            f"{TAX}/vouchers/{voucher_id}/void", json={"reason": "Prueba B"}, headers=b
+        )
+        assert res.status_code == 404
+    res = post_voucher(client, other_org.token, income_body(transaction_id=a_tx["id"]))
+    assert res.status_code == 404, res.text
+    for path in (
+        "/vouchers?year=2026",
+        "/vouchers/export/annual-preview?year=2026",
+    ):
+        res = client.get(f"{TAX}{path}", headers=b)
+        assert res.status_code == 200, res.text
+        assert not any(i in res.text for i in a_ids), path
+        assert "Juan Pérez" not in res.text
+    res = client.get(f"{TAX}/vouchers/export/annual?year=2026", headers=b)
+    assert res.status_code == 422 and res.json()["error"]["code"] == "NOTHING_TO_EXPORT"
+    # A ve lo suyo intacto.
+    listed = ok(client.get(f"{TAX}/vouchers?year=2026", headers=auth_header(owner_token)))
+    assert sorted(v["id"] for v in listed) == sorted(a_ids)
+    assert all(v["notes"] is None and v["voided_at"] is None for v in listed)

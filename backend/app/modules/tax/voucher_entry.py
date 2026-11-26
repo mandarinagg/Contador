@@ -89,6 +89,14 @@ def propose(
     voucher = vouchers.get_voucher(db, organization_id, voucher_id, lock=True)
     if voucher.voided_at is not None:
         raise Conflict("VOUCHER_VOIDED", "El comprobante está anulado: no se contabiliza.")
+    if voucher.direction not in ACCOUNT_KINDS:
+        # D-143: el registro anual es del IRP y la contabilidad de la persona física es opcional.
+        raise AppError(
+            "VOUCHER_ENTRY_NOT_SUPPORTED",
+            "Los ingresos y egresos del registro anual (956) no proponen asiento: cargalo a mano "
+            "en la contabilidad si la llevás.",
+            status_code=422,
+        )
     existing = vouchers.live_entry(db, voucher)
     if existing is not None:
         what = "un borrador" if existing.status == "draft" else f"el asiento N° {existing.number}"

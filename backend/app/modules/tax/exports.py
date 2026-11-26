@@ -23,7 +23,14 @@ Técnica para Importación, versión 1 (junio de 2021), transcripta en ese YAML 
   comprobante que no imputa a ninguna obligación no se exporta (Marangatu exige al menos
   una) y se lista;
 - es un **borrador**: Marangatu valida hasta en 72 horas y puede rechazar líneas. Conviene
-  probar primero con uno o dos comprobantes (`limit`).
+  probar primero con uno o dos comprobantes (`limit`);
+- el archivo mensual (955) lleva solo compras y ventas: los ingresos y egresos van en el anual.
+
+`annual_plan` (D-143): el archivo del **registro anual (956)** del IRP-RSP sin IVA, con el mismo
+escritor: `<RUC sin DV>_REG_<AAAA>_<id>`, las compras y ventas del año con sus 20 y 19 columnas
+y además INGRESOS (15 columnas) y EGRESOS (18), mezclados en el mismo archivo como admite la
+especificación. Fechas `dd/mm/aaaa`, salvo el período `mm/aaaa` de los tipos 206 y 208. Solo si
+el perfil vigente al cierre del año incluye la 956.
 """
 
 import csv
@@ -35,7 +42,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, aliased
 
 from app.core.errors import AppError
@@ -43,14 +50,32 @@ from app.modules.accounting import fast_xlsx
 from app.modules.accounting.exports import Column, Styled, workbook
 from app.modules.organizations.models import Organization
 from app.modules.tax import profile as profiles
-from app.modules.tax import rules
+from app.modules.tax import rules, vouchers
 from app.modules.tax.common import ZERO, month_end
-from app.modules.tax.models import Voucher
+from app.modules.tax.models import DIRECTIONS, PERIOD_TYPES, TIMBRADO_DIRECTIONS, Voucher
 
 IMPORT_RULE = "REG-COMPROB-IMPORTACION"
+ANNUAL_RULE = vouchers.ANNUAL_REGISTER_RULE
 MAX_ROWS = 5000
-REGISTER_SALES, REGISTER_PURCHASES = 1, 2
-VOUCHER_CODES = {"invoice": 109, "credit_note": 110, "debit_note": 111}
+# Tabla 1 de la especificación: tipos de registro.
+REGISTER_SALES, REGISTER_PURCHASES, REGISTER_INCOME, REGISTER_EXPENSE = 1, 2, 3, 4
+# Tabla 4: tipos de comprobante.
+VOUCHER_CODES = {
+    "invoice": 109,
+    "credit_note": 110,
+    "debit_note": 111,
+    "credit_purchase": 201,
+    "foreign_voucher": 202,
+    "credit_sale": 203,
+    "public_entity": 204,
+    "e_ticketing": 205,
+    "ips_statement": 206,
+    "card_statement": 207,
+    "payslip": 208,
+    "other_expense": 209,
+    "other_income": 210,
+    "bank_transfer": 211,
+}
 IDENTIFICATION_CODES = {
     "ruc": 11,
     "identity_card": 12,
@@ -83,6 +108,10 @@ def _int(value: Decimal) -> str:
 
 
 def _section(voucher: Voucher) -> int:
+    if voucher.direction == "income":
+        return REGISTER_INCOME
+    if voucher.direction == "expense":
+        return REGISTER_EXPENSE
     is_sale = voucher.direction == "sale"
     if voucher.voucher_type == "credit_note":
         is_sale = not is_sale  # D-122 (D-F4-4 resuelta)
@@ -92,14 +121,16 @@ def _section(voucher: Voucher) -> int:
 @dataclass
 class MarangatuPlan:
     organization_ruc: str
-    period: str  # MMAAAA
+    period: str  # MMAAAA (955) o AAAA (956)
     separator: str
     rows: list[list[str]] = field(default_factory=list)
     excluded_electronic: list[Voucher] = field(default_factory=list)
     excluded_not_imputed: list[Voucher] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     rule: Any = None
+    extra_rules: list[Any] = field(default_factory=list)
     total_rows: int = 0
+    period_text: str = "ese mes"
 
     def batches(self) -> list[list[list[str]]]:
         return [self.rows[i : i + MAX_ROWS] for i in range(0, len(self.rows), MAX_ROWS)] or []
@@ -118,15 +149,16 @@ def _clean(text: str, separator: str, changed: list[str]) -> str:
     return cleaned
 
 
-def marangatu_plan(
-    db: Session,
-    organization_id: uuid.UUID,
-    year: int,
-    month: int,
-    *,
-    separator: str = "semicolon",
-    limit: int | None = None,
-) -> MarangatuPlan:
+@dataclass
+class _Counters:
+    changed: list[str] = field(default_factory=list)
+    unnamed_numbers: int = 0
+    non_ruc_purchases: int = 0
+    old_cash: int = 0
+    ire_imputed: int = 0
+
+
+def _organization_ruc(db: Session, organization_id: uuid.UUID) -> str:
     org = db.get(Organization, organization_id)
     assert org is not None
     if org.ruc is None:
@@ -135,27 +167,127 @@ def marangatu_plan(
             "Cargá el RUC de la organización: el nombre del archivo lo lleva.",
             status_code=422,
         )
-    first = date(year, month, 1)
-    rule = rules.require_rule(db, IMPORT_RULE, first)
-    sep = SEPARATORS[separator]
-    plan = MarangatuPlan(org.ruc, f"{month:02d}{year}", separator, rule=rule)
+    return org.ruc
+
+
+def _rows_of(
+    db: Session, organization_id: uuid.UUID, first: date, last: date, directions: tuple[str, ...]
+) -> list[Any]:
     original = aliased(Voucher)
-    rows = db.execute(
-        select(Voucher, original.number, original.timbrado)
-        .outerjoin(original, original.id == Voucher.related_voucher_id)
-        .where(
-            Voucher.organization_id == organization_id,
-            Voucher.voided_at.is_(None),
-            Voucher.issued_on >= first,
-            Voucher.issued_on <= month_end(first),
-        )
-        .order_by(Voucher.issued_on, Voucher.direction, Voucher.number, Voucher.id)
-    ).all()
-    changed: list[str] = []
-    unnamed_numbers = 0
-    non_ruc_purchases = 0
-    old_cash = 0
-    ire_imputed = 0
+    return list(
+        db.execute(
+            select(Voucher, original.number, original.timbrado)
+            .outerjoin(original, original.id == Voucher.related_voucher_id)
+            .where(
+                Voucher.organization_id == organization_id,
+                Voucher.voided_at.is_(None),
+                Voucher.issued_on >= first,
+                Voucher.issued_on <= last,
+                Voucher.direction.in_(directions),
+            )
+            .order_by(Voucher.issued_on, Voucher.direction, Voucher.number, Voucher.id)
+        ).all()
+    )
+
+
+def _date(voucher: Voucher) -> str:
+    """dd/mm/aaaa; el período mm/aaaa en el extracto de IPS (206) y la liquidación (208)."""
+    if voucher.direction in ("income", "expense") and voucher.voucher_type in PERIOD_TYPES:
+        return f"{voucher.issued_on:%m/%Y}"
+    return f"{voucher.issued_on:%d/%m/%Y}"
+
+
+def _timbrado_row(
+    voucher: Voucher,
+    related_number: str | None,
+    related_timbrado: str | None,
+    sep: str,
+    counters: _Counters,
+) -> list[str]:
+    """VENTAS (19 columnas) o COMPRAS (20)."""
+    section = _section(voucher)
+    doc_type = voucher.counterparty_doc_type
+    assert doc_type is not None and voucher.timbrado is not None and voucher.number is not None
+    number = voucher.counterparty_ruc or voucher.counterparty_document or ""
+    if doc_type == "unnamed":
+        counters.unnamed_numbers += 1
+    if section == REGISTER_PURCHASES and doc_type != "ruc":
+        counters.non_ruc_purchases += 1
+    if voucher.issued_on < MIN_DATE and voucher.condition == "cash":
+        counters.old_cash += 1
+    total = voucher.taxed_10 + voucher.taxed_5 + voucher.exempt
+    row = [
+        str(section),
+        str(IDENTIFICATION_CODES[doc_type]),
+        _clean(number, sep, counters.changed)[:20],
+        _clean(voucher.counterparty_name, sep, counters.changed)[:250],
+        str(VOUCHER_CODES[voucher.voucher_type]),
+        f"{voucher.issued_on:%d/%m/%Y}",
+        voucher.timbrado,
+        voucher.number,
+        _int(voucher.taxed_10),
+        _int(voucher.taxed_5),
+        _int(voucher.exempt),
+        _int(total),
+        "1" if voucher.condition == "cash" else "2",
+        _yn(voucher.currency != "PYG"),
+        _yn(voucher.imputes_vat),
+        _yn(voucher.imputes_ire),
+        _yn(voucher.imputes_irp),
+    ]
+    if section == REGISTER_PURCHASES:
+        row.append("N")  # NO IMPUTA
+    row.extend([related_number or "", related_timbrado or ""])
+    return row
+
+
+def _register_row(voucher: Voucher, sep: str, counters: _Counters) -> list[str]:
+    """INGRESOS (15 columnas) o EGRESOS (18), en el orden del YAML de la especificación."""
+
+    def text(value: str | None, size: int) -> str:
+        return _clean(value, sep, counters.changed)[:size] if value else ""
+
+    doc_type = voucher.counterparty_doc_type
+    head = [
+        str(_section(voucher)),
+        str(VOUCHER_CODES[voucher.voucher_type]),
+        _date(voucher),
+        text(voucher.number, 20),
+        str(IDENTIFICATION_CODES[doc_type]) if doc_type else "",
+        text(voucher.counterparty_ruc or voucher.counterparty_document, 20),
+        text(voucher.counterparty_name, 250),
+    ]
+    total = voucher.taxed_10 + voucher.exempt
+    if voucher.direction == "income":
+        return [
+            *head,
+            _int(voucher.taxed_10),  # MONTO_GRAVADO
+            _int(voucher.exempt),  # MONTO_NO_GRAVADO_EXONERADO
+            _int(total),
+            _yn(voucher.imputes_ire),
+            _yn(voucher.imputes_irp),
+            text(voucher.document_description, 50),
+            voucher.related_number or "",
+            voucher.related_timbrado or "",
+        ]
+    return [
+        *head,
+        _int(total),
+        _yn(voucher.imputes_vat),
+        _yn(voucher.imputes_ire),
+        _yn(voucher.imputes_irp),
+        "N",  # NO IMPUTA
+        text(voucher.account_number, 30),
+        text(voucher.bank_name, 250),
+        text(voucher.ips_employer_number, 30),
+        text(voucher.document_description, 50),
+        voucher.related_number or "",
+        voucher.related_timbrado or "",
+    ]
+
+
+def _fill(plan: MarangatuPlan, rows: list[Any], limit: int | None, counters: _Counters) -> None:
+    sep = SEPARATORS[plan.separator]
     for voucher, related_number, related_timbrado in rows:
         if voucher.is_electronic:
             plan.excluded_electronic.append(voucher)
@@ -165,70 +297,51 @@ def marangatu_plan(
             continue
         if limit is not None and len(plan.rows) >= limit:
             continue
-        section = _section(voucher)
-        doc_type = voucher.counterparty_doc_type
-        number = voucher.counterparty_ruc or voucher.counterparty_document or ""
-        if doc_type == "unnamed":
-            unnamed_numbers += 1
-        if section == REGISTER_PURCHASES and doc_type != "ruc":
-            non_ruc_purchases += 1
-        if voucher.issued_on < MIN_DATE and voucher.condition == "cash":
-            old_cash += 1
-        ire_imputed += voucher.imputes_ire
-        total = voucher.taxed_10 + voucher.taxed_5 + voucher.exempt
-        row = [
-            str(section),
-            str(IDENTIFICATION_CODES[doc_type]),
-            _clean(number, sep, changed)[:20],
-            _clean(voucher.counterparty_name, sep, changed)[:250],
-            str(VOUCHER_CODES[voucher.voucher_type]),
-            f"{voucher.issued_on:%d/%m/%Y}",
-            voucher.timbrado,
-            voucher.number,
-            _int(voucher.taxed_10),
-            _int(voucher.taxed_5),
-            _int(voucher.exempt),
-            _int(total),
-            "1" if voucher.condition == "cash" else "2",
-            _yn(voucher.currency != "PYG"),
-            _yn(voucher.imputes_vat),
-            _yn(voucher.imputes_ire),
-            _yn(voucher.imputes_irp),
-        ]
-        if section == REGISTER_PURCHASES:
-            row.append("N")  # NO IMPUTA
-        row.extend([related_number or "", related_timbrado or ""])
-        plan.rows.append(row)
+        counters.ire_imputed += voucher.imputes_ire
+        if voucher.direction in TIMBRADO_DIRECTIONS:
+            plan.rows.append(
+                _timbrado_row(voucher, related_number, related_timbrado, sep, counters)
+            )
+        else:
+            plan.rows.append(_register_row(voucher, sep, counters))
     plan.total_rows = len(plan.rows)
-    if changed:
+
+
+def _warn(
+    plan: MarangatuPlan,
+    counters: _Counters,
+    db: Session,
+    organization_id: uuid.UUID,
+    last: date,
+) -> None:
+    if counters.changed:
         plan.warnings.append(
-            f"{len(changed)} nombre(s) o documento(s) tenían el separador, comillas o saltos "
-            "de línea: se "
-            "reemplazaron por espacios en el archivo."
+            f"{len(counters.changed)} nombre(s) o documento(s) tenían el separador, comillas o "
+            "saltos de línea: se reemplazaron por espacios en el archivo."
         )
-    if unnamed_numbers:
+    if counters.unnamed_numbers:
         plan.warnings.append(
-            f"{unnamed_numbers} venta(s) «sin nombre» (identificación 15) van sin número de "
-            "identificación: la especificación lo pide y no dice qué número va. Revisalo antes "
-            "de importar."
+            f"{counters.unnamed_numbers} venta(s) «sin nombre» (identificación 15) van sin número "
+            "de identificación: la especificación lo pide y no dice qué número va. Revisalo "
+            "antes de importar."
         )
-    if non_ruc_purchases:
+    if counters.non_ruc_purchases:
         plan.warnings.append(
-            f"{non_ruc_purchases} fila(s) en COMPRAS no son RUC (notas de crédito emitidas a "
-            "clientes sin RUC): la especificación pide RUC en compras y Marangatu puede "
-            "rechazarlas. Cargalas a mano."
+            f"{counters.non_ruc_purchases} fila(s) en COMPRAS no son RUC (notas de crédito "
+            "emitidas a clientes sin RUC): la especificación pide RUC en compras y Marangatu "
+            "puede rechazarlas. Cargalas a mano."
         )
-    if old_cash:
+    if counters.old_cash:
         plan.warnings.append(
-            f"{old_cash} comprobante(s) al contado anteriores al 01/01/2021: Marangatu no los "
-            "acepta."
+            f"{counters.old_cash} comprobante(s) al contado anteriores al 01/01/2021: Marangatu "
+            "no los acepta."
         )
     history = profiles.versions(db, organization_id)
-    current = profiles.vigente(history, month_end(first))
-    if ire_imputed and current is not None and current.profile.ire_regime == "ire_general":
+    current = profiles.vigente(history, last)
+    if counters.ire_imputed and current is not None and current.profile.ire_regime == "ire_general":
         plan.warnings.append(
-            f"{ire_imputed} comprobante(s) imputan al IRE, pero el perfil es del IRE General: "
-            "según las guías de la DNIT esa imputación es solo del IRE SIMPLE (D-F4-2)."
+            f"{counters.ire_imputed} comprobante(s) imputan al IRE, pero el perfil es del IRE "
+            "General: según las guías de la DNIT esa imputación es solo del IRE SIMPLE (D-F4-2)."
         )
     if plan.excluded_electronic:
         plan.warnings.append(
@@ -240,6 +353,74 @@ def marangatu_plan(
             f"{len(plan.excluded_not_imputed)} comprobante(s) no imputan a ninguna obligación y "
             "no van en el archivo: Marangatu exige imputar cada uno al menos a una."
         )
+
+
+def marangatu_plan(
+    db: Session,
+    organization_id: uuid.UUID,
+    year: int,
+    month: int,
+    *,
+    separator: str = "semicolon",
+    limit: int | None = None,
+) -> MarangatuPlan:
+    """Archivo mensual (955): compras y ventas del mes."""
+    ruc = _organization_ruc(db, organization_id)
+    first = date(year, month, 1)
+    rule = rules.require_rule(db, IMPORT_RULE, first)
+    plan = MarangatuPlan(ruc, f"{month:02d}{year}", separator, rule=rule)
+    counters = _Counters()
+    _fill(
+        plan,
+        _rows_of(db, organization_id, first, month_end(first), TIMBRADO_DIRECTIONS),
+        limit,
+        counters,
+    )
+    _warn(plan, counters, db, organization_id, month_end(first))
+    register = db.scalar(
+        select(func.count()).where(
+            Voucher.organization_id == organization_id,
+            Voucher.voided_at.is_(None),
+            Voucher.issued_on >= first,
+            Voucher.issued_on <= month_end(first),
+            Voucher.direction.not_in(TIMBRADO_DIRECTIONS),
+        )
+    )
+    if register:
+        plan.warnings.append(
+            f"{register} ingreso(s) o egreso(s) del mes no van en el registro mensual: son del "
+            "registro anual (956)."
+        )
+    return plan
+
+
+def annual_plan(
+    db: Session,
+    organization_id: uuid.UUID,
+    year: int,
+    *,
+    separator: str = "semicolon",
+    limit: int | None = None,
+) -> MarangatuPlan:
+    """Archivo del registro anual (956, D-143): compras, ventas, ingresos y egresos del año."""
+    ruc = _organization_ruc(db, organization_id)
+    if not vouchers.annual_register_applies(db, organization_id, year):
+        raise AppError(
+            "ANNUAL_REGISTER_NOT_APPLICABLE",
+            f"El perfil fiscal vigente al cierre de {year} no incluye el registro anual de "
+            "comprobantes (956). Con IVA, el registro es mensual (955).",
+            details={"year": year},
+            status_code=422,
+        )
+    first, last = date(year, 1, 1), date(year, 12, 31)
+    rule = rules.require_rule(db, IMPORT_RULE, last)
+    annual = rules.require_rule(db, ANNUAL_RULE, first)
+    plan = MarangatuPlan(
+        ruc, str(year), separator, rule=rule, extra_rules=[annual], period_text=f"{year}"
+    )
+    counters = _Counters()
+    _fill(plan, _rows_of(db, organization_id, first, last, DIRECTIONS), limit, counters)
+    _warn(plan, counters, db, organization_id, last)
     return plan
 
 
@@ -266,8 +447,8 @@ def marangatu_file(plan: MarangatuPlan, first_id: int) -> tuple[str, bytes]:
     if not batches:
         raise AppError(
             "NOTHING_TO_EXPORT",
-            "No hay comprobantes para el archivo de importación en ese mes (los electrónicos "
-            "y los que no imputan no van).",
+            f"No hay comprobantes para el archivo de importación en {plan.period_text} (los "
+            "electrónicos y los que no imputan no van).",
             status_code=422,
         )
     names = plan.names(first_id)
@@ -321,8 +502,12 @@ def marangatu_preview(plan: MarangatuPlan, first_id: int) -> dict[str, Any]:
         },
         "warnings": plan.warnings,
         "doubts": [{"code": code, "text": text} for code, text in DOUBTS.items()],
-        "rules_applied": [rules.applied(plan.rule)],
-        "rule_status": plan.rule.validation_status,
+        "rules_applied": [rules.applied(r) for r in (plan.rule, *plan.extra_rules)],
+        "rule_status": (
+            "pending"
+            if any(r.validation_status != "verified" for r in (plan.rule, *plan.extra_rules))
+            else "verified"
+        ),
     }
 
 
@@ -363,6 +548,8 @@ def vouchers_xlsx(
             Voucher.voided_at.is_(None),
             Voucher.issued_on >= first,
             Voucher.issued_on <= last,
+            # El libro es de compras y ventas; los ingresos y egresos van en el archivo 956.
+            Voucher.direction.in_(TIMBRADO_DIRECTIONS),
         )
         .order_by(Voucher.direction, Voucher.issued_on, Voucher.number, Voucher.id)
     )
@@ -410,7 +597,7 @@ def vouchers_xlsx(
                 totals[key] += value
             yield [
                 "Venta" if voucher.direction == "sale" else "Compra",
-                _DOC_TEXT[voucher.counterparty_doc_type],
+                _DOC_TEXT.get(voucher.counterparty_doc_type or "", ""),
                 voucher.counterparty_ruc or voucher.counterparty_document or "",
                 voucher.counterparty_ruc_dv or "",
                 voucher.counterparty_name,

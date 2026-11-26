@@ -4,8 +4,25 @@
  */
 
 export type RuleStatus = 'pending' | 'verified' | 'deprecated'
-export type Direction = 'purchase' | 'sale'
-export type VoucherType = 'invoice' | 'credit_note' | 'debit_note'
+/** Compras y ventas (con timbrado) e ingresos y egresos del IRP-RSP (sin timbrado, con la 956; D-143). */
+export type Direction = 'purchase' | 'sale' | 'income' | 'expense'
+export type TimbradoDirection = 'purchase' | 'sale'
+export type RegisterDirection = 'income' | 'expense'
+export type TimbradoVoucherType = 'invoice' | 'credit_note' | 'debit_note'
+/** Tipos 201 a 211 de la Tabla 4 del formato de la RG 90/2021. */
+export type RegisterVoucherType =
+  | 'credit_purchase'
+  | 'foreign_voucher'
+  | 'credit_sale'
+  | 'public_entity'
+  | 'e_ticketing'
+  | 'ips_statement'
+  | 'card_statement'
+  | 'payslip'
+  | 'other_expense'
+  | 'other_income'
+  | 'bank_transfer'
+export type VoucherType = TimbradoVoucherType | RegisterVoucherType
 export type DocType = 'ruc' | 'identity_card' | 'passport' | 'foreign_id' | 'unnamed' | 'diplomatic' | 'tax_id'
 export type Condition = 'cash' | 'credit'
 export type IreRegime = 'ire_general' | 'ire_simple' | 'resimple' | 'none' | 'unknown'
@@ -159,10 +176,10 @@ export interface Voucher {
   voucher_type: VoucherType
   is_electronic: boolean
   cdc: string | null
-  timbrado: string
-  number: string
+  timbrado: string | null
+  number: string | null
   issued_on: string
-  counterparty_doc_type: DocType
+  counterparty_doc_type: DocType | null
   counterparty_ruc: string | null
   counterparty_ruc_dv: string | null
   counterparty_document: string | null
@@ -182,6 +199,12 @@ export interface Voucher {
   imputes_ire: boolean
   imputes_irp: boolean
   related_voucher_id: string | null
+  account_number: string | null
+  bank_name: string | null
+  ips_employer_number: string | null
+  document_description: string | null
+  related_number: string | null
+  related_timbrado: string | null
   finance_counterparty_id: string | null
   transaction_id: string | null
   journal_entry_id: string | null
@@ -200,10 +223,10 @@ export interface VoucherIn {
   voucher_type: VoucherType
   is_electronic: boolean
   cdc?: string | null
-  timbrado: string
-  number: string
+  timbrado: string | null
+  number: string | null
   issued_on: string
-  counterparty_doc_type: DocType
+  counterparty_doc_type: DocType | null
   counterparty_ruc?: string | null
   counterparty_ruc_dv?: string | null
   counterparty_document?: string | null
@@ -224,6 +247,12 @@ export interface VoucherIn {
   finance_counterparty_id?: string | null
   transaction_id?: string | null
   notes?: string | null
+  account_number?: string | null
+  bank_name?: string | null
+  ips_employer_number?: string | null
+  document_description?: string | null
+  related_number?: string | null
+  related_timbrado?: string | null
 }
 
 export interface ExcludedVoucher {
@@ -231,7 +260,7 @@ export interface ExcludedVoucher {
   direction: Direction
   voucher_type: VoucherType
   issued_on: string
-  number: string
+  number: string | null
   cdc: string | null
   counterparty_name: string
 }

@@ -5,7 +5,8 @@
  */
 import { parseAmountInput, toInputText } from '../../lib/money'
 import { parseRateInput } from '../accounting/amounts'
-import { cdcDigits, checkCounterpartyRuc, includedVat, vatAccepted, voucherNumberOk, timbradoOk } from './logic'
+import { cdcDigits, checkCounterpartyRuc, includedVat, readPyg, vatAccepted, voucherNumberOk, timbradoOk } from './logic'
+import { defaultRegisterDraft, isRegister, registerDraftToBody } from './registerDraft'
 import type { Condition, Direction, DocType, Voucher, VoucherIn, VoucherType } from './types'
 
 export interface VoucherDraft {
@@ -38,6 +39,15 @@ export interface VoucherDraft {
   finance_counterparty_id: string
   transaction_id: string
   notes: string
+  // Ingresos y egresos del registro anual (956, D-143); vacíos en compras y ventas.
+  /** Extracto de IPS, de tarjeta o transferencia sin contraparte identificada. */
+  no_counterparty: boolean
+  account_number: string
+  bank_name: string
+  ips_employer_number: string
+  document_description: string
+  related_number: string
+  related_timbrado: string
 }
 
 export interface Rates {
@@ -48,7 +58,7 @@ export interface Rates {
 export const DEFAULT_RATES: Rates = { general: '0.1', reduced: '0.05' }
 
 export function emptyDraft(direction: Direction, issuedOn: string, imputesIre = false): VoucherDraft {
-  return {
+  const draft: VoucherDraft = {
     direction,
     voucher_type: 'invoice',
     is_electronic: false,
@@ -77,7 +87,15 @@ export function emptyDraft(direction: Direction, issuedOn: string, imputesIre = 
     finance_counterparty_id: '',
     transaction_id: '',
     notes: '',
+    no_counterparty: false,
+    account_number: '',
+    bank_name: '',
+    ips_employer_number: '',
+    document_description: '',
+    related_number: '',
+    related_timbrado: '',
   }
+  return isRegister(direction) ? defaultRegisterDraft(draft, direction) : draft
 }
 
 const shown = (amount: string) => (amount === '0' ? '' : toInputText(amount, 'PYG'))
@@ -91,10 +109,10 @@ export function draftFromVoucher(v: Voucher, rates: Rates = DEFAULT_RATES): Vouc
     voucher_type: v.voucher_type,
     is_electronic: v.is_electronic,
     cdc: v.cdc ?? '',
-    timbrado: v.timbrado,
-    number: v.number,
+    timbrado: v.timbrado ?? '',
+    number: v.number ?? '',
     issued_on: v.issued_on,
-    doc_type: v.counterparty_doc_type,
+    doc_type: v.counterparty_doc_type ?? 'ruc',
     ruc: v.counterparty_ruc ?? '',
     dv: v.counterparty_ruc_dv ?? '',
     document: v.counterparty_document ?? '',
@@ -115,17 +133,17 @@ export function draftFromVoucher(v: Voucher, rates: Rates = DEFAULT_RATES): Vouc
     finance_counterparty_id: v.finance_counterparty_id ?? '',
     transaction_id: v.transaction_id ?? '',
     notes: v.notes ?? '',
+    no_counterparty: isRegister(v.direction) && v.counterparty_doc_type === null,
+    account_number: v.account_number ?? '',
+    bank_name: v.bank_name ?? '',
+    ips_employer_number: v.ips_employer_number ?? '',
+    document_description: v.document_description ?? '',
+    related_number: v.related_number ?? '',
+    related_timbrado: v.related_timbrado ?? '',
   }
 }
 
-/** Importe en guaraníes enteros no negativos; '' cuenta como 0. */
-export function readPyg(text: string): { ok: true; value: string } | { ok: false; error: string } {
-  if (!text.trim()) return { ok: true, value: '0' }
-  const parsed = parseAmountInput(text, 'PYG')
-  if (!parsed.ok) return parsed
-  if (parsed.value.startsWith('-')) return { ok: false, error: 'Va en positivo: el tipo de comprobante ya dice si suma o resta.' }
-  return parsed
-}
+export { readPyg }
 
 export interface VatLine {
   amount: string | null
@@ -163,6 +181,7 @@ export type DraftErrors = Partial<Record<keyof VoucherDraft | 'amounts', string>
  * cuerpo.
  */
 export function draftToBody(d: VoucherDraft, rates: Rates = DEFAULT_RATES): { body: VoucherIn | null; errors: DraftErrors } {
+  if (isRegister(d.direction)) return registerDraftToBody(d)
   const errors: DraftErrors = {}
   if (!timbradoOk(d.timbrado)) errors.timbrado = 'El timbrado tiene 8 dígitos.'
   if (!voucherNumberOk(d.number)) errors.number = 'El número va como 001-001-0000001 (establecimiento, punto y número).'
@@ -239,8 +258,28 @@ export function draftToBody(d: VoucherDraft, rates: Rates = DEFAULT_RATES): { bo
 }
 
 /** Errores de la API que corresponden a un campo del formulario (los demás van en un aviso general). */
+/** Campos de la API que en el formulario tienen otro nombre. */
+const API_FIELDS: Partial<Record<string, keyof VoucherDraft>> = {
+  counterparty_doc_type: 'doc_type',
+  counterparty_ruc: 'ruc',
+  counterparty_document: 'document',
+  counterparty_name: 'name',
+}
+
 export function fieldOfApiError(code: string, details: unknown): keyof VoucherDraft | null {
+  const field = (details as { field?: string } | null)?.field
   switch (code) {
+    // Del registro anual (D-143): la API dice qué campo es.
+    case 'FIELD_REQUIRED':
+    case 'FIELD_NOT_APPLICABLE':
+    case 'VOUCHER_NUMBER_REQUIRED':
+    case 'COUNTERPARTY_REQUIRED':
+    case 'COUNTERPARTY_DOC_TYPE_INVALID':
+    case 'DATE_BEFORE_REGISTER':
+    case 'AMOUNT_NOT_APPLICABLE':
+    case 'TIMBRADO_INVALID':
+    case 'VOUCHER_NUMBER_INVALID':
+      return field ? (API_FIELDS[field] ?? (field as keyof VoucherDraft)) : null
     case 'VAT_MISMATCH':
       return ((details as { field?: string } | null)?.field as keyof VoucherDraft) ?? 'vat_10'
     case 'RUC_CHECK_DIGIT_INVALID':

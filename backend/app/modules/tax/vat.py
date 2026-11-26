@@ -52,7 +52,7 @@ from app.core.errors import AppError, NotFound
 from app.modules.accounting import balances
 from app.modules.tax import obligations, rules, tax_settings
 from app.modules.tax.common import ZERO, add_months, month_end, month_start, pyg
-from app.modules.tax.models import Obligation, RuleVersion, Voucher
+from app.modules.tax.models import TIMBRADO_DIRECTIONS, Obligation, RuleVersion, Voucher
 
 VAT_FILING = "IVA-GENERAL-LIQUIDACION"
 FORM_RULE = "IVA-F120-ESTRUCTURA"
@@ -159,6 +159,8 @@ def month_sums(
             Voucher.voided_at.is_(None),
             Voucher.issued_on >= month_start(first),
             Voucher.issued_on <= month_end(last),
+            # Los ingresos y egresos del IRP-RSP no son del IVA (D-143).
+            Voucher.direction.in_(TIMBRADO_DIRECTIONS),
         )
         .group_by(month, Voucher.direction, Voucher.voucher_type, Voucher.imputes_vat)
     ).all()
@@ -218,7 +220,9 @@ def previous_balance(db: Session, organization_id: uuid.UUID, month: date) -> Pr
     else:
         earliest = db.scalar(
             select(func.min(Voucher.issued_on)).where(
-                Voucher.organization_id == organization_id, Voucher.voided_at.is_(None)
+                Voucher.organization_id == organization_id,
+                Voucher.voided_at.is_(None),
+                Voucher.direction.in_(TIMBRADO_DIRECTIONS),
             )
         )
         if earliest is None or month_start(earliest) > prev:
@@ -610,6 +614,7 @@ def estimate(db: Session, organization_id: uuid.UUID, year: int, month: int) -> 
             .where(
                 Voucher.organization_id == organization_id,
                 Voucher.voided_at.is_(None),
+                Voucher.vat_rule_version_id.is_not(None),
                 Voucher.issued_on >= first,
                 Voucher.issued_on <= last,
             )

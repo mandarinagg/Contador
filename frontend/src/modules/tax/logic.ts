@@ -9,8 +9,18 @@
  * - DV del RUC y del CDC: módulo 11 (`lib/ruc.ts`, igual que `organizations/ruc.py`);
  * - CDC: estructura del Manual Técnico SIFEN v150 §10.1, como `vouchers._check_cdc` (D-107).
  */
+import { parseAmountInput } from '../../lib/money'
 import { rucCheckDigit } from '../../lib/ruc'
 import type { Direction, Obligation, Voucher, VoucherType } from './types'
+
+/** Importe en guaraníes enteros no negativos; '' cuenta como 0. */
+export function readPyg(text: string): { ok: true; value: string } | { ok: false; error: string } {
+  if (!text.trim()) return { ok: true, value: '0' }
+  const parsed = parseAmountInput(text, 'PYG')
+  if (!parsed.ok) return parsed
+  if (parsed.value.startsWith('-')) return { ok: false, error: 'Va en positivo: el tipo de comprobante ya dice si suma o resta.' }
+  return parsed
+}
 
 // --- IVA incluido ------------------------------------------------------------------------
 
@@ -248,8 +258,9 @@ export function actionTitle(action: ObligationAction, o: Pick<Obligation, 'code'
   }
 }
 
-/** ¿Se puede proponer el asiento? Sin asiento vivo y no anulado (el permiso lo decide quien llama). */
-export function canProposeVoucher(v: Pick<Voucher, 'voided_at' | 'journal_entry_status'>): boolean {
+/** ¿Se puede proponer el asiento? Sin asiento vivo y no anulado (el permiso lo decide quien llama). Los ingresos y egresos del registro anual no proponen asiento (D-143). */
+export function canProposeVoucher(v: Pick<Voucher, 'voided_at' | 'journal_entry_status'> & { direction?: Direction }): boolean {
+  if (v.direction === 'income' || v.direction === 'expense') return false
   return !v.voided_at && (!v.journal_entry_status || v.journal_entry_status === 'reversed' || v.journal_entry_status === 'discarded')
 }
 
@@ -271,7 +282,7 @@ const zero = (): Totals => ({ count: 0, taxed10: 0n, taxed5: 0n, exempt: 0n, vat
 
 /** Las notas de crédito restan; las anuladas no cuentan. */
 export function voucherTotals(rows: Voucher[]): Record<Direction, Totals> {
-  const out: Record<Direction, Totals> = { purchase: zero(), sale: zero() }
+  const out: Record<Direction, Totals> = { purchase: zero(), sale: zero(), income: zero(), expense: zero() }
   for (const v of rows) {
     if (v.voided_at) continue
     const t = out[v.direction]
@@ -287,6 +298,9 @@ export function voucherTotals(rows: Voucher[]): Record<Direction, Totals> {
 }
 
 // --- Descargas -----------------------------------------------------------------------------
+
+/** ¿El perfil vigente tiene el registro anual de comprobantes (956)? Con él se cargan ingresos y egresos (D-143). */
+export const hasAnnualRegister = (profile: { current: { obligations: { code: string }[] } | null } | undefined) => Boolean(profile?.current?.obligations.some((o) => o.code === '956'))
 
 /** Igual que `tax/router.py` (`export_vouchers`): `registro-compras-2026-10.xlsx`. */
 export function voucherXlsxName(year: number, month?: number | null, direction?: Direction | null): string {
