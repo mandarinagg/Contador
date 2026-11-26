@@ -3,24 +3,28 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.api.deps import Auth, AuthContext, DbSession, client_ip, load_permissions, require
 from app.core.permissions import Perm
 from app.modules.identity import service
 from app.modules.identity.models import PermissionRow, RolePermission, RoleRow, User
 from app.modules.identity.schemas import (
+    AddExistingUserRequest,
     ChangePasswordRequest,
     CreateUserRequest,
     LoginRequest,
     LoginResponse,
     MemberOut,
+    MembershipOut,
     MeResponse,
     OrganizationSummary,
     RoleOut,
+    SwitchOrganizationRequest,
     UpdateMemberRequest,
     UserOut,
 )
-from app.modules.organizations.models import Organization
+from app.modules.organizations.models import Organization, OrganizationMember
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 users_router = APIRouter(prefix="/users", tags=["users"])
@@ -32,15 +36,28 @@ def _org_summary(org: Organization) -> OrganizationSummary:
     )
 
 
-@auth_router.post("/login", response_model=LoginResponse)
-def login(body: LoginRequest, request: Request, db: DbSession) -> LoginResponse:
-    issued = service.login(
-        db,
-        body.email,
-        body.password,
-        ip=client_ip(request),
-        user_agent=request.headers.get("user-agent"),
-    )
+def organizations_of(
+    db: Session, user_id: uuid.UUID, current_id: uuid.UUID | None
+) -> list[MembershipOut]:
+    """Las organizaciones activas del usuario, por nombre."""
+    rows = [
+        MembershipOut(
+            id=m.organization.id,
+            legal_name=m.organization.legal_name,
+            trade_name=m.organization.trade_name,
+            legal_form=m.organization.legal_form,
+            ruc=m.organization.ruc,
+            ruc_check_digit=m.organization.ruc_check_digit,
+            role=m.member.role_code,
+            is_current=m.organization.id == current_id,
+        )
+        for m in service.active_memberships(db, user_id)
+    ]
+    return sorted(rows, key=lambda r: (r.legal_name.casefold(), str(r.id)))
+
+
+def session_response(db: Session, issued: service.IssuedSession) -> LoginResponse:
+    """Respuesta de toda sesión nueva: ingreso, cambio de organización y setup."""
     user = db.get_one(User, issued.session.user_id)
     org = db.get_one(Organization, issued.member.organization_id)
     return LoginResponse(
@@ -50,7 +67,42 @@ def login(body: LoginRequest, request: Request, db: DbSession) -> LoginResponse:
         organization=_org_summary(org),
         role=issued.member.role_code,
         permissions=sorted(load_permissions(db, issued.member.role_code)),
+        organizations=organizations_of(db, user.id, org.id),
     )
+
+
+@auth_router.post("/login", response_model=LoginResponse)
+def login(body: LoginRequest, request: Request, db: DbSession) -> LoginResponse:
+    issued = service.login(
+        db,
+        body.email,
+        body.password,
+        organization_id=body.organization_id,
+        ip=client_ip(request),
+        user_agent=request.headers.get("user-agent"),
+    )
+    return session_response(db, issued)
+
+
+@auth_router.get("/organizations", response_model=list[MembershipOut])
+def list_my_organizations(auth: Auth, db: DbSession) -> list[MembershipOut]:
+    return organizations_of(db, auth.user_id, auth.organization_id)
+
+
+@auth_router.post("/switch", response_model=LoginResponse)
+def switch_organization(
+    body: SwitchOrganizationRequest, auth: Auth, request: Request, db: DbSession
+) -> LoginResponse:
+    """Cambia de organización: el token actual deja de valer y se entrega uno nuevo."""
+    issued = service.switch_organization(
+        db,
+        auth.user,
+        auth.session,
+        body.organization_id,
+        ip=client_ip(request),
+        user_agent=request.headers.get("user-agent"),
+    )
+    return session_response(db, issued)
 
 
 @auth_router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -84,14 +136,19 @@ def change_password(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+def _member_out(user: User, member: OrganizationMember) -> MemberOut:
+    # `user.is_active` dice si está activo en ESTA organización (D-137).
+    out = UserOut.model_validate(user).model_copy(
+        update={"is_active": user.is_active and member.is_active}
+    )
+    return MemberOut(user=out, role=member.role_code, member_since=member.created_at)
+
+
 @users_router.get("", response_model=list[MemberOut])
 def list_users(
     auth: Annotated[AuthContext, Depends(require(Perm.USERS_READ))], db: DbSession
 ) -> list[MemberOut]:
-    return [
-        MemberOut(user=UserOut.model_validate(u), role=m.role_code, member_since=m.created_at)
-        for u, m in service.list_members(db, auth.organization_id)
-    ]
+    return [_member_out(u, m) for u, m in service.list_members(db, auth.organization_id)]
 
 
 @users_router.post("", response_model=MemberOut, status_code=status.HTTP_201_CREATED)
@@ -110,9 +167,25 @@ def create_user(
         password=body.password,
         role=body.role,
     )
-    return MemberOut(
-        user=UserOut.model_validate(user), role=member.role_code, member_since=member.created_at
+    return _member_out(user, member)
+
+
+@users_router.post("/existing", response_model=MemberOut, status_code=status.HTTP_201_CREATED)
+def add_existing_user(
+    body: AddExistingUserRequest,
+    auth: Annotated[AuthContext, Depends(require(Perm.USERS_MANAGE))],
+    db: DbSession,
+) -> MemberOut:
+    """Suma a un usuario que ya existe (con su contraseña de siempre) a esta organización."""
+    user, member = service.add_existing_member(
+        db,
+        organization_id=auth.organization_id,
+        actor_id=auth.user_id,
+        actor_role=auth.role_code,
+        email=str(body.email),
+        role=body.role,
     )
+    return _member_out(user, member)
 
 
 @users_router.patch("/{user_id}", response_model=MemberOut)
@@ -131,9 +204,7 @@ def update_user(
         role=body.role,
         is_active=body.is_active,
     )
-    return MemberOut(
-        user=UserOut.model_validate(user), role=member.role_code, member_since=member.created_at
-    )
+    return _member_out(user, member)
 
 
 @users_router.get("/roles", response_model=list[RoleOut])

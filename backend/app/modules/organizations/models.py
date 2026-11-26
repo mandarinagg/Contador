@@ -7,7 +7,17 @@ aunque al principio exista una sola EAS.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, UniqueConstraint, func, text
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -29,6 +39,9 @@ class Organization(TimestampMixin, Base):
         ),
         CheckConstraint("(ruc IS NULL) = (ruc_check_digit IS NULL)", name="ruc_complete"),
         CheckConstraint("base_currency ~ '^[A-Z]{3}$'", name="base_currency_iso"),
+        # Una sola organización por RUC en la instalación (la clave de Marangatu es por RUC,
+        # D-128; respuesta 1 del propietario). Migración 0008.
+        Index("uq_organizations_ruc", "ruc", unique=True, postgresql_where=text("ruc IS NOT NULL")),
         {"schema": "core"},
     )
 
@@ -60,6 +73,9 @@ class OrganizationMember(Base):
         ForeignKey("core.users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     role_code: Mapped[str] = mapped_column(ForeignKey("core.roles.code"), nullable=False)
+    # Activo en esta organización. Desactivar a alguien en una no lo toca en las demás
+    # (migración 0009, D-137). `users.is_active` queda como interruptor de toda la cuenta.
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

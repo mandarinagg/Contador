@@ -48,7 +48,7 @@ vez, cada una con sus datos separados y un selector para elegir con cuál trabaj
 |---|---|---|
 | F0 | Investigación del IRP, el RESIMPLE y la unipersonal: `docs/research/TRIBUTACION_PERSONA_FISICA.md` y las candidatas `pending` | — |
 | M1 | Pruebas de aislamiento entre organizaciones en todos los módulos; los eventos de seguridad sin organización ya no se ven en todas | — |
-| M2 | Backend: `GET /auth/organizations`, `POST /auth/switch` (un token nuevo), ingreso con organización, `POST /organizations`, sumar un usuario existente, migración 0008 con RUC único | M1 |
+| M2 | Backend: `GET /auth/organizations`, `POST /auth/switch` (un token nuevo), ingreso con organización, `POST /organizations`, sumar un usuario existente, migración 0008 con RUC único. **Hecho (2026-11-25):** además `POST /users/existing` y la 0009 (activo por organización); D-135 a D-139 | M1 |
 | M3 | Frontend: selector, «Nueva organización», elección al ingresar y textos | M2 |
 | M4 | Identidad de la persona física: migración con `PERSONA_FISICA`, nombres y apellidos; setup y alta con empresa o persona | M2 |
 | M5 | Bot: una corrida en toda la PC, documentos por organización, 409 al cambiar el RUC con una clave guardada | M2 |

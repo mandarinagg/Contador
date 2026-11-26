@@ -92,7 +92,13 @@ def get_auth(
         )
     )
     organization = db.get(Organization, session.organization_id)
-    if user is None or not user.is_active or member is None or organization is None:
+    if (
+        user is None
+        or not user.is_active
+        or member is None
+        or not member.is_active
+        or organization is None
+    ):
         raise NotAuthenticated("SESSION_EXPIRED", "La sesión ya no es válida.")
 
     if now - session.last_seen_at >= _TOUCH_INTERVAL:

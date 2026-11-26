@@ -6,22 +6,15 @@ from fastapi import APIRouter, Request, status
 from pydantic import BaseModel, EmailStr, StringConstraints
 from sqlalchemy import func, select, text
 
-from app.api.deps import DbSession, client_ip, load_permissions
+from app.api.deps import DbSession, client_ip
 from app.core.errors import Conflict
-from app.core.permissions import Role
 from app.core.security import hash_password
 from app.modules.audit import service as audit
-from app.modules.finance import service as finance
+from app.modules.identity import router as identity_router
 from app.modules.identity import service as identity
 from app.modules.identity.models import User
-from app.modules.identity.schemas import (
-    FullName,
-    LoginResponse,
-    OrganizationSummary,
-    Password,
-    UserOut,
-)
-from app.modules.organizations.models import Organization, OrganizationMember
+from app.modules.identity.schemas import FullName, LoginResponse, Password
+from app.modules.organizations import service as organizations
 
 router = APIRouter(prefix="/system", tags=["system"])
 
@@ -81,23 +74,21 @@ def run_setup(body: SetupRequest, request: Request, db: DbSession) -> LoginRespo
     if _has_users(db):
         raise Conflict("ALREADY_SET_UP", "El sistema ya fue configurado.")
 
-    org = Organization(
-        legal_name=body.organization.legal_name,
-        trade_name=body.organization.trade_name,
-        legal_form=body.organization.legal_form,
-    )
     user = User(
         email=str(body.owner.email),
         full_name=body.owner.full_name,
         password_hash=hash_password(body.owner.password),
     )
-    db.add_all([org, user])
+    db.add(user)
     db.flush()
-    member = OrganizationMember(organization_id=org.id, user_id=user.id, role_code=Role.OWNER)
-    db.add(member)
-    # Contexto financiero empresarial (D-023), en la misma transacción que la organización.
-    finance.create_business_context(db, org.id)
-    db.flush()
+    # Mismo alta que `POST /organizations` (con su contexto empresarial, D-023), sin RUC.
+    org, member = organizations.create_organization(
+        db,
+        owner_user_id=user.id,
+        legal_name=body.organization.legal_name,
+        trade_name=body.organization.trade_name,
+        legal_form=body.organization.legal_form,
+    )
     audit.record(
         db,
         action="system.setup",
@@ -120,16 +111,4 @@ def run_setup(body: SetupRequest, request: Request, db: DbSession) -> LoginRespo
     )
     issued = identity.issue_session(db, user, member, request.headers.get("user-agent"))
     db.commit()
-    return LoginResponse(
-        token=issued.token,
-        expires_at=issued.session.expires_at,
-        user=UserOut.model_validate(user),
-        organization=OrganizationSummary(
-            id=org.id,
-            legal_name=org.legal_name,
-            trade_name=org.trade_name,
-            legal_form=org.legal_form,
-        ),
-        role=member.role_code,
-        permissions=sorted(load_permissions(db, member.role_code)),
-    )
+    return identity_router.session_response(db, issued)

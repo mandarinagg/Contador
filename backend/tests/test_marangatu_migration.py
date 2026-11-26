@@ -4,6 +4,7 @@ y la bajada no pierde el registro de una corrida (D-080; Res. 568/2006, art. 10)
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -38,6 +39,7 @@ def test_0007_is_reversible_and_keeps_runs(
     assert run["stop_code"] == "BOT_OFF"
     with pytest.raises(RuntimeError, match=r"hay 1 corrida\(s\) del bot de Marangatu"):
         command.downgrade(cfg, "0006")
-    assert _version(engine) == "0007"
+    # Sigue en head: la bajada entera se revierte.
+    assert _version(engine) == ScriptDirectory.from_config(cfg).get_current_head()
     with engine.connect() as conn:
         assert conn.scalar(text("SELECT count(*) FROM marangatu.steps")) == 1

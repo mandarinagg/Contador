@@ -17,6 +17,7 @@ from app.modules.audit.router import router as audit_router
 from app.modules.finance.router import router as finance_router
 from app.modules.identity.router import auth_router, users_router
 from app.modules.marangatu.router import router as marangatu_router
+from app.modules.organizations.router import organizations_router
 from app.modules.organizations.router import router as organization_router
 from app.modules.system.router import router as system_router
 from app.modules.tax.router import router as tax_router
@@ -86,6 +87,7 @@ def create_app() -> FastAPI:
         auth_router,
         users_router,
         organization_router,
+        organizations_router,
         audit_router,
         finance_router,
         accounting_router,

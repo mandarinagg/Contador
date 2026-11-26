@@ -35,6 +35,12 @@ FullName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2,
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=PASSWORD_MAX_LENGTH)
+    # Opcional: sin ella abre la usada por última vez, si no la membresía más antigua (D-138).
+    organization_id: uuid.UUID | None = None
+
+
+class SwitchOrganizationRequest(BaseModel):
+    organization_id: uuid.UUID
 
 
 class UserOut(BaseModel):
@@ -54,6 +60,19 @@ class OrganizationSummary(BaseModel):
     legal_form: str
 
 
+class MembershipOut(BaseModel):
+    """Una organización a la que el usuario tiene acceso, con su rol ahí."""
+
+    id: uuid.UUID
+    legal_name: str
+    trade_name: str | None
+    legal_form: str
+    ruc: str | None
+    ruc_check_digit: str | None
+    role: str
+    is_current: bool
+
+
 class MeResponse(BaseModel):
     user: UserOut
     organization: OrganizationSummary
@@ -64,6 +83,8 @@ class MeResponse(BaseModel):
 class LoginResponse(MeResponse):
     token: str
     expires_at: datetime
+    # Las organizaciones activas del usuario, para ofrecer elegir otra (D-138).
+    organizations: list[MembershipOut]
 
 
 class ChangePasswordRequest(BaseModel):
@@ -81,6 +102,11 @@ class CreateUserRequest(BaseModel):
     email: EmailStr
     full_name: FullName
     password: Password
+    role: Role
+
+
+class AddExistingUserRequest(BaseModel):
+    email: EmailStr
     role: Role
 
 

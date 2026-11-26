@@ -1,0 +1,91 @@
+"""Alta de organizaciones y RUC único (fase M2 del plan multiempresa).
+
+Lo usan el setup (D-009, solo con la base vacía) y `POST /organizations` (D-136).
+"""
+
+import uuid
+
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.core.errors import Conflict
+from app.core.permissions import Role
+from app.modules.finance import service as finance
+from app.modules.identity.models import User
+from app.modules.organizations.models import Organization, OrganizationMember
+
+RUC_INDEX = "uq_organizations_ruc"
+
+
+def ruc_taken() -> Conflict:
+    return Conflict("RUC_TAKEN", "Ya hay otra organización con ese RUC en esta instalación.")
+
+
+def ensure_ruc_available(db: Session, ruc: str | None, *, exclude_id: uuid.UUID | None) -> None:
+    """409 `RUC_TAKEN` si otra organización ya tiene ese RUC (D-135). El índice único parcial
+    de la 0008 es la garantía; esto da el error claro sin esperar a la base."""
+    if ruc is None:
+        return
+    query = select(Organization.id).where(Organization.ruc == ruc)
+    if exclude_id is not None:
+        query = query.where(Organization.id != exclude_id)
+    if db.scalar(query.limit(1)) is not None:
+        raise ruc_taken()
+
+
+def flush_checking_ruc(db: Session) -> None:
+    """`flush` que traduce la violación del índice de RUC (carrera entre dos altas) a 409."""
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        if RUC_INDEX not in str(exc.orig):
+            raise
+        db.rollback()
+        raise ruc_taken() from exc
+
+
+def is_active_owner_somewhere(db: Session, user_id: uuid.UUID) -> bool:
+    return (
+        db.scalar(
+            select(OrganizationMember.id)
+            .join(User, User.id == OrganizationMember.user_id)
+            .where(
+                OrganizationMember.user_id == user_id,
+                OrganizationMember.role_code == Role.OWNER,
+                OrganizationMember.is_active.is_(True),
+                User.is_active.is_(True),
+            )
+            .limit(1)
+        )
+        is not None
+    )
+
+
+def create_organization(
+    db: Session,
+    *,
+    owner_user_id: uuid.UUID,
+    legal_name: str,
+    trade_name: str | None,
+    legal_form: str,
+    ruc: str | None = None,
+    ruc_check_digit: str | None = None,
+) -> tuple[Organization, OrganizationMember]:
+    """Organización, su propietario y su contexto financiero empresarial (D-023), en la
+    transacción del que llama (no hace `commit` ni audita: cada llamador deja su registro)."""
+    ensure_ruc_available(db, ruc, exclude_id=None)
+    org = Organization(
+        legal_name=legal_name,
+        trade_name=trade_name,
+        legal_form=legal_form,
+        ruc=ruc,
+        ruc_check_digit=ruc_check_digit,
+    )
+    db.add(org)
+    flush_checking_ruc(db)
+    member = OrganizationMember(organization_id=org.id, user_id=owner_user_id, role_code=Role.OWNER)
+    db.add(member)
+    finance.create_business_context(db, org.id)
+    db.flush()
+    return org, member

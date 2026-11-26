@@ -371,3 +371,27 @@ Fase M1 del plan multiempresa: pruebas de aislamiento entre organizaciones (`bac
   - `GET /audit/security-events` devolvía, además de los de la organización, los que no tienen ninguna (intentos fallidos con un email desconocido). Con más de una organización, cada una veía los intentos de las demás. Ahora solo trae los de su organización.
   - Los eventos sin organización siguen guardándose (solo inserción, como el resto de `audit`); no hay hoy una pantalla ni un permiso de «administrador de la instalación» que los muestre. Si hace falta verlos, se agrega con ese concepto, no reabriendo el filtro por organización.
   - Un intento fallido con el email de un usuario existente sí lleva organización y lo ve esa organización. El bloqueo de cuenta (`account_locked`) no la llevaba: ahora sí.
+
+## D-135 a D-139 — Varias organizaciones: sesiones y altas (fase M2), 2026-11-25
+
+Plan: `docs/specs/MULTI_ORG_PERSONA_FISICA.md`, fase M2. Pruebas: `backend/tests/test_multi_org_sessions.py`.
+
+- **D-135 — RUC único en la instalación.** **Aceptada · 2026-11-25.**
+  - Migración `0008`: índice único parcial `uq_organizations_ruc` sobre `core.organizations(ruc)` cuando hay RUC; las organizaciones sin RUC no chocan. La subida se niega (`RuntimeError`) si ya hay RUC repetidos, nombrándolos: se corrigen a mano, no se elige solo cuál queda. La bajada borra el índice.
+  - `PATCH /organization` y `POST /organizations` responden 409 `RUC_TAKEN`; el choque por carrera con el índice da el mismo 409.
+- **D-136 — Alta de organizaciones y usuarios existentes.** **Aceptada · 2026-11-25.**
+  - `POST /organizations`: cualquier usuario que sea propietario activo de alguna organización (respuesta 3), desde cualquier sesión. Crea la organización, su contexto empresarial y la membresía de propietario en una transacción, con el mismo servicio que el setup (`organizations/service.py`). Auditoría `organization.created` en la nueva. No cambia la sesión. El setup sigue siendo solo con la base vacía (D-009).
+  - `POST /users/existing {email, role}` (`users.manage`): suma a un usuario que ya existe, sin tocar su contraseña, su nombre ni sus otras membresías. 404 `USER_NOT_FOUND`, 409 `ALREADY_MEMBER`, 403 `OWNER_ONLY` para dar propietario sin serlo. Auditoría `user.added` solo en esa organización. `POST /users` con un email existente sigue dando `EMAIL_TAKEN`.
+  - Riesgo aceptado: la organización que lo suma sabe que el email tiene cuenta en la instalación y ve su `last_login_at` (de toda la cuenta); no ve en qué otras organizaciones está. El usuario no confirma la invitación (instalación local, D-009).
+- **D-137 — Activo o desactivado por organización.** **Aceptada · 2026-11-25.**
+  - Con `users.is_active` global, el administrador de B podía dejar a alguien sin acceso a A, e incluso a A sin propietario activo. Migración `0009`: `organization_members.is_active`; el valor de cada usuario pasa a sus membresías y `users.is_active` queda en `true` como interruptor de toda la cuenta (sin API).
+  - `PATCH /users/{id}` con `is_active` cambia la membresía de esa organización y cierra solo las sesiones de esa organización. El «al menos un propietario activo» (D-010) cuenta membresías activas. En `MemberOut`, `user.is_active` es el de esa organización.
+  - La bajada de la `0009` se niega si algún usuario está activo en una organización y desactivado en otra.
+- **D-138 — Organización al ingresar.** **Aceptada · 2026-11-25.**
+  - `POST /auth/login` acepta `organization_id` opcional. Sin él abre la usada por última vez (la sesión más reciente, también las de un cambio) y, si nunca usó ninguna, la membresía más antigua. Con él exige una membresía activa: si no, 403 `ORGANIZATION_NOT_AVAILABLE` (igual si no existe), sin sumar intentos fallidos porque la contraseña era correcta, y `login_failed` con motivo `organization_not_available` en la organización de preferencia del usuario (D-134).
+  - La respuesta de toda sesión nueva (ingreso, cambio, setup) trae `organizations`: las membresías activas por nombre, con el rol y cuál es la actual. `GET /auth/organizations` da la misma lista.
+- **D-139 — Cambio de organización con token nuevo.** **Aceptada · 2026-11-25.**
+  - `POST /auth/switch {organization_id}` exige usuario y membresía activos; revoca la sesión actual (con candado: dos cambios con el mismo token no abren dos sesiones) y abre otra con token nuevo. El token viejo deja de valer enseguida.
+  - La sesión nueva conserva el vencimiento absoluto de la anterior: cambiar de organización no alarga las 12 h (D-006). La inactividad empieza de nuevo. El frontend reemplaza el token en `sessionStorage` (D-014).
+  - Sin membresía activa (o si la organización no existe): 403 `ORGANIZATION_NOT_AVAILABLE` y `organization_switch_denied` en la organización actual. A la misma: 409 `SAME_ORGANIZATION`.
+  - Eventos `organization_switched`: uno en la de salida (`direction: out`) y otro en la de llegada (`direction: in`), sin el id de la otra, para que ninguna se entere de las demás.
