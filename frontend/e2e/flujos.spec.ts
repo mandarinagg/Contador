@@ -64,7 +64,7 @@ test.describe('ingreso con credenciales incorrectas', () => {
 
 test('datos de la empresa: el dígito verificador del RUC se valida y se guarda', async ({ page }) => {
   await signIn(page, OWNER.email, PASSWORD)
-  await page.getByRole('link', { name: 'Datos de la empresa' }).click()
+  await page.getByRole('link', { name: 'Datos de la organización' }).click()
 
   await page.getByLabel('RUC', { exact: true }).fill('44444401')
   await page.getByLabel('Dígito verificador').fill('3')
@@ -73,7 +73,7 @@ test('datos de la empresa: el dígito verificador del RUC se valida y se guarda'
   await page.getByLabel('Dígito verificador').fill('7')
   await expect(page.getByText('Para ese RUC el dígito verificador es 7.')).toBeHidden()
   await page.getByRole('button', { name: 'Guardar cambios' }).click()
-  await expect(page.getByText('Datos de la empresa guardados.')).toBeVisible()
+  await expect(page.getByText('Datos de la organización guardados.')).toBeVisible()
 
   // Los datos quedan guardados: se ven al recargar.
   await page.reload()
@@ -110,7 +110,7 @@ test('el rol Contador ingresa pero no gestiona usuarios ni edita la empresa', as
   await page.getByRole('link', { name: 'Usuarios y roles' }).click()
   await expect(page.getByRole('button', { name: 'Nuevo usuario' })).toHaveCount(0)
 
-  await page.getByRole('link', { name: 'Datos de la empresa' }).click()
+  await page.getByRole('link', { name: 'Datos de la organización' }).click()
   await expect(page.getByLabel('Razón social')).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Guardar cambios' })).toHaveCount(0)
 })

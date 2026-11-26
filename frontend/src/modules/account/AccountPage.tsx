@@ -72,7 +72,7 @@ export function AccountPage() {
             <dd>{me.user.email}</dd>
             <dt className="text-ink-2">Rol</dt>
             <dd>{ROLE_LABELS[me.role]}</dd>
-            <dt className="text-ink-2">Empresa</dt>
+            <dt className="text-ink-2">Organización</dt>
             <dd>{me.organization.legal_name}</dd>
           </dl>
         </Sheet>

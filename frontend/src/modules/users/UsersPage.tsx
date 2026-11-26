@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { UserPlus } from 'lucide-react'
+import { UserPlus, Users } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Badge, Button, EmptyState, Field, Input, Modal, Notice, PageHeader, Select, Sheet, Skeleton } from '../../components/ui'
 import { useToast } from '../../components/ui/toast'
@@ -69,11 +69,73 @@ function CreateUserForm({ roles, onDone }: { roles: Role[]; onDone: () => void }
   )
 }
 
+const EXISTING_ERRORS: Record<string, string> = {
+  USER_NOT_FOUND: 'No hay ningún usuario con ese email. Si todavía no tiene cuenta, creá el usuario.',
+  ALREADY_MEMBER: 'Ese usuario ya es parte de esta organización.',
+}
+
+function AddExistingUserForm({ roles, onDone }: { roles: Role[]; onDone: () => void }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const { me } = useSession()
+  const [form, setForm] = useState({ email: '', role: 'accountant' as RoleCode })
+  const add = useMutation({
+    mutationFn: () => post<Member>('/users/existing', { email: form.email.trim(), role: form.role }),
+    onSuccess: (m) => {
+      qc.invalidateQueries({ queryKey: ['users'] })
+      toast('ok', `${m.user.email} ya es parte de la organización.`)
+      onDone()
+    },
+  })
+  const error = add.error instanceof ApiError ? add.error : null
+  const fe = error?.fieldErrors() ?? {}
+  const assignable = roles.filter((r) => r.code !== 'owner' || me?.role === 'owner')
+
+  const onSubmit = (e: FormEvent) => {
+    e.preventDefault()
+    if (form.email.trim()) add.mutate()
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
+      {error && (error.status !== 422 || Object.keys(fe).length === 0) && (
+        <Notice tone="bad" title={EXISTING_ERRORS[error.code] ?? error.message} />
+      )}
+      <p className="text-sm text-ink-2">
+        Para alguien que ya usa Contador AI en otra organización: entra con su misma contraseña, sin cuenta nueva.
+      </p>
+      <Field label="Email del usuario" error={fe.email}>
+        {(p) => <Input {...p} type="email" autoFocus value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />}
+      </Field>
+      <Field label="Rol en esta organización" hint={roles.find((r) => r.code === form.role)?.description}>
+        {(p) => (
+          <Select {...p} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as RoleCode })}>
+            {assignable.map((r) => (
+              <option key={r.code} value={r.code}>
+                {r.name}
+              </option>
+            ))}
+          </Select>
+        )}
+      </Field>
+      <div className="flex justify-end gap-2 border-t border-line pt-4">
+        <Button type="button" variant="ghost" onClick={onDone}>
+          Cancelar
+        </Button>
+        <Button type="submit" busy={add.isPending}>
+          Sumar a la organización
+        </Button>
+      </div>
+    </form>
+  )
+}
+
 export function UsersPage() {
   const { me, can } = useSession()
   const qc = useQueryClient()
   const toast = useToast()
   const [creating, setCreating] = useState(false)
+  const [adding, setAdding] = useState(false)
   const manage = can('users.manage')
   const users = useQuery({ queryKey: ['users'], queryFn: () => get<Member[]>('/users') })
   const roles = useQuery({ queryKey: ['roles'], queryFn: () => get<Role[]>('/users/roles') })
@@ -98,10 +160,16 @@ export function UsersPage() {
         description="Quién puede entrar y qué puede hacer. Cada cambio queda en la auditoría."
         actions={
           manage && (
-            <Button onClick={() => setCreating(true)}>
-              <UserPlus size={16} />
-              Nuevo usuario
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => setAdding(true)}>
+                <Users size={16} />
+                Sumar un usuario que ya existe
+              </Button>
+              <Button onClick={() => setCreating(true)}>
+                <UserPlus size={16} />
+                Nuevo usuario
+              </Button>
+            </div>
           )
         }
       />
@@ -201,6 +269,9 @@ export function UsersPage() {
 
       <Modal open={creating} title="Nuevo usuario" onClose={() => setCreating(false)}>
         <CreateUserForm roles={roles.data ?? []} onDone={() => setCreating(false)} />
+      </Modal>
+      <Modal open={adding} title="Sumar un usuario que ya existe" onClose={() => setAdding(false)}>
+        <AddExistingUserForm roles={roles.data ?? []} onDone={() => setAdding(false)} />
       </Modal>
     </>
   )

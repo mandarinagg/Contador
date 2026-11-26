@@ -50,7 +50,7 @@ export function HomePage() {
     <>
       <PageHeader
         title={`Hola, ${firstName}`}
-        description="El estado de tu empresa en Contador AI: lo que vence, lo que falta cargar y la puesta en marcha."
+        description="El estado de tu organización en Contador AI: lo que vence, lo que falta cargar y la puesta en marcha."
       />
       <RecurringDueBanner className="mb-6" />
       {can('tax.read') && (
@@ -75,12 +75,12 @@ export function HomePage() {
             </div>
           ) : (
             <ol className="divide-y divide-line">
-              <ChecklistItem done title="Empresa registrada">
+              <ChecklistItem done title="Organización registrada">
                 {org.data?.legal_name} — {LEGAL_FORM_LABELS[org.data?.legal_form ?? 'OTRA']}.
               </ChecklistItem>
               <ChecklistItem
                 done={Boolean(org.data?.ruc)}
-                title="RUC de la empresa"
+                title="RUC de la organización"
                 action={
                   !org.data?.ruc && can('organization.manage') ? (
                     <Link to="/empresa" className="text-sm font-medium text-ledger hover:underline">

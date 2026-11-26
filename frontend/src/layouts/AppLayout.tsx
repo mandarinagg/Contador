@@ -6,6 +6,7 @@ import { ROLE_LABELS } from '../lib/format'
 import { FINANCE_SECTIONS, preferredContext, useContexts } from '../modules/finance/data'
 import { useTaxAlerts } from '../modules/tax/data'
 import { useSession } from '../stores/session'
+import { OrgSwitcher } from './OrgSwitcher'
 
 interface NavItem {
   to: string
@@ -49,9 +50,9 @@ function useFinanceNav(): NavItem[] {
 const NAV: { group: string; items: NavItem[] }[] = [
   { group: 'General', items: [{ to: '/', label: 'Inicio', icon: <Home size={16} /> }] },
   {
-    group: 'Empresa',
+    group: 'Organización',
     items: [
-      { to: '/empresa', label: 'Datos de la empresa', icon: <Building2 size={16} />, permission: 'organization.read' },
+      { to: '/empresa', label: 'Datos de la organización', icon: <Building2 size={16} />, permission: 'organization.read' },
     ],
   },
   {
@@ -126,9 +127,7 @@ export function AppLayout() {
           <BrandMark />
           <div className="min-w-0">
             <p className="font-semibold tracking-tight">Contador AI</p>
-            <p className="truncate text-sm text-ink-2" title={me.organization.legal_name}>
-              {me.organization.trade_name ?? me.organization.legal_name}
-            </p>
+            <OrgSwitcher />
           </div>
         </div>
 

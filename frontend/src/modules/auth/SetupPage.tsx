@@ -1,26 +1,27 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { type FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Button, Field, Input, Notice, Select } from '../../components/ui'
-import { LEGAL_FORM_LABELS } from '../../lib/format'
+import { Button, Field, Input, Notice } from '../../components/ui'
 import { ApiError, post } from '../../services/api'
 import { useSession } from '../../stores/session'
-import type { LegalForm, LoginResponse } from '../../types/api'
+import type { LoginResponse } from '../../types/api'
 import { AuthFrame } from './AuthFrame'
+import { OrganizationFields } from './OrganizationFields'
+import { EMPTY_ORGANIZATION, type OrganizationDraft } from './organizationDraft'
 import { PASSWORD_HINT, passwordProblem } from './password'
 
 export function SetupPage() {
   const { start } = useSession()
   const qc = useQueryClient()
   const navigate = useNavigate()
-  const [org, setOrg] = useState({ legal_name: '', trade_name: '', legal_form: 'EAS' as LegalForm })
+  const [org, setOrg] = useState<OrganizationDraft>(EMPTY_ORGANIZATION)
   const [owner, setOwner] = useState({ full_name: '', email: '', password: '', confirm: '' })
   const [touched, setTouched] = useState(false)
 
   const setup = useMutation({
     mutationFn: () =>
       post<LoginResponse>('/system/setup', {
-        organization: { ...org, trade_name: org.trade_name.trim() || null },
+        organization: { legal_name: org.legal_name, legal_form: org.legal_form, trade_name: org.trade_name.trim() || null },
         owner: { full_name: owner.full_name, email: owner.email, password: owner.password },
       }),
     onSuccess: (res) => {
@@ -52,25 +53,12 @@ export function SetupPage() {
 
         <fieldset className="flex flex-col gap-4">
           <legend className="mb-3 font-semibold">1. Empresa</legend>
-          <Field label="Razón social" error={fieldErrors['organization.legal_name']}>
-            {(p) => (
-              <Input {...p} required autoFocus value={org.legal_name} onChange={(e) => setOrg({ ...org, legal_name: e.target.value })} />
-            )}
-          </Field>
-          <Field label="Nombre de fantasía" hint="Opcional. Es el nombre que se muestra en la aplicación.">
-            {(p) => <Input {...p} value={org.trade_name} onChange={(e) => setOrg({ ...org, trade_name: e.target.value })} />}
-          </Field>
-          <Field label="Forma jurídica">
-            {(p) => (
-              <Select {...p} value={org.legal_form} onChange={(e) => setOrg({ ...org, legal_form: e.target.value as LegalForm })}>
-                {Object.entries(LEGAL_FORM_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
+          <OrganizationFields
+            value={org}
+            onChange={setOrg}
+            autoFocus
+            errors={{ legal_name: fieldErrors['organization.legal_name'], trade_name: fieldErrors['organization.trade_name'] }}
+          />
         </fieldset>
 
         <fieldset className="flex flex-col gap-4">

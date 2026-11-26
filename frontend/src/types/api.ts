@@ -29,9 +29,22 @@ export interface Me {
   permissions: string[]
 }
 
+/** Una organización a la que el usuario tiene acceso, con su rol ahí (`GET /auth/organizations`). */
+export interface Membership {
+  id: string
+  legal_name: string
+  trade_name: string | null
+  legal_form: LegalForm
+  ruc: string | null
+  ruc_check_digit: string | null
+  role: RoleCode
+  is_current: boolean
+}
+
 export interface LoginResponse extends Me {
   token: string
   expires_at: string
+  organizations: Membership[]
 }
 
 export interface Organization extends OrganizationSummary {

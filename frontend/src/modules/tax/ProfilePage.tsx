@@ -502,7 +502,7 @@ export function ProfilePage() {
             title="Primero, el RUC de la empresa"
             action={
               <Link to="/empresa" className="inline-flex h-9 items-center rounded-sm bg-ledger px-3.5 font-medium text-surface hover:bg-ledger-strong">
-                Cargar el RUC en Datos de la empresa
+                Cargar el RUC en Datos de la organización
               </Link>
             }
           >

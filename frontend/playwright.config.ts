@@ -53,6 +53,13 @@ export default defineConfig({
       dependencies: ['tributacion'],
       use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 860 } },
     },
+    {
+      // Varias organizaciones: parte de la empresa con RUC y usuarios de las anteriores; es la última de la cadena.
+      name: 'organizaciones',
+      testMatch: 'organizaciones.spec.ts',
+      dependencies: ['marangatu'],
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1366, height: 860 } },
+    },
   ],
   webServer: [
     {

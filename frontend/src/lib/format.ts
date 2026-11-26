@@ -25,7 +25,7 @@ export const LEGAL_FORM_LABELS: Record<string, string> = {
 
 export const AUDIT_ACTION_LABELS: Record<string, string> = {
   'system.setup': 'Configuración inicial',
-  'organization.updated': 'Datos de la empresa modificados',
+  'organization.updated': 'Datos de la organización modificados',
   'user.created': 'Usuario creado',
   'user.updated': 'Usuario modificado',
 }

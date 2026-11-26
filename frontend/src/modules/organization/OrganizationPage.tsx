@@ -29,14 +29,14 @@ export function OrganizationPage() {
   return (
     <>
       <PageHeader
-        title="Datos de la empresa"
+        title="Datos de la organización"
         description="Identificación de la organización. Los datos societarios completos (accionistas, actas, libros) llegan con el módulo de gestión empresarial."
       />
       {org.data ? (
         // La key reinicia el formulario cuando cambia la versión guardada.
         <OrganizationForm key={org.data.updated_at} org={org.data} />
       ) : org.isError ? (
-        <Notice tone="bad" title="No se pudieron cargar los datos de la empresa." />
+        <Notice tone="bad" title="No se pudieron cargar los datos de la organización." />
       ) : (
         <Skeleton className="h-64 w-full" />
       )}
@@ -67,7 +67,7 @@ function OrganizationForm({ org }: { org: Organization }) {
     onSuccess: (data) => {
       qc.setQueryData(['organization'], data)
       qc.invalidateQueries({ queryKey: ['me'] })
-      toast('ok', 'Datos de la empresa guardados.')
+      toast('ok', 'Datos de la organización guardados.')
     },
   })
 

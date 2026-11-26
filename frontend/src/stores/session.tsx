@@ -8,6 +8,8 @@ interface SessionState {
   loading: boolean
   /** Guarda el token devuelto por login/setup y carga el usuario. */
   start: (res: LoginResponse) => void
+  /** Cambia de organización: reemplaza el token y descarta todo lo cargado con la anterior. */
+  switchOrg: (organizationId: string) => Promise<void>
   logout: () => Promise<void>
   can: (permission: string) => boolean
 }
@@ -28,23 +30,36 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     staleTime: 60_000,
   })
 
+  // Se descarta todo lo cargado con la sesión, salvo el estado de configuración.
+  const dropCache = useCallback(() => qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'setup' }), [qc])
+
   const end = useCallback(() => {
     session.clear()
     setToken(null)
-    // Se descarta todo lo cargado con la sesión, salvo el estado de configuración.
-    qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'setup' })
-  }, [qc])
+    dropCache()
+  }, [dropCache])
 
   useEffect(() => session.onUnauthorized(end), [end])
 
   const start = useCallback(
     (res: LoginResponse) => {
-      const { token: newToken, expires_at: _exp, ...me } = res
+      const { token: newToken, expires_at: _exp, organizations, ...me } = res
       session.set(newToken)
       qc.setQueryData(['me', newToken], me)
+      qc.setQueryData(['organizations'], organizations)
       setToken(newToken)
     },
     [qc],
+  )
+
+  const switchOrg = useCallback(
+    async (organizationId: string) => {
+      const res = await post<LoginResponse>('/auth/switch', { organization_id: organizationId })
+      // El token anterior ya no sirve: nada de lo cargado con él se conserva.
+      dropCache()
+      start(res)
+    },
+    [dropCache, start],
   )
 
   const logout = useCallback(async () => {
@@ -61,10 +76,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       me,
       loading: token !== null && meQuery.isPending,
       start,
+      switchOrg,
       logout,
       can: (p) => me?.permissions.includes(p) ?? false,
     }),
-    [me, token, meQuery.isPending, start, logout],
+    [me, token, meQuery.isPending, start, switchOrg, logout],
   )
   return <SessionContext value={value}>{children}</SessionContext>
 }
