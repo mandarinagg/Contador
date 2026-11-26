@@ -158,7 +158,7 @@ def test_downgrade_to_0004_and_upgrade_with_data(
     command.check(cfg)
     assert _counts(engine) == before
     # Vuelve a funcionar: reglas, perfil y calendario se cargan de nuevo.
-    assert load_rules(api, token)["created"] == 39
+    assert load_rules(api, token)["created"] == 43
     put_profile(api, token)
     assert _scalar(engine, "SELECT count(*) FROM tax.obligations") > 0
 

@@ -951,3 +951,175 @@ rules:
       La RG DNIT 48/2026 listó un sábado sin correrlo, pero es una medida de contingencia (corrió las
       fechas al martes 24). Sigue abierta D-F4-12: si un feriado nacional corre los vencimientos.
       Antes del 03-09-2025 regían las leyes 08/1990 y siguientes, derogadas por la Ley 7544; no las leí.
+
+  # ================================================================ PERSONA FÍSICA (agregadas el 2026-11-25)
+  # Detalle, citas y dudas (D-PF-1 a D-PF-16): docs/research/TRIBUTACION_PERSONA_FISICA.md
+  # Sin esquema en rule_params.py todavía: se cargan y se muestran, pero no generan obligaciones.
+
+  # ---------------------------------------------------------------- IRP
+  - code: IRP-RSP-DJ
+    description: >
+      IRP por servicios personales (obligación 715, Formulario 515 v1): DJ y pago anuales. El ejercicio es
+      el año civil; vence en el 3.er mes después del cierre (marzo), día según CAL-PERPETUO-DJ. Alcanza a
+      quien supera G. 80.000.000 de ingresos brutos gravados en el año (inscripción en 30 días hábiles);
+      desde entonces presenta la DJ todos los años aunque no supere el monto, y solo paga si lo supera.
+      Tasas progresivas por tramo de renta neta: 8%, 9% y 10%. Cesa la DJ tras dos ejercicios consecutivos
+      sin superar el monto.
+    parameters:
+      obligation_code: 715
+      form: "515 v1"
+      periodicity: annual
+      fiscal_year: calendar
+      due: {months_after_fiscal_close: 3, day_rule: CAL-PERPETUO-DJ}
+      file_even_if_zero: true
+      not_reached_amount_pyg: 80000000
+      registration_deadline_business_days: 30
+      rate_brackets:
+        - {up_to_pyg: 50000000, rate: 0.08}
+        - {up_to_pyg: 150000000, rate: 0.09}
+        - {up_to_pyg: null, rate: 0.10}
+      cease_after_consecutive_years_not_reached: 2
+      donations_cap_pct_of_gross: 0.05
+      loss_carryforward: false
+      housing_loss_carryforward: {years: 5, max_pct_of_net_income: 0.20}
+      voucher_register: {without_vat: 956, with_vat: 955}
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2020-11-05"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-69-20"
+    legal_reference: "Ley N° 6380/2019, arts. 52, 62 a 69; Decreto N° 3184/2019, arts. 57, 60, 61 y 62; RG N° 69/2020, arts. 11, 28, 29 y 40; RG N° 38/2020, art. 2°"
+    consulted_at: "2026-11-25"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      Decreto 3184/2019 (30-12-2019): https://www.dnit.gov.py/documents/47797/47809/Decreto+N%C2%B0+3184-19.pdf/6eaa47e9-504b-fc0b-6a03-4dc2b267e2a8?t=1681424323603
+      (escaneo con OCR). Casillas del 515 en TRIBUTACION_PERSONA_FISICA.md §4.5 (renta neta 45; impuesto
+      46/47/48; saldo 44 o 51). Sin anticipos: la ley no los prevé para el IRP (lectura propia). Con IVA el
+      registro de comprobantes es mensual (955), no anual (956). La ley no tiene arrastre de pérdidas,
+      salvo la vivienda al contado (art. 66). Dudas: D-PF-5 (retenciones computables),
+      D-PF-12 (modificaciones de la ley), D-PF-13 (versión del 515), D-PF-15 (multa) y D-PF-16 (datos de
+      deducciones).
+
+  - code: IRP-RGC-DJ
+    description: >
+      IRP por rentas y ganancias del capital (obligación 716, Formulario 516 v2): DJ y pago anuales en el
+      3.er mes después del cierre (marzo), día según CAL-PERPETUO-DJ. Tasa 8% sobre la renta neta. Solo se
+      declaran las rentas sin retención de pago único y definitivo: alquileres (la menor entre el 50% del
+      precio cobrado sin IVA y el precio menos gastos documentados), venta de bienes muebles, acciones,
+      cuotas y derechos (la menor entre el 30% del precio y la ganancia real), rescates, regalías del
+      exterior y otras. Los dividendos que pagaron IDU no se declaran.
+    parameters:
+      obligation_code: 716
+      form: "516 v2"
+      periodicity: annual
+      fiscal_year: calendar
+      due: {months_after_fiscal_close: 3, day_rule: CAL-PERPETUO-DJ}
+      file_even_if_zero: null
+      rate: 0.08
+      presumed_net_income: {sale_pct_of_price: 0.30, rental_pct_of_price: 0.50}
+      rental_base_excludes_vat: true
+      rental_base: cobrado_en_el_ejercicio
+      excluded: [retencion_pago_unico_y_definitivo, dividendos_con_idu]
+      exempt_movable_sales_up_to_pyg: 20000000
+      registration_deadline_business_days: 30
+      economic_activity: {default: "99999", rentals: "68100"}
+    valid_from: "2022-01-01"
+    valid_to: null
+    published_at: "2022-10-06"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-121-22"
+    legal_reference: "Ley N° 6380/2019, arts. 41, 52, 56, 57, 59, 60 y 61; Decreto N° 3184/2019, arts. 15, 17, 40 (texto Decreto N° 7047/2022) y 41; RG N° 69/2020, arts. 3°, 7° a 10; RG N° 121/2022, art. 1°; RG N° 38/2020, art. 2°"
+    consulted_at: "2026-11-25"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      valid_from es el primer ejercicio del 516 v2 (RG 121/2022: «Ejercicio Fiscal 2022 en adelante»;
+      disponible en Marangatu desde el 01-01-2023). Antes rigió el 516 v1 (RG 69/2020, art. 40).
+      Casillas en TRIBUTACION_PERSONA_FISICA.md §5.3 (renta neta total 129; impuesto 130; saldo 132).
+      file_even_if_zero queda en null: no encontré un texto que diga que se presenta sin rentas. La RG
+      69/2020, art. 10, permite pedir la baja de la 716 si el año anterior no hubo rentas. Los alquileres
+      además hacen a la persona física contribuyente del IVA (Ley 6380, art. 82, num. 1, inc. a). Los
+      intereses de depósitos en bancos, financieras y cooperativas del país están exonerados (art. 56,
+      num. 12). Duda D-PF-2 (inmuebles del dueño de una unipersonal).
+
+  # ---------------------------------------------------------------- REGISTRO DE COMPROBANTES
+  - code: REG-COMPROB-ANUAL
+    description: >
+      Registro anual de comprobantes en Marangatu (obligación 956), asociado a 715-IRP RSP. Se confirma hasta
+      el día de vencimiento DJI del 2.º mes después del cierre (febrero), aunque no haya movimientos. Tiene
+      carácter de declaración jurada. El contribuyente del IRP-RSP que también tiene IVA no usa la 956:
+      registra y confirma todo en la 955 mensual. Archivo de importación <RUC sin DV>_REG_AAAA_<id>,
+      con registros INGRESOS (15 columnas) y EGRESOS (18 columnas), además de COMPRAS y VENTAS.
+    parameters:
+      obligation_code: 956
+      linked_obligation: 715
+      periodicity: annual
+      due: {months_after_fiscal_close: 2, day_rule: CAL-PERPETUO-DJI}
+      confirm_even_if_zero: true
+      replaced_by_if_also_obligation: {"211": 955}
+      file_name_pattern: "<RUC sin DV>_REG_AAAA_<id alfanumérico de hasta 5>"
+      spec_file: docs/research/formato_registro_comprobantes.yaml
+    valid_from: "2022-01-01"
+    valid_to: null
+    published_at: "2024-05-31"
+    source_url: "https://www.dnit.gov.py/documents/20123/796215/Res.+General+DNIT+N%C2%B0+12_2024.pdf/06555b22-920e-f0ac-74d9-f5b6aa50329f?t=1717201434815"
+    legal_reference: "RG N° 90/2021, arts. 2°, 3°, 12, 13, 15 y 16; art. 7° según RG DNIT N° 12/2024; RG N° 69/2020, art. 32; Especificación Técnica para Importación, versión 1"
+    consulted_at: "2026-11-25"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      Texto original de la RG 90/2021: https://www.dnit.gov.py/documents/20123/199761/RG+N%C2%B0+90+Registro+de+comprobantes+de+ingresos%2C+ventas%2C+egresos+y+compras_07_05_2021.pdf/79409903-d18f-1a9d-97a6-0ee840345395?t=1682697830527
+      El art. 7° vigente dice «Hasta el segundo mes de cerrado el ejercicio fiscal, conforme al calendario
+      de vencimiento DJI». valid_from es la obligatoriedad general (RG 90, art. 16). Los comprobantes con
+      timbrado van como COMPRAS o VENTAS con «Imputa IRP-RSP = S»; INGRESOS y EGRESOS son para los tipos
+      201 a 211 sin timbrado (IPS 206, tarjetas 207, salario 208, transferencias 211…). Dudas: D-PF-6
+      (IRP-RGC fuera de la RG 90), D-PF-7 (art. 14 según la RG 132/2023) y D-PF-15 (multa).
+
+  # ---------------------------------------------------------------- IRE RESIMPLE
+  - code: IRE-RESIMPLE-DJ
+    description: >
+      IRE RESIMPLE (obligación 702, Formulario 502 v1), solo para empresas unipersonales con ingresos brutos
+      del ejercicio anterior de hasta G. 80.000.000, que no importen ni exporten y no estén obligadas a
+      llevar contabilidad (Ley 1034/1983). DJ informativa anual hasta el 26 de febrero con los ingresos del
+      año cerrado; con ellos se fija la cuota mensual del año en curso (G. 20.000 a 80.000), que se paga por
+      trimestre en marzo, junio, setiembre y diciembre, día según CAL-PERPETUO-DJ. No es contribuyente del
+      IVA ni paga anticipos ni sufre retenciones. Emite Boleta Resimple.
+    parameters:
+      obligation_code: 702
+      form: "502 v1"
+      periodicity: annual
+      fiscal_year: calendar
+      due: {months_after_fiscal_close: 2, fixed_day: 26}
+      payments: {months: [3, 6, 9, 12], day_rule: CAL-PERPETUO-DJ, frequency: quarterly}
+      max_prior_year_income_pyg: 80000000
+      monthly_fee_by_prior_year_income:
+        - {up_to_pyg: 20000000, monthly_pyg: 20000}
+        - {up_to_pyg: 40000000, monthly_pyg: 40000}
+        - {up_to_pyg: 60000000, monthly_pyg: 60000}
+        - {up_to_pyg: 80000000, monthly_pyg: 80000}
+      if_not_filed: {generated_by_dnit_on: "02-27", assumed_income_up_to_pyg: 20000000}
+      vat_taxpayer: false
+      advances: false
+      withholdings: false
+      applies_to: [EMPRESA_UNIPERSONAL]
+      excluded_if: [importador, exportador, obligado_a_contabilidad_ley_1034]
+      sales_voucher_type: 104
+    valid_from: "2020-01-01"
+    valid_to: null
+    published_at: "2020-08-13"
+    source_url: "https://www.dnit.gov.py/web/portal-institucional/w/resolucion-general-n-61-20"
+    legal_reference: "Ley N° 6380/2019, arts. 27, 28 y 29; Decreto N° 3182/2019, arts. 80, 81 y 82; RG N° 61/2020, arts. 12 a 15, 19 y 22; RG N° 38/2020, art. 2°, num. 1, inc. c), literal ii"
+    consulted_at: "2026-11-25"
+    validation_status: pending
+    reviewed_by: null
+    confidence: oficial_leida
+    notes: >
+      La RG 61/2020, art. 22, deroga el literal «i» de la RG 38/2020 («segundo mes») y el art. 12 fija
+      «hasta el 26 de febrero»; la página de la RG 38 en la DNIT no lo refleja (D-PF-8). `fixed_day` no
+      existe todavía en AnnualDue (rule_params.py), que solo admite day_rule. El pago de cada trimestre
+      como 3 cuotas mensuales es una inferencia del Formulario 502, casillas 15 a 18 (D-PF-9). La página
+      RESIMPLE de la DNIT dice «Vencimiento: Mensual». Una DJ sin movimiento lleva a G. 20.000 mensuales el
+      año siguiente (Decreto 3182, art. 80). Primer año del inscripto: D-PF-10. Exclusión por la Ley 1034:
+      D-PF-11. Boleta Resimple: RG 32/2020, citada por la cartilla DNIT 2024, no leída.

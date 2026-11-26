@@ -17,7 +17,7 @@ from tests.finance_utils import audit_entries, ok
 from tests.tax_utils import TAX, load_rules, org_id, rejected, rules_by_code, setup_tax, user_id
 
 YAML_PATH = os.path.join(BACKEND_DIR, "..", "docs", "research", "tax_rules_candidatas.yaml")
-CANDIDATES = 39
+CANDIDATES = 43
 
 
 def test_packaged_rules_are_identical_to_research_yaml() -> None:
