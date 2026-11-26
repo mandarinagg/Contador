@@ -721,3 +721,63 @@ def vat_xlsx(db: Session, organization_id: uuid.UUID, estimate: dict[str, Any]) 
         notes=notes,
         sheet="IVA",
     )
+
+
+def irp_xlsx(db: Session, organization_id: uuid.UUID, estimate: dict[str, Any]) -> bytes:
+    """Borrador del IRP-RSP y del Formulario 515 (D-144), con los mismos importes del JSON."""
+
+    def amount(value: str | None) -> Decimal | None:
+        return None if value is None else Decimal(value)
+
+    register = estimate["register"]
+    rows: list[Any] = [
+        Styled(["Registro de comprobantes del año", None, None]),
+        [f"Ingresos gravados ({register['income_count']})", None, amount(register["income_taxed"])],
+        ["Ingresos no gravados o exonerados", None, amount(register["income_exempt"])],
+        [f"Egresos ({register['expense_count']})", None, amount(register["expenses"])],
+    ]
+    result = estimate["result"]
+    if result is not None:
+        rows.extend(
+            [
+                Styled(["Renta neta imponible", None, amount(result["net_income"])]),
+                Styled(["Impuesto por la escala", None, amount(result["tax"])]),
+                Styled(["A pagar (estimado)", None, amount(result["to_pay"])]),
+            ]
+        )
+    rows.append([])
+    form = estimate["form_515"]
+    if form["available"]:
+        rows.append(Styled(["Borrador del Formulario 515 v1 (sin céntimos)", None, None]))
+        for box in form["boxes"]:
+            doubt = f" [{', '.join(box['doubts'])}]" if box["doubts"] else ""
+            label = f"Rubro {box['rubro']}: {box['label']}{doubt}"
+            rows.append([label, box["box"], amount(box["value"]), box["note"] or ""])
+    else:
+        rows.append([form["message"]])
+    notes = [
+        "Estimación, no declaración: copiá los valores a mano en Marangatu y revisalos.",
+        "Reglas aplicadas: "
+        + ", ".join(
+            f"{r['code']} v{r['version']} ({r['validation_status']})"
+            for r in estimate["rules_applied"]
+        ),
+        *[w["message"] for w in estimate["warnings"]],
+        *form["warnings"],
+    ]
+    return workbook(
+        db,
+        organization_id,
+        title="Borrador del IRP y del Formulario 515",
+        subtitle=f"Ejercicio {estimate['year']}",
+        chart_status="validated",
+        columns=[
+            Column("Concepto", width=70),
+            Column("Casilla", width=10),
+            Column("Importe", money=True, width=16),
+            Column("Nota", width=60),
+        ],
+        rows=rows,
+        notes=notes,
+        sheet="IRP",
+    )

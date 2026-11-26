@@ -21,6 +21,7 @@ export const taxKeys = {
   obligations: () => ['tax', 'obligations'] as const,
   vouchers: () => ['tax', 'vouchers'] as const,
   vat: () => ['tax', 'vat'] as const,
+  irp: () => ['tax', 'irp'] as const,
   settings: () => ['tax', 'settings'] as const,
 }
 

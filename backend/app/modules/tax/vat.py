@@ -543,6 +543,8 @@ def _rate_block(sums: Sums) -> dict[str, Any]:
 def _ledger_control(
     db: Session, organization_id: uuid.UUID, first: date, last: date, sums: MonthSums
 ) -> dict[str, Any]:
+    """Condición 3 de la D-119 con contabilidad: el IVA del mes contra el mayor. Sin
+    contabilidad, el cuadre es contra el registro de comprobantes (`irp.condition_3`, D-144)."""
     accounts = tax_settings.effective(db, organization_id).effective
     expected = {
         "vat_debit_10_account_id": sums.sales.vat_10 - sums.sale_credit_notes.vat_10,

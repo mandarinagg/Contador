@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Bot, BadgePercent, BookCheck, Boxes, Building2, CalendarDays, CalendarRange, Contact, FileBadge2, FileUp, Gauge, Home, Landmark, LayoutDashboard, ListTree, LogOut, Network, NotebookPen, ReceiptText, Repeat, Scale, ScrollText, Settings2, Tags, UserRound, Users } from 'lucide-react'
+import { ArrowLeftRight, Bot, BadgePercent, BookOpenCheck, BookCheck, Boxes, Building2, CalendarDays, CalendarRange, Contact, FileBadge2, FileUp, Gauge, Home, Landmark, LayoutDashboard, ListTree, LogOut, Network, NotebookPen, ReceiptText, Repeat, Scale, ScrollText, Settings2, Tags, UserRound, Users } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { NavLink, Outlet, useMatch } from 'react-router'
 import { cx } from '../lib/cx'
@@ -6,6 +6,7 @@ import { ROLE_LABELS } from '../lib/format'
 import { FINANCE_SECTIONS, preferredContext, useContexts } from '../modules/finance/data'
 import { useTaxAlerts, useTaxProfile } from '../modules/tax/data'
 import { accountingOptional } from '../modules/tax/labels'
+import { hasIrpServices } from '../modules/tax/logic'
 import { useSession } from '../stores/session'
 import { OrgSwitcher } from './OrgSwitcher'
 
@@ -80,11 +81,15 @@ const ACCOUNTING_NAV: NavItem[] = [
 function useTaxNav(): NavItem[] {
   const { can } = useSession()
   const alerts = useTaxAlerts(can('tax.read'))
+  // «IRP del año» solo con la 715 en el perfil vigente (D-144).
+  const profile = useTaxProfile(can('tax.read'))
+  const irp: NavItem[] = hasIrpServices(profile.data) ? [{ to: '/impuestos/irp', label: 'IRP del año', icon: <BookOpenCheck size={16} />, permission: 'tax.read' }] : []
   return [
     { to: '/impuestos', label: 'Resumen fiscal', icon: <Gauge size={16} />, permission: 'tax.read', end: true, count: alerts.data?.count },
     { to: '/impuestos/calendario', label: 'Calendario', icon: <CalendarDays size={16} />, permission: 'tax.read' },
     { to: '/impuestos/comprobantes', label: 'Comprobantes', icon: <ReceiptText size={16} />, permission: 'tax.read' },
     { to: '/impuestos/iva', label: 'IVA del mes', icon: <BadgePercent size={16} />, permission: 'tax.read' },
+    ...irp,
     { to: '/impuestos/perfil', label: 'Perfil fiscal', icon: <FileBadge2 size={16} />, permission: 'tax.read' },
     { to: '/impuestos/reglas', label: 'Reglas y feriados', icon: <BookCheck size={16} />, permission: 'tax.read' },
     { to: '/impuestos/marangatu', label: 'Marangatu', icon: <Bot size={16} />, permission: 'tax.read' },

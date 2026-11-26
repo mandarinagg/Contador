@@ -114,6 +114,11 @@ export const DOUBTS: Record<string, string> = {
   'D-F4-10': 'El algoritmo del DV coincide con los ejemplos oficiales, pero no se encontró el documento oficial que lo describe. Hay RUC antiguos con letra.',
   'D-F4-12': 'No está claro si un feriado nacional corre los vencimientos de la DNIT.',
   // Persona física (`docs/research/TRIBUTACION_PERSONA_FISICA.md` §9).
+  'D-PF-5': 'Retenciones del IRP-RSP: no se encontró qué retenciones generales se computan en la casilla 41 del Formulario 515. Consultalas en Marangatu.',
+  'D-PF-15': 'Multa por presentar tarde: no se encontró el monto; la calcula Marangatu.',
+  'D-PF-16': 'Familiares a cargo, el autovehículo cada 3 años y la vivienda cada 5 años dependen de datos tuyos que la app todavía no pide: esas casillas quedan vacías.',
+  'D-PF-19':
+    'Cómo arma la app el borrador del 515: sin el IVA en los ingresos (instructivo) ni en los egresos con crédito fiscal (art. 68); sin los comprobantes con timbrado a crédito (van sus cobros y pagos, 201 y 203); todos los egresos en la casilla 22, porque la app no guarda su rubro; y con ingresos de hasta ₲ 80.000.000 muestra la escala pero estima cero a pagar (art. 69). No se sabe si Marangatu deja en cero las casillas 46 a 48.',
   'D-PF-7': 'Si aparece el IVA, la 956 pasa a la 955 en enero del año siguiente (RG 90/2021, art. 14); falta leer el texto de la RG 132/2023.',
   'D-PF-18':
     'Cómo se cargan los importes: en un ingreso, «gravado» y «no gravado o exonerado»; en un egreso, solo el total. El cobro de una venta a crédito (203) va por lo cobrado, y lo que identifica a un comprobante sin número es su período, su contraparte y, en el IPS, el número de empleador.',

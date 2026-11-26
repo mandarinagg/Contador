@@ -312,6 +312,18 @@ export function voucherXlsxName(year: number, month?: number | null, direction?:
 /** Igual que `tax/router.py` (`vat_estimate`): `iva-2026-10.xlsx`. */
 export const vatXlsxName = (year: number, month: number) => `iva-${year}-${String(month).padStart(2, '0')}.xlsx`
 
+/** Igual que `tax/router.py` (`irp_estimate`): `irp-2026.xlsx`. */
+export const irpXlsxName = (year: number) => `irp-${year}.xlsx`
+
+/** Con la 715 (IRP por servicios personales) en el perfil vigente: muestra «IRP del año» (D-144). */
+export const hasIrpServices = (profile: { current: { obligations: { code: string }[] } | null } | undefined) => Boolean(profile?.current?.obligations.some((o) => o.code === '715'))
+
+/** Año del borrador por defecto: hasta marzo, el del año anterior (su DJ vence en marzo); después, el año en curso. */
+export function defaultIrpYear(today: string): number {
+  const [y, m] = today.split('-').map(Number)
+  return m <= 3 ? y - 1 : y
+}
+
 /**
  * Archivo de Marangatu (D-096): `<RUC>_REG_<MMAAAA>_<XXXXX>.zip`, o `…_lotes.zip` si hay más
  * de un lote de 5.000 filas. Mismo nombre que `exports.marangatu_file`.

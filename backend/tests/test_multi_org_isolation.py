@@ -432,6 +432,8 @@ EXEMPT = {
     # Año y mes, no ids: calcula siempre sobre la organización de la sesión.
     ("GET", "/tax/vat/{year}/{month}"),
     ("POST", "/tax/vat/{year}/{month}/apply"),
+    # Año, no id: el borrador del IRP es siempre de la organización de la sesión (D-144).
+    ("GET", "/tax/irp/{year}"),
 }
 ALL_ID_PROBES = [
     *FINANCE_PROBES,
@@ -1109,6 +1111,15 @@ def test_annual_register_of_another_organization(
         assert "Juan Pérez" not in res.text
     res = client.get(f"{TAX}/vouchers/export/annual?year=2026", headers=b)
     assert res.status_code == 422 and res.json()["error"]["code"] == "NOTHING_TO_EXPORT"
+    # El borrador del IRP de B no suma nada de A (D-144); el de A, sí.
+    draft_b = ok(client.get(f"{TAX}/irp/2026", headers=b))
+    assert draft_b["register"]["income_count"] == draft_b["register"]["expense_count"] == 0
+    assert draft_b["register_control"]["vouchers"] == 0
+    draft_a = ok(client.get(f"{TAX}/irp/2026", headers=auth_header(owner_token)))
+    assert draft_a["register"]["income_taxed"] == "300000"
+    assert draft_a["register"]["expenses"] == "450000"
+    res = client.get(f"{TAX}/irp/2026?format=xlsx", headers=b)
+    assert res.status_code == 200
     # A ve lo suyo intacto.
     listed = ok(client.get(f"{TAX}/vouchers?year=2026", headers=auth_header(owner_token)))
     assert sorted(v["id"] for v in listed) == sorted(a_ids)

@@ -114,6 +114,11 @@ diferencias** del mismo tipo, en períodos distintos. El propietario puede volve
 ### Pasos de una presentación
 
 1. **Preparar** (sin navegador): calcula la declaración y revisa las condiciones 1, 3, 4 y 8.
+   - Condición 3 (cuadre): con contabilidad, contra el mayor (`vat._ledger_control` en el F120).
+     Sin contabilidad (persona física sin IRE General; enmienda de la D-119 del 2026-11-26,
+     D-144), contra el registro de comprobantes del período, al guaraní: `irp.condition_3` para
+     el 515, que devuelve `matches` y `stop_code`. Si no cuadra o no se puede cuadrar,
+     `LEDGER_MISMATCH`. Se vuelve a correr con las casillas leídas de vuelta (condición 6).
    - Si falla una, no abre el navegador.
    - La tarea queda `detenida`, con el motivo y lo que hay que hacer.
 2. **Ingresar:** un solo intento. Ante «usuario o contraseña incorrectos», un captcha o cualquier

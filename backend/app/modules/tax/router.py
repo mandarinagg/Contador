@@ -31,6 +31,7 @@ from app.modules.tax import (
     alerts,
     exports,
     holidays,
+    irp,
     obligations,
     profile,
     rule_params,
@@ -790,6 +791,24 @@ def vat_apply(year: int, month: int, auth: Manager, db: DbSession) -> Obligation
     """Lleva el estimado a `calculated_amount` de la obligación IVA del mes."""
     obligation, _ = vat.apply(db, auth.organization_id, auth.user_id, year, month)
     return _obligation_out(db, obligation)
+
+
+# --- IRP ---------------------------------------------------------------------------------
+
+
+@router.get("/irp/{year}")
+def irp_estimate(
+    year: int,
+    auth: Reader,
+    db: DbSession,
+    export_format: Annotated[Literal["json", "xlsx"], Query(alias="format")] = "json",
+) -> Any:
+    """Borrador del IRP-RSP del año y del Formulario 515 (no es una declaración, D-144)."""
+    result = irp.estimate(db, auth.organization_id, year)
+    if export_format == "xlsx":
+        content = exports.irp_xlsx(db, auth.organization_id, result)
+        return _file(content, f"irp-{year}.xlsx", XLSX_MEDIA_TYPE)
+    return result
 
 
 # --- Avisos y configuración ---------------------------------------------------------------

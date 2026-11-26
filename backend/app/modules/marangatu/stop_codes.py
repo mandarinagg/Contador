@@ -36,8 +36,9 @@ STOP_TEXTS: dict[StopCode, str] = {
         "fiscal verificado. Revisá el perfil fiscal contra la constancia de RUC."
     ),
     StopCode.LEDGER_MISMATCH: (
-        "Lo calculado no cuadra con la contabilidad. Revisá el control contra el mayor del mes "
-        "antes de presentar."
+        "Lo calculado no cuadra con la contabilidad o, si no la llevás, con el registro de "
+        "comprobantes (D-119, enmienda del 2026-11-26). Revisá el control del borrador antes de "
+        "presentar."
     ),
     StopCode.DATA_INCOMPLETE: (
         "Faltan datos para preparar la presentación. Completalos en la herramienta y volvé a "

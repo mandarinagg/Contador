@@ -3,7 +3,8 @@
  * primera, vuelve y lo ve de nuevo; al ingresar con dos organizaciones elige en cuál trabajar.
  *
  * Corre al final de la cadena (misma base): la primera organización ya tiene RUC 44444401-7 y usuarios.
- * La persona física (M4 a M7) carga su perfil con la 715, suma la 956 y registra ingresos y egresos.
+ * La persona física (M4 a M8) carga su perfil con la 715, suma la 956, registra ingresos y egresos
+ * y ve el borrador de su Formulario 515.
  */
 import { readFileSync } from 'node:fs'
 import { inflateRawSync } from 'node:zlib'
@@ -261,4 +262,47 @@ test('la persona física con la 956 carga un ingreso y un egreso sin timbrado y 
   await orgButton(page).click()
   await page.getByRole('menuitemradio', { name: new RegExp(firstName) }).click()
   await expect(orgButton(page)).toContainText(firstName)
+})
+
+test('la persona física con registros ve el borrador de su Formulario 515 y lo descarga (M8)', async ({ page }) => {
+  const year = new Date().getFullYear()
+  await signInTo(page, firstName)
+  await orgButton(page).click()
+  await page.getByRole('menuitemradio', { name: /Benítez Duarte, María José/ }).click()
+  await expect(orgButton(page)).toContainText('Benítez Duarte, María José')
+
+  // Con la 715 en el perfil, el menú de Impuestos suma «IRP del año».
+  const nav = page.getByRole('navigation', { name: 'Principal' })
+  await nav.getByRole('link', { name: 'IRP del año' }).click()
+  await expect(page).toHaveURL(/\/impuestos\/irp/)
+  await page.goto(`/impuestos/irp?anio=${year}`)
+  await expect(page.getByRole('heading', { name: 'IRP del año' })).toBeVisible()
+  // tributacion.spec.ts ya verificó las reglas con fuente oficial (son globales): sin el banner de
+  // reglas pendientes, que cubren IrpPage.test.tsx y test_tax_irp.py.
+  await expect(page.getByRole('heading', { name: /Borrador del Formulario 515/ })).toBeVisible()
+  await expect(page.getByText('Las reglas del IRP están sin verificar contra la fuente oficial')).toHaveCount(0)
+
+  // El ingreso (300.000 gravado y 50.000 exonerado) y el egreso (800.000) del registro (M7).
+  await expect(page.getByTestId('f515-10')).toContainText('50.000')
+  await expect(page.getByTestId('f515-12')).toContainText('300.000')
+  await expect(page.getByTestId('f515-12').getByRole('link', { name: 'Ingresos y ventas del registro' })).toBeVisible()
+  await expect(page.getByTestId('f515-22')).toContainText('800.000')
+  // Los egresos superan a los ingresos: la 26 se limita a la 25 y la renta neta queda en cero.
+  await expect(page.getByTestId('f515-26')).toContainText('300.000')
+  await expect(page.getByTestId('f515-45')).toContainText('0')
+  await expect(page.getByTestId('irp-to-pay')).toContainText('0')
+  await expect(page.getByTestId('f515-18')).toContainText('No calculado: falta el dato')
+  await expect(page.getByTestId('f515-41')).toContainText('Vacía')
+  await expect(page.getByTestId('irp-cuadre')).toContainText('cuadra al guaraní con el registro (2 comprobantes)')
+
+  const downloading = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Descargar borrador' }).click()
+  expect((await downloading).suggestedFilename()).toBe(`irp-${year}.xlsx`)
+
+  // La primera organización no tiene la 715: no ve «IRP del año».
+  await orgButton(page).click()
+  await page.getByRole('menuitemradio', { name: new RegExp(firstName) }).click()
+  await expect(orgButton(page)).toContainText(firstName)
+  await expect(nav.getByRole('link', { name: 'Comprobantes' })).toBeVisible()
+  await expect(nav.getByRole('link', { name: 'IRP del año' })).toHaveCount(0)
 })

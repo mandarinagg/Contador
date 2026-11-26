@@ -189,12 +189,14 @@ Casillas leídas del formulario y de su instructivo. Oficial leída.
 | Encabezado | 01 original, 02 rectificativa, 03 número que rectifica, 04 año, 05 clausura |
 | 1 Ingresos (col. I exonerados, col. II gravados) | 10 y 12 ingresos propios (art. 62); 11 y 13 como padre, tutor o curador; **14** total de ingresos gravados |
 | 2 Egresos deducibles | **15** actividad; **16** personales y familiares en el país; **17** salud y educación en el exterior; **18** autovehículo cada 3 años; **19** aporte patronal; **20** seguridad social privada; **21** donaciones (hasta el 5%); **22** suma de 15 a 21 (sin arrastre); **23** vivienda al contado cada 5 años; **24** = 22 + 23 |
-| 3 Resultado | 25 = 14; 26 = 22, limitada a 25; 27 = 25 − 26; 28 = 23, limitada a 27; **29** subtotal de renta neta; 30 préstamos o remanente usados (Anexo, casilla 102); 31 pérdida no arrastrable; 32 pérdida arrastrable |
+| 3 Resultado | 25 = 14; 26 = 22, limitada a 25; 27 = 25 − 26; 28 = 23, limitada a 27; **29** = 27 − 28; 30 préstamos o remanente usados (Anexo, casilla 102); 31 pérdida **por la vivienda** no arrastrable; 32 pérdida **por la vivienda** arrastrable (las dos solo con la casilla 23) |
 | 4 Pérdida por vivienda | 33 a 39 (arrastre de 5 años; compensación de hasta el 20% de la casilla 29 en la 38) |
 | 5 Liquidación (col. I contribuyente, col. II fisco) | **45** renta neta imponible = 29 − 38; **46** 8%; **47** 9%; **48** 10%; 40 saldo a favor anterior; 41 retenciones; 42 percepciones; 49 multa; 43 y 50 subtotales; **44** saldo a favor; **51** saldo a ingresar |
 | Anexo, Cuadro 1 | 52 a 102: préstamos y remanentes (RUC de la entidad, fecha, monto total, monto usado) |
 
 - El instructivo dice que los ingresos se consignan «de acuerdo con lo declarado en el Libro de Ingresos». Es decir, desde el registro de comprobantes.
+- El instructivo también dice: «Se excluirán de los ingresos el IVA», y los aportes del trabajador a la jubilación. Las casillas 46 a 48 son el **impuesto** de cada tramo sobre su porción de la renta neta (ejemplos: renta neta 210.000.000 → 4.000.000 + 9.000.000 + 6.000.000; 60.000.000 → 4.000.000 + 900.000). 43 = 40 a 42; 50 = 46 a 49; 44 = 43 − 50 si 43 es mayor; 51 = 50 − 43 si 50 es mayor. El Anexo tiene además el Cuadro 2 (familiares a cargo, casillas 103 a 154). Releído el 2026-11-26 (PDF oficial, texto extraído).
+- El instructivo no dice si con ingresos de hasta el monto no alcanzado el sistema deja en cero las casillas 46 a 48 (D-PF-19).
 - Solo encontré la **versión 1** del 515 en la página de formularios de la DNIT (D-PF-13).
 
 ---
@@ -421,6 +423,14 @@ Casillas leídas del formulario y de su instructivo. Oficial leída.
 > - **D-PF-6 y D-PF-7:** los ingresos y egresos se cargan solo con la 956 en el perfil vigente al cierre del año; la 716 sin IVA no carga nada y, si aparece el IVA, el año siguiente es de la 955.
 > - **D-PF-15:** confirmar tarde la 956 no calcula multa.
 > - **D-PF-18 (nueva):** cómo se cargan los importes y qué identifica a un comprobante sin número.
+>
+> **Fase M8 (D-144, 2026-11-26).** El borrador del Formulario 515 depende de:
+> - **D-PF-5:** la casilla 41 (retenciones) queda vacía, «no calculado: falta el dato».
+> - **D-PF-13:** el borrador es del 515 versión 1.
+> - **D-PF-15:** la casilla 49 (multa) queda vacía; los subtotales 43, 44, 50 y 51 también.
+> - **D-PF-16:** familiares a cargo, autovehículo (18), vivienda (23, 28, 30 a 39) y préstamos del Anexo quedan vacíos; no se piden en el perfil.
+> - **D-PF-18:** los importes de los ingresos y egresos son los del registro tal como se cargaron.
+> - **D-PF-19 (nueva):** cómo arma la app el borrador con lo que el registro no dice.
 
 **D-PF-1. ¿La empresa unipersonal usa el RUC de su dueño?**
 
@@ -440,7 +450,7 @@ Casillas leídas del formulario y de su instructivo. Oficial leída.
 
 **D-PF-4. IVA crédito de la persona física.** Leer el Decreto 8175/2022 (rubros admitidos y tope del 30% en alimentos) antes de aplicar las reglas `IVA-CREDITO-*` a una persona física.
 
-**D-PF-5. Retenciones del IRP-RSP.** ¿Qué retenciones generales se computan hoy en la casilla 41 del 515? Solo encontré los regímenes especiales: el del servicio diplomático y el INR que retiene el propio contribuyente.
+**D-PF-5. Retenciones del IRP-RSP.** ¿Qué retenciones generales se computan hoy en la casilla 41 del 515? Solo encontré los regímenes especiales: el del servicio diplomático y el INR que retiene el propio contribuyente. Hoy (D-144) la casilla 41 queda vacía.
 
 **D-PF-6. ¿El IRP-RGC registra comprobantes?**
 
@@ -483,7 +493,7 @@ Casillas leídas del formulario y de su instructivo. Oficial leída.
 
 **D-PF-15. Multa por presentar tarde el 515, el 516 o el 502** (casillas 49 y 131) y por confirmar tarde la 956 (RG 90/2021, art. 8°). No encontré el monto (igual que la D-11).
 
-**D-PF-16. Deducciones que la aplicación no puede saber sola.** El familiar a cargo (cónyuge no contribuyente, ingresos de hasta ₲ 30.000.000), el autovehículo cada 3 años y la vivienda cada 5 años dependen de datos del contribuyente. ¿Se piden en el perfil de la persona física?
+**D-PF-16. Deducciones que la aplicación no puede saber sola.** El familiar a cargo (cónyuge no contribuyente, ingresos de hasta ₲ 30.000.000), el autovehículo cada 3 años y la vivienda cada 5 años dependen de datos del contribuyente. ¿Se piden en el perfil de la persona física? Hoy (D-144) no se piden y sus casillas del 515 quedan vacías.
 
 
 **D-PF-17. ¿La persona física con RESIMPLE puede tener IVA por sus servicios personales?**
@@ -495,6 +505,14 @@ Casillas leídas del formulario y de su instructivo. Oficial leída.
 
 - En INGRESOS, «monto gravado» es lo que grava el IRP y «no gravado o exonerado», el resto; en EGRESOS va solo el total. El cobro de una venta a crédito (203) va por lo cobrado en el año, con el número y el timbrado de la factura.
 - Un comprobante sin número (205 a 208) se identifica por tipo, contraparte y fecha o período; el extracto de IPS, además, por el número de empleador. Si el IPS emite dos extractos del mismo mes para el mismo empleador, el segundo necesita un número.
+
+**D-PF-19. Borrador del 515 desde el registro (D-144).** Lo que la aplicación interpreta, sin texto que lo diga:
+
+- Los egresos con timbrado se toman sin el IVA si es crédito fiscal (Ley 6380, art. 68) y con el IVA si no lo es. Para los ingresos el instructivo sí lo dice: sin el IVA.
+- Los comprobantes con timbrado a crédito no entran: el IRP va por lo percibido y lo pagado (art. 52) y eso lo registran los cobros (203) y los pagos (201). Si Marangatu los suma igual, el borrador no cuadraría con su total.
+- La aplicación no guarda el rubro de cada egreso (casillas 15 a 21): todo va en la 22, y el tope del 5 % de las donaciones (21) no se aplica.
+- Con ingresos gravados de hasta ₲ 80.000.000 las casillas 46 a 48 muestran la escala y el resultado estimado a pagar es cero (art. 69, último párrafo). ¿El sistema las deja en cero?
+- El primer ejercicio (art. 62) deduce solo los egresos desde el día siguiente a superar el monto: la aplicación avisa y toma los de todo el año.
 
 ---
 

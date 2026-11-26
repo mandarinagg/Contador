@@ -337,6 +337,47 @@ export interface VatEstimate {
   is_estimate: boolean
 }
 
+/** Casilla del borrador del Formulario 515 (D-144): `missing_data` falta un dato personal (D-PF-16, D-PF-5). */
+export interface Form515Box {
+  box: string
+  rubro: number
+  label: string
+  value: string | null
+  status: 'calculated' | 'not_calculated' | 'missing_data'
+  doubts: string[]
+  note: string | null
+  /** De dónde sale el importe: el registro de ingresos o de egresos; `null` si es una fórmula o está vacía. */
+  origin: 'income' | 'expense' | null
+}
+
+/** Condición 3 de la D-119 sin contabilidad: el borrador contra el registro, al guaraní. */
+export interface RegisterControl {
+  method: 'voucher_register' | 'ledger'
+  available: boolean
+  matches: boolean | null
+  rows: { box: string; draft: string | null; register: string; difference: string | null; matches: boolean }[]
+  vouchers: number
+  message: string | null
+  stop_code: string | null
+}
+
+export interface IrpEstimate {
+  year: number
+  period_start: string
+  period_end: string
+  registered_on: string
+  register: { income_taxed: string; income_exempt: string; income_count: number; expenses: string; expense_count: number; credit_excluded: number }
+  threshold: { amount: string; reached: boolean } | null
+  result: { net_income: string; tax: string; to_pay: string } | null
+  warnings: { code: string; message: string }[]
+  register_control: RegisterControl
+  form_515: { available: boolean; version: number | null; rule: RuleApplied | null; boxes: Form515Box[]; warnings: string[]; message: string | null }
+  obligation: { id: string; status: ObligationStatus; calculated_amount: string | null; declared_amount: string | null } | null
+  rules_applied: RuleApplied[]
+  rule_status: string | null
+  is_estimate: boolean
+}
+
 export type AlertCode =
   | 'OBLIGATIONS_OVERDUE'
   | 'OBLIGATIONS_DUE_SOON'
