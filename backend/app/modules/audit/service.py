@@ -99,14 +99,11 @@ def list_logs(
 def list_security_events(
     db: Session, organization_id: uuid.UUID, *, limit: int
 ) -> list[SecurityEvent]:
-    # Los intentos fallidos con un email desconocido no tienen organización: también se muestran
-    # (la app de escritorio tiene una sola instalación por máquina).
+    # Los intentos fallidos con un email desconocido no tienen organización: no son de ninguna
+    # y no se muestran a ninguna (D-134); quedan en la base para quien la administre.
     query = (
         select(SecurityEvent)
-        .where(
-            (SecurityEvent.organization_id == organization_id)
-            | SecurityEvent.organization_id.is_(None)
-        )
+        .where(SecurityEvent.organization_id == organization_id)
         .order_by(SecurityEvent.occurred_at.desc())
         .limit(limit)
     )

@@ -361,3 +361,13 @@ Spec: `docs/specs/BOT_MARANGATU.md` §10, paso 1. Catálogo **provisorio** (pant
   - Lo que se revisa sin navegador (bot apagado, sin clave, sin RUC) también deja una corrida `detenida` con su paso «preparar»: queda registro de que se intentó.
   - El reconocimiento general es una corrida de tipo `general` (solo en la etapa `reconocimiento`). Resultados: `en_curso`, `completada`, `detenida`, `incierta`.
   - `GET /marangatu/verify` recorre la cadena y además vuelve a calcular el SHA-256 de cada archivo.
+
+
+## D-134 — Eventos de seguridad sin organización, 2026-11-25
+
+Fase M1 del plan multiempresa: pruebas de aislamiento entre organizaciones (`backend/tests/test_multi_org_isolation.py`).
+
+- **D-134 — Los eventos de seguridad sin organización no se muestran a ninguna.** **Aceptada · 2026-11-25.**
+  - `GET /audit/security-events` devolvía, además de los de la organización, los que no tienen ninguna (intentos fallidos con un email desconocido). Con más de una organización, cada una veía los intentos de las demás. Ahora solo trae los de su organización.
+  - Los eventos sin organización siguen guardándose (solo inserción, como el resto de `audit`); no hay hoy una pantalla ni un permiso de «administrador de la instalación» que los muestre. Si hace falta verlos, se agrega con ese concepto, no reabriendo el filtro por organización.
+  - Un intento fallido con el email de un usuario existente sí lleva organización y lo ve esa organización. El bloqueo de cuenta (`account_locked`) no la llevaba: ahora sí.

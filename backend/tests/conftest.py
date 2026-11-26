@@ -6,7 +6,9 @@ código pasan a ser SAVEPOINTs, así que las pruebas no se pisan entre sí.
 """
 
 import os
+import uuid
 from collections.abc import Iterator
+from dataclasses import dataclass
 from typing import Any
 
 os.environ["CONTADOR_ENV"] = "test"
@@ -27,7 +29,12 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.db import get_db
+from app.core.permissions import Role
+from app.core.security import hash_password
 from app.main import create_app
+from app.modules.finance.service import create_business_context
+from app.modules.identity.models import User
+from app.modules.organizations.models import Organization, OrganizationMember
 
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STRONG_PASSWORD = "Clave-Segura-2026"
@@ -141,3 +148,38 @@ def make_user(client: TestClient, owner_token: str) -> Any:
         return str(res.json()["user"]["id"]), str(login.json()["token"])
 
     return _make
+
+
+@dataclass(frozen=True)
+class OtherOrg:
+    """Segunda organización, con su propietario, su contexto empresarial y su sesión."""
+
+    organization_id: uuid.UUID
+    user_id: uuid.UUID
+    token: str
+    business_context_id: str
+    email: str
+
+
+@pytest.fixture
+def other_org(client: TestClient, db: Session, owner_token: str) -> OtherOrg:
+    """Organización B, creada directo en la base (la API solo crea una, con `/system/setup`) y
+    con sesión por el inicio de sesión normal. La A es la de `owner_token`."""
+    org = Organization(legal_name="Otra Empresa SRL", legal_form="SRL")
+    email = "duena-b@example.com"
+    user = User(email=email, full_name="Dueña de B", password_hash=hash_password(STRONG_PASSWORD))
+    db.add_all([org, user])
+    db.flush()
+    db.add(OrganizationMember(organization_id=org.id, user_id=user.id, role_code=Role.OWNER))
+    business = create_business_context(db, org.id)
+    db.commit()
+    login = client.post("/api/v1/auth/login", json={"email": email, "password": STRONG_PASSWORD})
+    assert login.status_code == 200, login.text
+    assert login.json()["organization"]["id"] == str(org.id)
+    return OtherOrg(
+        organization_id=org.id,
+        user_id=user.id,
+        token=str(login.json()["token"]),
+        business_context_id=str(business.id),
+        email=email,
+    )

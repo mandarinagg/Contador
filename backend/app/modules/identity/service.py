@@ -93,7 +93,12 @@ def login(
                 user.locked_until = now + timedelta(minutes=settings.login_lockout_minutes)
                 user.failed_login_count = 0
                 audit.security_event(
-                    db, "account_locked", user_id=user.id, email_attempted=email, ip_address=ip
+                    db,
+                    "account_locked",
+                    user_id=user.id,
+                    organization_id=member.organization_id if member else None,
+                    email_attempted=email,
+                    ip_address=ip,
                 )
         reason = (
             "unknown_email"
