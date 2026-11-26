@@ -178,7 +178,7 @@ def _supervise(db: Session, run_id: uuid.UUID) -> Run:
         return service.stop_before_browser(
             db, run, StopCode.DATA_INCOMPLETE, "La empresa no tiene el RUC cargado"
         )
-    capture_dir = storage.run_dir(run.id)
+    capture_dir = storage.run_dir(run.organization_id, run.id)
     job = build_job(run, ruc, capture_dir)
     end: EndEvent | None = None
     failure: str | None = None
@@ -273,6 +273,16 @@ def _supervise_in_thread(run_id: uuid.UUID) -> None:
     finally:
         session.close()
         _release(run_id)
+
+
+def close_interrupted_at_startup() -> int:
+    """Al arrancar la app: toda corrida `en_curso` de cualquier organización quedó así por un
+    cierre o una caída (ningún trabajador de este proceso la atiende). Devuelve cuántas cerró."""
+    session = get_sessionmaker()()
+    try:
+        return len(service.close_interrupted(session, alive_runs()))
+    finally:
+        session.close()
 
 
 def launch(run_id: uuid.UUID) -> None:

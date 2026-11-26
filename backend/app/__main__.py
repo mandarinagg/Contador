@@ -53,6 +53,12 @@ def main() -> None:
     upgrade_database(settings.database_url)
 
     from app.main import app  # después de migrar: la app asume el esquema al día
+    from app.modules.marangatu import supervisor
+
+    # Las corridas del bot que quedaron «en curso» por un cierre o una caída (D-140).
+    closed = supervisor.close_interrupted_at_startup()
+    if closed:
+        logger.warning("Corridas del bot interrumpidas y cerradas: %d", closed)
 
     logger.info("API en http://%s:%s", settings.api_host, settings.api_port)
     uvicorn.run(

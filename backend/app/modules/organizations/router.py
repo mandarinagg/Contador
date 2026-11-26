@@ -88,6 +88,8 @@ def update_organization(
     # Solo se auditan los campos que realmente cambian.
     changes = {k: v for k, v in body.model_dump(exclude_unset=True).items() if getattr(org, k) != v}
     before = {k: getattr(org, k) for k in changes}
+    if "ruc" in changes:
+        service.ensure_ruc_changeable(org.ruc)
     if changes.get("ruc") is not None:
         service.ensure_ruc_available(db, changes["ruc"], exclude_id=org.id)
     for key, value in changes.items():

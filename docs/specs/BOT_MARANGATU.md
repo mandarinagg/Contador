@@ -155,8 +155,8 @@ diferencias** del mismo tipo, en períodos distintos. El propietario puede volve
 - Tablas `marangatu.runs` (corrida: tipo, período, etapa, resultado, motivo) y `marangatu.steps`
   (paso: hora, pantalla reconocida, acción, valores sin la clave, resultado y captura).
 - Las capturas y los archivos descargados se guardan en el almacén de documentos de la app, con su
-  SHA-256. Mientras no exista ese almacén (fase 6), van a `<datos>/documentos/marangatu/<corrida>/`
-  y el paso guarda la ruta relativa y el SHA-256 (D-131).
+  SHA-256. Mientras no exista ese almacén (fase 6), van a `<datos>/documentos/<organización>/marangatu/<corrida>/`
+  (D-140; antes, sin la organización) y el paso guarda la ruta relativa y el SHA-256 (D-131).
 - **Solo agregar:** un disparador rechaza `UPDATE` y `DELETE` en `steps`, como en los asientos
   contabilizados.
 - Cada paso guarda el hash del anterior (cadena). Una verificación recorre la cadena y avisa si

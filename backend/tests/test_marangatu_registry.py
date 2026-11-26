@@ -120,7 +120,7 @@ def test_modified_or_missing_capture_is_detected(
     run: Run,
     bot_env: BotEnv,  # noqa: F811
 ) -> None:
-    folder = storage.run_dir(run.id)
+    folder = storage.run_dir(run.organization_id, run.id)
     shot = folder / "001-ingreso.png"
     shot.write_bytes(b"captura original")
     gone = folder / "002-otra.png"
@@ -155,4 +155,4 @@ def test_modified_or_missing_capture_is_detected(
 def test_capture_outside_the_data_folder_is_refused(bot_env: BotEnv) -> None:  # noqa: F811
     with pytest.raises(ValueError, match="fuera de la carpeta"):
         storage.resolve("../../etc/passwd")
-    assert storage.run_dir(uuid.uuid4()).is_relative_to(bot_env.data_dir)
+    assert storage.run_dir(uuid.uuid4(), uuid.uuid4()).is_relative_to(bot_env.data_dir)

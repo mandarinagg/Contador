@@ -96,10 +96,12 @@ class Run(Base):
         CheckConstraint("period IS NULL OR extract(day FROM period) = 1", name="period_month"),
         CheckConstraint("(status = 'en_curso') = (finished_at IS NULL)", name="finished"),
         CheckConstraint("(status = 'detenida') = (stop_code IS NOT NULL)", name="stop_reason"),
-        # Una sola corrida en curso por organización (un solo navegador a la vez).
+        # Una sola corrida en curso en toda la instalación: un solo navegador a la vez (D-140).
+        # Se indexa `status` solo cuando es `en_curso`: dos filas en curso chocan, sea cual sea
+        # la organización.
         Index(
             "uq_runs_one_running",
-            "organization_id",
+            "status",
             unique=True,
             postgresql_where=text("status = 'en_curso'"),
         ),

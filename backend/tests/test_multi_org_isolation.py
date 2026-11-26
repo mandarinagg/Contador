@@ -240,7 +240,7 @@ def worlds(
     a["marangatu_run_id"] = run["id"]
     row = db.get(Run, run["id"])
     assert row is not None
-    shot = storage.run_dir(row.id) / "001-ingreso.png"
+    shot = storage.run_dir(row.organization_id, row.id) / "001-ingreso.png"
     shot.parent.mkdir(parents=True, exist_ok=True)
     shot.write_bytes(b"captura de A")
     step = marangatu_service.add_step(

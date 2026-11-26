@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import Conflict, NotFound
@@ -16,6 +17,7 @@ from app.modules.marangatu.stop_codes import StopCode
 from app.modules.organizations.models import Organization
 
 HIDDEN = "[oculta]"
+RUNNING_INDEX = "uq_runs_one_running"
 
 
 # --- Interruptor y etapas ----------------------------------------------------------------
@@ -177,26 +179,45 @@ def stop_before_browser(db: Session, run: Run, code: StopCode, detail: str) -> R
     return finish_run(db, run, status="detenida", stop_code=code, detail=detail)
 
 
-def close_interrupted(db: Session, organization_id: uuid.UUID, alive: set[uuid.UUID]) -> None:
-    """Una corrida «en curso» sin trabajador vivo quedó así por un cierre de la app."""
-    for run in db.scalars(
-        select(Run).where(Run.organization_id == organization_id, Run.status == "en_curso")
-    ):
-        if run.id not in alive:
-            add_step(
-                db,
-                run,
-                action="interrumpida",
-                result="error",
-                message="La app se cerró durante la corrida",
-            )
-            finish_run(
-                db,
-                run,
-                status="detenida",
-                stop_code=StopCode.BROWSER_ERROR,
-                detail="Corrida interrumpida: la app se cerró antes de terminar",
-            )
+def close_interrupted(db: Session, alive: set[uuid.UUID]) -> list[uuid.UUID]:
+    """Cierra toda corrida «en curso», de cualquier organización, que ningún trabajador atiende:
+    quedó así por un cierre o una caída de la app (D-140). Cada cierre deja su paso en la cadena
+    y la corrida detenida con `BROWSER_ERROR`, en su propia organización. Devuelve las cerradas."""
+    closed: list[uuid.UUID] = []
+    for run in list(db.scalars(select(Run).where(Run.status == "en_curso").order_by(Run.id))):
+        if run.id in alive:
+            continue
+        add_step(
+            db,
+            run,
+            action="interrumpida",
+            result="error",
+            message="La app se cerró durante la corrida",
+        )
+        finish_run(
+            db,
+            run,
+            status="detenida",
+            stop_code=StopCode.BROWSER_ERROR,
+            detail="Corrida interrumpida: la app se cerró antes de terminar",
+        )
+        closed.append(run.id)
+    return closed
+
+
+def _busy(db: Session, organization_id: uuid.UUID) -> Conflict | None:
+    """El 409 si hay una corrida en curso en la instalación. Si es de otra organización, no dice
+    de cuál (D-140): solo que el bot está ocupado."""
+    owner = db.scalar(select(Run.organization_id).where(Run.status == "en_curso").limit(1))
+    if owner is None:
+        return None
+    if owner == organization_id:
+        return Conflict("RUN_IN_PROGRESS", "Ya hay una corrida del bot en curso.")
+    return Conflict(
+        "BOT_BUSY",
+        "El bot de Marangatu está ocupado con otra corrida. Esperá a que termine y volvé a "
+        "lanzarla.",
+    )
 
 
 def start_reconnaissance(
@@ -210,12 +231,12 @@ def start_reconnaissance(
     """Crea la corrida y revisa lo que se puede revisar sin navegador.
 
     Devuelve la corrida `en_curso` (lista para el trabajador) o ya `detenida` con su motivo.
+    Hay una sola corrida en curso en toda la instalación (D-140): si otra organización tiene
+    una, 409 `BOT_BUSY`.
     """
-    close_interrupted(db, organization_id, alive)
-    if db.scalar(
-        select(Run.id).where(Run.organization_id == organization_id, Run.status == "en_curso")
-    ):
-        raise Conflict("RUN_IN_PROGRESS", "Ya hay una corrida del bot en curso.")
+    close_interrupted(db, alive)
+    if (busy := _busy(db, organization_id)) is not None:
+        raise busy
     run = Run(
         organization_id=organization_id,
         task_type="general",
@@ -225,7 +246,16 @@ def start_reconnaissance(
         started_by=user_id,
     )
     db.add(run)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        # Carrera: otra corrida entró entre la revisión y el alta (índice único, D-140).
+        if RUNNING_INDEX not in str(exc.orig):
+            raise
+        db.rollback()
+        raise _busy(db, organization_id) or Conflict(
+            "BOT_BUSY", "El bot de Marangatu está ocupado con otra corrida."
+        ) from exc
     audit.record(
         db,
         action="marangatu.run.started",

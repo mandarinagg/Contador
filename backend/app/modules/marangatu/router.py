@@ -170,7 +170,12 @@ def get_run(run_id: uuid.UUID, db: DbSession, auth: Reader) -> RunDetailOut:
 def get_capture(step_id: uuid.UUID, db: DbSession, auth: Reader) -> Response:
     """El archivo de un paso, solo si su SHA-256 sigue siendo el registrado."""
     step = db.get(Step, step_id)
-    if step is None or step.organization_id != auth.organization_id or not step.capture_path:
+    if (
+        step is None
+        or step.organization_id != auth.organization_id
+        or not step.capture_path
+        or not storage.belongs_to(step.capture_path, auth.organization_id)
+    ):
         raise NotFound("CAPTURE_NOT_FOUND", "Ese paso no tiene captura.")
     path = storage.resolve(step.capture_path)
     if not path.is_file():

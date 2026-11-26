@@ -13,6 +13,7 @@ from app.core.errors import Conflict
 from app.core.permissions import Role
 from app.modules.finance import service as finance
 from app.modules.identity.models import User
+from app.modules.marangatu import credentials
 from app.modules.organizations.models import Organization, OrganizationMember
 
 RUC_INDEX = "uq_organizations_ruc"
@@ -32,6 +33,26 @@ def ensure_ruc_available(db: Session, ruc: str | None, *, exclude_id: uuid.UUID 
         query = query.where(Organization.id != exclude_id)
     if db.scalar(query.limit(1)) is not None:
         raise ruc_taken()
+
+
+def ensure_ruc_changeable(current_ruc: str | None) -> None:
+    """409 `MARANGATU_CREDENTIALS_EXIST` si hay una clave de Marangatu guardada para el RUC
+    actual (D-140). La clave del almacén es por RUC (D-128): cambiarlo la dejaría huérfana, y
+    con ella otra organización que tomara ese RUC después. Primero se borra la clave. Sin RUC
+    actual no hay clave posible. Si el almacén no responde no se puede saber (ni nadie puede
+    leerla): no se bloquea un cambio de datos por eso."""
+    if current_ruc is None:
+        return
+    try:
+        saved = credentials.has_password(current_ruc)
+    except credentials.CredentialStoreError:
+        return
+    if saved:
+        raise Conflict(
+            "MARANGATU_CREDENTIALS_EXIST",
+            "Hay una clave de Marangatu guardada para este RUC: borrá la clave de Marangatu "
+            "antes de cambiar el RUC.",
+        )
 
 
 def flush_checking_ruc(db: Session) -> None:

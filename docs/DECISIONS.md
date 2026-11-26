@@ -395,3 +395,15 @@ Plan: `docs/specs/MULTI_ORG_PERSONA_FISICA.md`, fase M2. Pruebas: `backend/tests
   - La sesión nueva conserva el vencimiento absoluto de la anterior: cambiar de organización no alarga las 12 h (D-006). La inactividad empieza de nuevo. El frontend reemplaza el token en `sessionStorage` (D-014).
   - Sin membresía activa (o si la organización no existe): 403 `ORGANIZATION_NOT_AVAILABLE` y `organization_switch_denied` en la organización actual. A la misma: 409 `SAME_ORGANIZATION`.
   - Eventos `organization_switched`: uno en la de salida (`direction: out`) y otro en la de llegada (`direction: in`), sin el id de la otra, para que ninguna se entere de las demás.
+
+## D-140 — Bot de Marangatu con varias organizaciones (fase M5), 2026-11-26
+
+Plan: `docs/specs/MULTI_ORG_PERSONA_FISICA.md`, fase M5 (respuesta 4). Pruebas: `backend/tests/test_marangatu_multi_org.py`. Cambia lo que decían D-127 (una corrida por organización) y D-131 (carpeta de documentos).
+
+- **D-140 — Una corrida en toda la instalación, documentos por organización, RUC con clave.** **Aceptada · 2026-11-26.**
+  - Migración `0010`: `uq_runs_one_running` pasa a índice único parcial sobre `status` cuando es `en_curso`: hay un solo navegador, así que dos corridas en curso chocan sean de la organización que sean. Si al subir hubiera más de una, queda la más antigua y las demás se cierran `BROWSER_ERROR` con su paso «interrumpida». La bajada vuelve al índice por organización (siempre se puede).
+  - Lanzar un reconocimiento con otra organización corriendo da 409 `BOT_BUSY`; el mensaje no dice cuál. Con una propia en curso sigue siendo `RUN_IN_PROGRESS`. Si dos pedidos compiten, el índice decide y el perdedor recibe el mismo 409. No hay cola: la persona vuelve a lanzar cuando termine.
+  - `close_interrupted` es global: cierra toda corrida `en_curso` sin trabajador vivo, de cualquier organización, con su paso y su corrida en la cadena de su propia organización. Corre al lanzar una corrida y al arrancar el backend (`app/__main__.py`, después de migrar).
+  - Documentos nuevos: `<datos>/documentos/<organización>/marangatu/<corrida>/`. Las corridas anteriores (`documentos/marangatu/<corrida>/`) no se mueven, porque mover un archivo rompería su SHA-256: se siguen resolviendo por la ruta relativa guardada y la verificación recalcula ambas. Además de filtrar por la organización del paso, `GET /steps/{id}/capture` rechaza (404) una ruta con la carpeta de otra organización.
+  - `PATCH /organization` que cambie o quite el RUC con una clave guardada para el RUC actual: 409 `MARANGATU_CREDENTIALS_EXIST` («borrá la clave de Marangatu antes de cambiar el RUC»). La clave del almacén es por RUC (D-128): cambiarlo la dejaría huérfana, disponible para quien tomara ese RUC. Sin RUC actual o sin clave, procede. Si el almacén del sistema no responde no se puede saber si hay clave (ni nadie puede leerla): el cambio procede, para que un almacén roto no bloquee los datos de la organización.
+  - **Pendiente:** la copia de seguridad sigue sin incluir la carpeta de documentos (D-131).
