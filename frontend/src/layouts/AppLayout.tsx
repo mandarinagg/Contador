@@ -4,7 +4,8 @@ import { NavLink, Outlet, useMatch } from 'react-router'
 import { cx } from '../lib/cx'
 import { ROLE_LABELS } from '../lib/format'
 import { FINANCE_SECTIONS, preferredContext, useContexts } from '../modules/finance/data'
-import { useTaxAlerts } from '../modules/tax/data'
+import { useTaxAlerts, useTaxProfile } from '../modules/tax/data'
+import { accountingOptional } from '../modules/tax/labels'
 import { useSession } from '../stores/session'
 import { OrgSwitcher } from './OrgSwitcher'
 
@@ -103,10 +104,19 @@ function BrandMark() {
   )
 }
 
+/** Persona física sin IRE General: el menú Contabilidad se marca como opcional (un aviso, no un bloqueo; D-142). */
+function useAccountingOptional(): boolean {
+  const { me, can } = useSession()
+  const person = me?.organization.legal_form === 'PERSONA_FISICA'
+  const profile = useTaxProfile(person && can('tax.read'))
+  return person && accountingOptional(me?.organization.legal_form, profile.data?.current?.ire_regime)
+}
+
 export function AppLayout() {
   const { me, can, logout } = useSession()
   const financeNav = useFinanceNav()
   const taxNav = useTaxNav()
+  const optionalAccounting = useAccountingOptional()
   // Los libros contables y los registros de impuestos necesitan más ancho que el resto.
   const wideAccounting = useMatch('/contabilidad/*')
   const wideTax = useMatch('/impuestos/*')
@@ -115,7 +125,7 @@ export function AppLayout() {
   const nav = [
     NAV[0],
     { group: 'Finanzas', items: financeNav },
-    { group: 'Contabilidad', items: ACCOUNTING_NAV },
+    { group: 'Contabilidad', items: ACCOUNTING_NAV, note: optionalAccounting ? 'opcional' : undefined },
     { group: 'Impuestos', items: taxNav },
     ...NAV.slice(1),
   ]
@@ -132,12 +142,19 @@ export function AppLayout() {
         </div>
 
         <nav className="flex-1 overflow-y-auto px-3 py-2" aria-label="Principal">
-          {nav.map(({ group, items }) => {
+          {nav.map(({ group, items, note }: { group: string; items: NavItem[]; note?: string }) => {
             const visible = items.filter((i) => !i.permission || can(i.permission))
             if (visible.length === 0) return null
             return (
               <div key={group} className="mb-4">
-                <p className="px-2 pb-1 text-xs font-medium text-ink-3">{group}</p>
+                <p className="px-2 pb-1 text-xs font-medium text-ink-3">
+                  {group}
+                  {note && (
+                    <span className="ml-1.5 font-normal" title="Sin el IRE General, la persona física no está obligada a llevar contabilidad por partida doble.">
+                      · {note}
+                    </span>
+                  )}
+                </p>
                 <ul>
                   {visible.map((item) => (
                     <li key={item.to}>

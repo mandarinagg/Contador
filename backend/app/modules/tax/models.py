@@ -46,7 +46,8 @@ CONFIDENCES = ("oficial_leida", "oficial_citada_por_terceros", "secundaria", "no
 HOLIDAY_STATUSES = ("pending", "verified")
 ORIGINS = ("candidate", "user")
 EXCEPTION_GROUPS = ("determinative",)
-IRE_REGIMES = ("ire_general", "ire_simple", "unknown")
+# `resimple` y `none` (sin IRE): persona física (migración 0012, D-142).
+IRE_REGIMES = ("ire_general", "ire_simple", "resimple", "none", "unknown")
 PROFILE_ORIGINS = ("declared", "verified")
 OBLIGATION_STATUSES = ("pending", "filed", "paid", "not_applicable")
 DIRECTIONS = ("purchase", "sale")

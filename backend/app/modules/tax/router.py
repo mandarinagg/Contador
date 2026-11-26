@@ -367,7 +367,9 @@ def _obligations_out(db: Session, rows: list[Obligation]) -> list[ObligationOut]
     now_day = today()
     result = []
     for o in rows:
-        applied_rules = [rule_map[o.rule_version_id], rule_map[o.calendar_rule_version_id]]
+        applied_rules = [rule_map[o.rule_version_id]]
+        if o.calendar_rule_version_id != o.rule_version_id:  # día fijo de la regla (D-142)
+            applied_rules.append(rule_map[o.calendar_rule_version_id])
         exception = exception_map.get(o.exception_id) if o.exception_id else None
         result.append(
             ObligationOut(

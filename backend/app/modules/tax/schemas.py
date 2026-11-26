@@ -23,7 +23,7 @@ DocType = Literal[
     "ruc", "identity_card", "passport", "foreign_id", "unnamed", "diplomatic", "tax_id"
 ]
 Condition = Literal["cash", "credit"]
-IreRegime = Literal["ire_general", "ire_simple", "unknown"]
+IreRegime = Literal["ire_general", "ire_simple", "resimple", "none", "unknown"]
 RuleStatus = Literal["pending", "verified", "deprecated"]
 HolidayStatus = Literal["pending", "verified"]
 ObligationStatus = Literal["pending", "filed", "paid", "not_applicable", "overdue"]

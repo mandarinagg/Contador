@@ -10,8 +10,9 @@ puede llamar las veces que haga falta:
 - la regla de la obligación es la vigente al inicio del período; la del día del calendario
   (DJ o DJI), la vigente al inicio del mes del vencimiento. Sin regla vigente no se genera
   nada (D-082);
-- vencimiento: día del calendario por la terminación del RUC sin DV, corrido al siguiente
-  hábil (D-086); una excepción fechada lo reemplaza;
+- vencimiento: día del calendario por la terminación del RUC sin DV (o el día fijo de la
+  regla, como el 26 de febrero del RESIMPLE), corrido al siguiente hábil (D-086, D-142); una
+  excepción fechada lo reemplaza;
 - lo no presentado (`pending`) se recalcula siempre; lo presentado o pagado, nunca;
 - lo que el perfil (o la falta de regla) deja de cubrir pasa a `not_applicable` con motivo
   automático, y vuelve a `pending` si se cubre otra vez (D-098). Nada se borra.
@@ -159,12 +160,19 @@ def plan_due(
         due_month = add_months(period_start, due.month_offset)
     else:
         due_month = add_months(period_end, due.months_after_fiscal_close)
-    calendar_rule = rules.at(due.day_rule, due_month)
-    if calendar_rule is None:
-        return rule
-    calendar_params = rule_params.parse(calendar_rule.code, calendar_rule.parameters)
-    assert isinstance(calendar_params, rule_params.CalendarParams)
-    nominal = due_month.replace(day=calendar_params.day_by_digit[str(digit)])
+    if isinstance(due, rule_params.FixedDayDue):
+        # Día fijo de la propia regla (RESIMPLE, 26 de febrero): ella hace de regla del
+        # calendario. Se corre al siguiente hábil como todo vencimiento calculado (D-142).
+        calendar_rule: RuleVersion | None = rule
+        nominal = due_month.replace(day=due.fixed_day)
+    else:
+        calendar_rule = rules.at(due.day_rule, due_month)
+        if calendar_rule is None:
+            return rule
+        calendar_params = rule_params.parse(calendar_rule.code, calendar_rule.parameters)
+        assert isinstance(calendar_params, rule_params.CalendarParams)
+        nominal = due_month.replace(day=calendar_params.day_by_digit[str(digit)])
+    assert calendar_rule is not None
     match = exceptions.find(code, due_month, digit)
     due_date = (
         match.exception.new_due_date if match is not None else calendar.next_business_day(nominal)

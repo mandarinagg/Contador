@@ -1,4 +1,5 @@
 /** Textos de la tributación: nombres de obligaciones, estados, tipos y las dudas abiertas de la investigación. */
+import type { LegalForm } from '../../types/api'
 import type { Condition, DocType, Direction, IreRegime, VoucherType } from './types'
 
 /** Obligaciones que genera el sistema (regla → nombre, D-085). */
@@ -8,24 +9,43 @@ export const OBLIGATION_LABELS: Record<string, string> = {
   'IRE-GENERAL-DJ': 'IRE General: declaración anual',
   'IRE-SIMPLE-DJ': 'IRE SIMPLE: declaración anual',
   'EEFF-PRESENTACION': 'Estados financieros',
+  'IRP-RSP-DJ': 'IRP-RSP: declaración anual (Formulario 515)',
+  'IRP-RGC-DJ': 'IRP-RGC: declaración anual (Formulario 516)',
+  'REG-COMPROB-ANUAL': 'Registro anual de comprobantes (956)',
+  'IRE-RESIMPLE-DJ': 'RESIMPLE: declaración anual (Formulario 502)',
 }
 
 export const obligationLabel = (code: string) => OBLIGATION_LABELS[code] ?? code
 
-/** Obligaciones del perfil por código DNIT: qué son y si la app las calcula (D-085). */
-export const DNIT_OBLIGATIONS: { code: string; name: string; hint: string }[] = [
-  { code: '211', name: 'IVA General', hint: 'Declaración mensual del IVA (Formulario 120). Solo si la empresa es contribuyente del IVA.' },
+/**
+ * Obligaciones del perfil por código DNIT: qué son y si la app las calcula (D-085). `forms`: las
+ * formas jurídicas que pueden tenerla (sin `forms`, todas); el backend hace el mismo control (D-142).
+ */
+export const DNIT_OBLIGATIONS: { code: string; name: string; hint: string; forms?: LegalForm[] }[] = [
+  { code: '211', name: 'IVA General', hint: 'Declaración mensual del IVA (Formulario 120). Solo para contribuyentes del IVA.' },
   { code: '955', name: 'Registro mensual de comprobantes', hint: 'Compras y ventas del mes en Marangatu (RG 90/2021).' },
   { code: '700', name: 'IRE General', hint: 'Declaración anual del IRE en el régimen general (Formulario 500).' },
   { code: '701', name: 'IRE SIMPLE', hint: 'Declaración anual del IRE en el régimen simple (Formulario 501).' },
+  { code: '702', name: 'RESIMPLE', hint: 'Declaración anual del RESIMPLE (Formulario 502), hasta el 26 de febrero.', forms: ['PERSONA_FISICA', 'UNIPERSONAL'] },
+  { code: '715', name: 'IRP-RSP', hint: 'Renta personal por servicios (Formulario 515): declaración anual en marzo.', forms: ['PERSONA_FISICA'] },
+  { code: '716', name: 'IRP-RGC', hint: 'Rentas y ganancias del capital, como alquileres (Formulario 516): declaración anual en marzo.', forms: ['PERSONA_FISICA'] },
+  { code: '956', name: 'Registro anual de comprobantes', hint: 'Ingresos y egresos del año en Marangatu, con la 715 y sin IVA (RG 90/2021): se confirma en febrero.', forms: ['PERSONA_FISICA'] },
   { code: '948', name: 'Estados financieros', hint: 'Presentación anual de los estados financieros.' },
 ]
 
+/** Las obligaciones de la lista que corresponden a la forma jurídica. */
+export const obligationsFor = (legalForm: LegalForm | undefined) => DNIT_OBLIGATIONS.filter((o) => !o.forms || (legalForm !== undefined && o.forms.includes(legalForm)))
+
 export const dnitName = (code: string) => DNIT_OBLIGATIONS.find((o) => o.code === code)?.name ?? `Obligación ${code}`
+
+/** Sin el IRE General, la persona física no está obligada a la partida doble: la contabilidad queda como opcional, nunca se bloquea (D-142). */
+export const accountingOptional = (legalForm: LegalForm | undefined, regime: IreRegime | undefined) => legalForm === 'PERSONA_FISICA' && regime !== undefined && regime !== 'ire_general'
 
 export const IRE_REGIME_LABELS: Record<IreRegime, string> = {
   ire_general: 'IRE General',
   ire_simple: 'IRE SIMPLE',
+  resimple: 'RESIMPLE',
+  none: 'Sin IRE',
   unknown: 'Todavía no lo sé',
 }
 

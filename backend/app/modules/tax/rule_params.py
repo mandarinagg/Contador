@@ -92,6 +92,15 @@ class AnnualDue(_Params):
     day_rule: DayRuleCode
 
 
+class FixedDayDue(_Params):
+    """Día fijo del mes, igual para todas las terminaciones del RUC (RESIMPLE: el 26 de
+    febrero, RG 61/2020, art. 12). Si cae en un día inhábil se corre como cualquier otro
+    vencimiento calculado (D-086); que la norma lo corra no está verificado (D-PF-8)."""
+
+    months_after_fiscal_close: int = Field(ge=1, le=12)
+    fixed_day: int = Field(ge=1, le=28)
+
+
 class VatFilingParams(_Params):
     """`IVA-GENERAL-LIQUIDACION` (obligación 211, Formulario 120)."""
 
@@ -146,6 +155,121 @@ class FinancialStatementsParams(_Params):
     applies_to: list[str]
 
 
+class RateBracket(_Params):
+    up_to_pyg: int | None = Field(default=..., gt=0)
+    rate: Decimal = Field(gt=0, lt=1)
+
+
+class HousingLossCarryforward(_Params):
+    years: int = Field(ge=1)
+    max_pct_of_net_income: Decimal = Field(gt=0, lt=1)
+
+
+class VoucherRegisterByVat(_Params):
+    without_vat: Literal[956]
+    with_vat: Literal[955]
+
+
+class IrpServicesParams(_Params):
+    """`IRP-RSP-DJ` (obligación 715, Formulario 515): ejercicio = año civil (Ley 6380, art. 52)."""
+
+    obligation_code: Literal[715]
+    form: str
+    periodicity: Literal["annual"]
+    fiscal_year: Literal["calendar"]
+    due: AnnualDue
+    file_even_if_zero: bool
+    not_reached_amount_pyg: int = Field(gt=0)
+    registration_deadline_business_days: int = Field(gt=0)
+    rate_brackets: list[RateBracket] = Field(min_length=1)
+    cease_after_consecutive_years_not_reached: int = Field(ge=1)
+    donations_cap_pct_of_gross: Decimal = Field(gt=0, lt=1)
+    loss_carryforward: bool
+    housing_loss_carryforward: HousingLossCarryforward
+    voucher_register: VoucherRegisterByVat
+
+
+class PresumedNetIncome(_Params):
+    sale_pct_of_price: Decimal = Field(gt=0, lt=1)
+    rental_pct_of_price: Decimal = Field(gt=0, lt=1)
+
+
+class EconomicActivity(_Params):
+    default: str
+    rentals: str
+
+
+class IrpCapitalParams(_Params):
+    """`IRP-RGC-DJ` (obligación 716, Formulario 516): ejercicio = año civil."""
+
+    obligation_code: Literal[716]
+    form: str
+    periodicity: Literal["annual"]
+    fiscal_year: Literal["calendar"]
+    due: AnnualDue
+    file_even_if_zero: bool | None
+    rate: Decimal = Field(gt=0, lt=1)
+    presumed_net_income: PresumedNetIncome
+    rental_base_excludes_vat: bool
+    rental_base: str
+    excluded: list[str]
+    exempt_movable_sales_up_to_pyg: int = Field(gt=0)
+    registration_deadline_business_days: int = Field(gt=0)
+    economic_activity: EconomicActivity
+
+
+class AnnualVoucherRegisterParams(_Params):
+    """`REG-COMPROB-ANUAL` (obligación 956, RG 90/2021, art. 7° según la RG DNIT 12/2024)."""
+
+    obligation_code: Literal[956]
+    linked_obligation: int
+    periodicity: Literal["annual"]
+    due: AnnualDue
+    confirm_even_if_zero: bool
+    replaced_by_if_also_obligation: dict[str, int]
+    file_name_pattern: str
+    spec_file: str
+
+
+class QuarterlyPayments(_Params):
+    months: list[int] = Field(min_length=1)
+    day_rule: DayRuleCode
+    frequency: Literal["quarterly"]
+
+
+class FeeBracket(_Params):
+    up_to_pyg: int = Field(gt=0)
+    monthly_pyg: int = Field(gt=0)
+
+
+class IfNotFiled(_Params):
+    generated_by_dnit_on: str
+    assumed_income_up_to_pyg: int = Field(gt=0)
+
+
+class IreResimpleParams(_Params):
+    """`IRE-RESIMPLE-DJ` (obligación 702, Formulario 502): DJ informativa con día fijo.
+
+    El calendario genera solo la declaración jurada; las cuotas trimestrales (`payments`)
+    todavía no (D-PF-9)."""
+
+    obligation_code: Literal[702]
+    form: str
+    periodicity: Literal["annual"]
+    fiscal_year: Literal["calendar"]
+    due: FixedDayDue
+    payments: QuarterlyPayments
+    max_prior_year_income_pyg: int = Field(gt=0)
+    monthly_fee_by_prior_year_income: list[FeeBracket] = Field(min_length=1)
+    if_not_filed: IfNotFiled
+    vat_taxpayer: Literal[False]
+    advances: bool
+    withholdings: bool
+    applies_to: list[str]
+    excluded_if: list[str]
+    sales_voucher_type: int
+
+
 SCHEMAS: dict[str, type[_Params]] = {
     "CAL-PERPETUO-DJ": CalendarParams,
     "CAL-PERPETUO-DJI": CalendarParams,
@@ -155,6 +279,10 @@ SCHEMAS: dict[str, type[_Params]] = {
     "IRE-GENERAL-DJ": IreGeneralParams,
     "IRE-SIMPLE-DJ": IreSimpleParams,
     "EEFF-PRESENTACION": FinancialStatementsParams,
+    "IRP-RSP-DJ": IrpServicesParams,
+    "IRP-RGC-DJ": IrpCapitalParams,
+    "REG-COMPROB-ANUAL": AnnualVoucherRegisterParams,
+    "IRE-RESIMPLE-DJ": IreResimpleParams,
 }
 EXCEPTION_PREFIX = "CAL-EXCEPCION-"
 
@@ -165,12 +293,18 @@ OBLIGATION_RULES: dict[str, str] = {
     "IRE-GENERAL-DJ": "700",
     "IRE-SIMPLE-DJ": "701",
     "EEFF-PRESENTACION": "948",
+    "IRP-RSP-DJ": "715",
+    "IRP-RGC-DJ": "716",
+    "REG-COMPROB-ANUAL": "956",
+    "IRE-RESIMPLE-DJ": "702",
 }
 RULE_BY_DNIT_CODE: dict[str, str] = {dnit: code for code, dnit in OBLIGATION_RULES.items()}
 MONTHLY_RULES = frozenset({"IVA-GENERAL-LIQUIDACION", "REG-COMPROB-MENSUAL"})
 # Las «determinativas» de la excepción de grupo (D-086): las que vencen por el calendario
 # de las declaraciones juradas determinativas.
-DETERMINATIVE_RULES = frozenset({"IVA-GENERAL-LIQUIDACION", "IRE-GENERAL-DJ", "IRE-SIMPLE-DJ"})
+DETERMINATIVE_RULES = frozenset(
+    {"IVA-GENERAL-LIQUIDACION", "IRE-GENERAL-DJ", "IRE-SIMPLE-DJ", "IRP-RSP-DJ", "IRP-RGC-DJ"}
+)
 
 
 def schema_for(code: str) -> type[_Params] | None:
@@ -179,10 +313,10 @@ def schema_for(code: str) -> type[_Params] | None:
     return SCHEMAS.get(code)
 
 
-def due_of(params: _Params) -> MonthlyDue | AnnualDue:
+def due_of(params: _Params) -> MonthlyDue | AnnualDue | FixedDayDue:
     """Cómo vence una obligación (los esquemas de las reglas de obligaciones lo traen)."""
     due = getattr(params, "due", None)  # no todos los esquemas lo tienen
-    if not isinstance(due, MonthlyDue | AnnualDue):
+    if not isinstance(due, MonthlyDue | AnnualDue | FixedDayDue):
         raise TypeError("La regla no define un vencimiento.")
     return due
 

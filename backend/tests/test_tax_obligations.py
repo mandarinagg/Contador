@@ -68,10 +68,10 @@ def test_sync_is_idempotent_and_covers_until_three_months_ahead(
     put_profile(
         client,
         owner_token,
-        obligations=(("211", "2026-01-01"), ("955", "2026-01-01"), ("715", "2026-01-01")),
+        obligations=(("211", "2026-01-01"), ("955", "2026-01-01"), ("726", "2026-01-01")),
     )
     result = ok(client.post(f"{TAX}/obligations/sync", headers=auth_header(owner_token)))
-    assert result["unsupported_codes"] == ["715"]
+    assert result["unsupported_codes"] == ["726"]
 
 
 def test_overdue_is_derived(

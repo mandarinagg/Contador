@@ -954,7 +954,7 @@ rules:
 
   # ================================================================ PERSONA FÍSICA (agregadas el 2026-11-25)
   # Detalle, citas y dudas (D-PF-1 a D-PF-16): docs/research/TRIBUTACION_PERSONA_FISICA.md
-  # Sin esquema en rule_params.py todavía: se cargan y se muestran, pero no generan obligaciones.
+  # Con esquema en rule_params.py desde la fase M6 (D-142): generan obligaciones, siguen en pending.
 
   # ---------------------------------------------------------------- IRP
   - code: IRP-RSP-DJ

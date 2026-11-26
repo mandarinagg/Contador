@@ -13,11 +13,13 @@ import { useToast } from '../../components/ui/toast'
 import { cx } from '../../lib/cx'
 import { formatDateTime } from '../../lib/format'
 import { ApiError, post, put } from '../../services/api'
+import { useSession } from '../../stores/session'
+import type { LegalForm } from '../../types/api'
 import { ApiErrorNotice, Check as CheckBox, ReadOnlyHint, Th } from '../finance/components'
 import { formatBookDate, todayIso } from '../finance/labels'
 import { UnverifiedMark, VerifyForm } from './components'
 import { useInvalidateTax, useTaxPerms, useTaxProfile } from './data'
-import { DNIT_OBLIGATIONS, dnitName, IRE_REGIME_LABELS, monthName } from './labels'
+import { accountingOptional, dnitName, IRE_REGIME_LABELS, monthName, obligationsFor } from './labels'
 import type { IreRegime, Profile, ProfileVersion } from './types'
 
 interface Draft {
@@ -38,15 +40,49 @@ const fromVersion = (v: ProfileVersion | null | undefined): Draft => ({
   notes: '',
 })
 
-/** Los mismos controles que hace la API (`profile._check_consistency`), para avisar antes de guardar. */
-function consistencyProblems(d: Pick<Draft, 'ire_regime' | 'vat_taxpayer' | 'obligations'>): string[] {
+const IRE_BY_CODE: Record<string, IreRegime> = { '700': 'ire_general', '701': 'ire_simple', '702': 'resimple' }
+const IRE_NAMES: Record<string, string> = { '700': 'IRE General', '701': 'IRE SIMPLE', '702': 'IRE RESIMPLE' }
+const REGIME_NAMES: Partial<Record<IreRegime, string>> = { ire_general: 'el IRE General', ire_simple: 'el IRE SIMPLE', resimple: 'el RESIMPLE', none: '«sin IRE»' }
+const IRP_NAMES: Record<string, string> = { '715': 'IRP-RSP', '716': 'IRP-RGC' }
+const COMPANY_FORMS: LegalForm[] = ['EAS', 'SA', 'SRL', 'UNIPERSONAL']
+const RESIMPLE_FORMS: LegalForm[] = ['PERSONA_FISICA', 'UNIPERSONAL']
+
+/** Los mismos controles que hace la API (`profile._check_consistency`, D-142), para avisar antes de guardar. */
+function consistencyProblems(d: Pick<Draft, 'ire_regime' | 'vat_taxpayer' | 'obligations' | 'fiscal_close_month'>, legalForm: LegalForm | undefined): string[] {
   const codes = Object.keys(d.obligations)
+  const regime = d.ire_regime
+  const person = legalForm === 'PERSONA_FISICA'
   const out: string[] = []
   if (codes.includes('211') && d.vat_taxpayer === false) out.push('La obligación 211 (IVA General) es de contribuyentes del IVA.')
-  if (codes.includes('700') && codes.includes('701')) out.push('No se puede estar en el IRE General (700) y en el SIMPLE (701) a la vez.')
-  if (codes.includes('700') && d.ire_regime === 'ire_simple') out.push('La obligación 700 es del IRE General, pero el régimen elegido es el SIMPLE.')
-  if (codes.includes('701') && d.ire_regime === 'ire_general') out.push('La obligación 701 es del IRE SIMPLE, pero el régimen elegido es el General.')
+  const ire = Object.keys(IRE_BY_CODE).filter((c) => codes.includes(c))
+  if (ire.length > 1) out.push(`No se puede estar en más de un régimen del IRE a la vez: ${ire.map((c) => `${IRE_NAMES[c]} (${c})`).join(' y ')}.`)
+  for (const code of ire) {
+    if (code === '702' && regime !== 'resimple') out.push('La obligación 702 es del IRE RESIMPLE: elegí el régimen RESIMPLE para cargarla.')
+    else if (code !== '702' && regime && REGIME_NAMES[regime] && regime !== IRE_BY_CODE[code]) out.push(`La obligación ${code} es del ${IRE_NAMES[code]}, pero el régimen es ${REGIME_NAMES[regime]}.`)
+  }
+  if (regime === 'resimple' && !(legalForm && RESIMPLE_FORMS.includes(legalForm))) out.push('El RESIMPLE es solo para empresas unipersonales de una persona física (Ley 6380/2019, art. 27).')
+  if (regime === 'none' && legalForm && COMPANY_FORMS.includes(legalForm)) out.push('Una empresa es contribuyente del IRE (Ley 6380/2019, art. 2°): elegí su régimen o «Todavía no lo sé».')
+  if (regime === 'resimple' && codes.includes('211'))
+    out.push('Quien liquida por el RESIMPLE no es contribuyente del IVA (Ley 6380/2019, art. 27, último párrafo): no puede tener la obligación 211.')
+  const irp = Object.keys(IRP_NAMES).filter((c) => codes.includes(c))
+  if (!person) for (const code of irp) out.push(`La obligación ${code} (${IRP_NAMES[code]}) es del impuesto a la renta personal: solo la tiene una persona física, no una empresa.`)
+  if (irp.length > 0 && person && d.fiscal_close_month !== 12)
+    out.push(`El ejercicio del IRP es el año civil (Ley 6380/2019, art. 52): con la obligación ${irp.join(' o ')} el cierre del ejercicio es en diciembre.`)
+  if (codes.includes('956')) {
+    if (codes.includes('211')) out.push('Con la 211 (IVA) el registro de comprobantes es el mensual, 955, no el anual 956 (RG 90/2021, art. 7°, texto de la RG DNIT 12/2024).')
+    if (!codes.includes('715')) out.push('El registro anual de comprobantes (956) va con la obligación 715 (IRP-RSP) (RG 90/2021, art. 7°, texto de la RG DNIT 12/2024).')
+  }
   return out
+}
+
+function AccountingOptionalNote() {
+  return (
+    <Notice tone="neutral" title="La contabilidad es opcional">
+      Sin el IRE General, a la persona física no se le exige contabilidad por partida doble: alcanzan el registro de comprobantes y los libros de ingresos y egresos (RG
+      69/2020, art. 32; RG 90/2021). El menú Contabilidad sigue disponible si querés llevarla igual. Si la Ley 1034 «Del Comerciante» te obliga a llevarla, sí corresponde
+      (sin verificar).
+    </Notice>
+  )
 }
 
 const STEPS = ['Desde cuándo', 'Régimen del IRE', 'Cierre del ejercicio', 'IVA', 'Obligaciones', 'Revisar'] as const
@@ -77,7 +113,7 @@ function Choice({ checked, onSelect, title, children, name }: { checked: boolean
   )
 }
 
-function Wizard({ profile, onDone }: { profile: Profile; onDone: () => void }) {
+function Wizard({ profile, legalForm, onDone }: { profile: Profile; legalForm: LegalForm | undefined; onDone: () => void }) {
   const toast = useToast()
   const invalidate = useInvalidateTax()
   const [step, setStep] = useState(0)
@@ -89,6 +125,8 @@ function Wizard({ profile, onDone }: { profile: Profile; onDone: () => void }) {
     setStepError(undefined)
   }
   const sameAsDeclared = profile.history.find((v) => v.valid_from === d.valid_from)
+  const person = legalForm === 'PERSONA_FISICA'
+  const catalog = obligationsFor(legalForm)
 
   const save = useMutation({
     mutationFn: () =>
@@ -110,7 +148,7 @@ function Wizard({ profile, onDone }: { profile: Profile; onDone: () => void }) {
   const validate = (): string | undefined => {
     if (step === 0 && !d.valid_from) return 'Elegí la fecha desde la que rige.'
     if (step === 1 && !d.ire_regime) return 'Elegí el régimen (o «Todavía no lo sé»).'
-    if (step === 3 && d.vat_taxpayer === null) return 'Indicá si la empresa es contribuyente del IVA.'
+    if (step === 3 && d.vat_taxpayer === null) return person ? 'Indicá si sos contribuyente del IVA.' : 'Indicá si la empresa es contribuyente del IVA.'
     if (step === 4) {
       const missing = Object.entries(d.obligations).find(([, date]) => !date)
       if (missing) return `Falta la fecha de alta de la obligación ${missing[0]}.`
@@ -132,6 +170,7 @@ function Wizard({ profile, onDone }: { profile: Profile; onDone: () => void }) {
       }
       if (d.ire_regime === 'ire_general') suggested['700'] = ''
       if (d.ire_regime === 'ire_simple') suggested['701'] = ''
+      if (d.ire_regime === 'resimple') suggested['702'] = ''
       set({ obligations: suggested })
     }
     setStep((s) => Math.min(STEPS.length - 1, s + 1))
@@ -142,9 +181,9 @@ function Wizard({ profile, onDone }: { profile: Profile; onDone: () => void }) {
     else delete obligations[code]
     set({ obligations })
   }
-  const problems = consistencyProblems(d)
+  const problems = consistencyProblems(d, legalForm)
   const apiProblems = save.error instanceof ApiError && save.error.code === 'PROFILE_INCONSISTENT' ? ((save.error.details as { problems?: string[] })?.problems ?? []) : []
-  const otherCodes = Object.keys(d.obligations).filter((c) => !DNIT_OBLIGATIONS.some((o) => o.code === c))
+  const otherCodes = Object.keys(d.obligations).filter((c) => !catalog.some((o) => o.code === c))
 
   return (
     <div className="grid grid-cols-[12rem_minmax(0,1fr)] gap-6">
@@ -205,7 +244,17 @@ function Wizard({ profile, onDone }: { profile: Profile; onDone: () => void }) {
         {step === 1 && (
           <>
             <Where>
-              En el apartado de obligaciones figura <b>700 — IRE General</b> o <b>701 — IRE SIMPLE</b>. Si no figura ninguna, revisá tus obligaciones en Marangatu antes de elegir.
+              En el apartado de obligaciones figura <b>700 — IRE General</b>, <b>701 — IRE SIMPLE</b>
+              {RESIMPLE_FORMS.includes(legalForm as LegalForm) && (
+                <>
+                  {' '}
+                  o <b>702 — IRE RESIMPLE</b>
+                </>
+              )}
+              .{' '}
+              {person
+                ? 'Si no figura ninguna (por ejemplo, solo tenés IRP o IVA), elegí «Sin IRE».'
+                : 'Si no figura ninguna, revisá tus obligaciones en Marangatu antes de elegir.'}
             </Where>
             <fieldset className="flex flex-col gap-2">
               <legend className="sr-only">Régimen del IRE</legend>
@@ -215,6 +264,16 @@ function Wizard({ profile, onDone }: { profile: Profile; onDone: () => void }) {
               <Choice name="ire" checked={d.ire_regime === 'ire_simple'} onSelect={() => set({ ire_regime: 'ire_simple' })} title="IRE SIMPLE">
                 Para ingresos anuales de hasta el tope de la ley: declaración anual con el Formulario 501.
               </Choice>
+              {RESIMPLE_FORMS.includes(legalForm as LegalForm) && (
+                <Choice name="ire" checked={d.ire_regime === 'resimple'} onSelect={() => set({ ire_regime: 'resimple' })} title="RESIMPLE">
+                  Empresa unipersonal con ingresos de hasta 80 millones al año: declaración anual con el Formulario 502 y cuotas fijas. No es contribuyente del IVA.
+                </Choice>
+              )}
+              {person && (
+                <Choice name="ire" checked={d.ire_regime === 'none'} onSelect={() => set({ ire_regime: 'none' })} title="Sin IRE">
+                  No tenés obligaciones del IRE: por ejemplo, solo el IRP por servicios personales o el IVA.
+                </Choice>
+              )}
               <Choice name="ire" checked={d.ire_regime === 'unknown'} onSelect={() => set({ ire_regime: 'unknown' })} title="Todavía no lo sé">
                 El calendario no genera la declaración anual del IRE hasta que lo indiques.
               </Choice>
@@ -227,6 +286,7 @@ function Wizard({ profile, onDone }: { profile: Profile; onDone: () => void }) {
           <>
             <Where>
               Figura como <b>cierre del ejercicio</b> (o mes de cierre). En la mayoría de las empresas es diciembre. Define cuándo vencen las declaraciones anuales.
+              {person && ' Con el IRP es siempre diciembre: su ejercicio es el año civil.'}
             </Where>
             <Field label="Mes de cierre del ejercicio fiscal">
               {(p) => (
@@ -245,7 +305,7 @@ function Wizard({ profile, onDone }: { profile: Profile; onDone: () => void }) {
         {step === 3 && (
           <>
             <Where>
-              Si entre las obligaciones figura <b>211 — IVA General</b>, la empresa es contribuyente del IVA y presenta el Formulario 120 todos los meses.
+              Si entre las obligaciones figura <b>211 — IVA General</b>, {person ? 'sos' : 'la empresa es'} contribuyente del IVA y presenta el Formulario 120 todos los meses.
             </Where>
             <fieldset className="flex flex-col gap-2">
               <legend className="sr-only">Contribuyente del IVA</legend>
@@ -267,7 +327,7 @@ function Wizard({ profile, onDone }: { profile: Profile; onDone: () => void }) {
               por su cuenta.
             </Where>
             <ul className="flex flex-col divide-y divide-line rounded-sm border border-line">
-              {DNIT_OBLIGATIONS.map((o) => {
+              {catalog.map((o) => {
                 const on = o.code in d.obligations
                 return (
                   <li key={o.code} className="flex items-start gap-4 px-3.5 py-3">
@@ -304,7 +364,7 @@ function Wizard({ profile, onDone }: { profile: Profile; onDone: () => void }) {
               ))}
             </ul>
             <div className="flex items-end gap-2">
-              <Field label="Otra obligación de la constancia (código)" hint="Por ejemplo 715 o 726. Se guarda, aunque la app no la calcule todavía.">
+              <Field label="Otra obligación de la constancia (código)" hint="Por ejemplo 726 o 954. Se guarda, aunque la app no la calcule todavía.">
                 {(p) => <Input {...p} className="w-32" inputMode="numeric" maxLength={4} value={otherCode} onChange={(e) => setOtherCode(e.target.value.replace(/\D/g, ''))} />}
               </Field>
               <Button
@@ -405,7 +465,7 @@ function Wizard({ profile, onDone }: { profile: Profile; onDone: () => void }) {
   )
 }
 
-function VersionCard({ version, canVerify, onVerify }: { version: ProfileVersion; canVerify: boolean; onVerify: () => void }) {
+function VersionCard({ version, legalForm, canVerify, onVerify }: { version: ProfileVersion; legalForm: LegalForm | undefined; canVerify: boolean; onVerify: () => void }) {
   return (
     <div className="flex flex-col gap-4 p-5">
       <div className="flex items-start justify-between gap-4">
@@ -461,6 +521,7 @@ function VersionCard({ version, canVerify, onVerify }: { version: ProfileVersion
           </>
         )}
       </dl>
+      {accountingOptional(legalForm, version.ire_regime) && <AccountingOptionalNote />}
     </div>
   )
 }
@@ -472,6 +533,7 @@ export function ProfilePage() {
   const invalidate = useInvalidateTax()
   const [editing, setEditing] = useState(false)
   const [verifying, setVerifying] = useState(false)
+  const legalForm = useSession().me?.organization.legal_form
   const data = profile.data
   const current = data?.current
 
@@ -526,13 +588,13 @@ export function ProfilePage() {
               <EmptyState title="Todavía no hay perfil fiscal">Lo carga el propietario, el administrador o el contador. {perms.manageReason}</EmptyState>
             )
           ) : (
-            <Wizard profile={data} onDone={() => setEditing(false)} />
+            <Wizard profile={data} legalForm={legalForm} onDone={() => setEditing(false)} />
           )}
         </Sheet>
       ) : (
         <>
           <Sheet>
-            <VersionCard version={current} canVerify={perms.canVerify} onVerify={() => setVerifying(true)} />
+            <VersionCard version={current} legalForm={legalForm} canVerify={perms.canVerify} onVerify={() => setVerifying(true)} />
             {current.origin === 'declared' && !perms.canVerify && (
               <div className="border-t border-line px-5 py-3">
                 <ReadOnlyHint reason={perms.verifyReason} />

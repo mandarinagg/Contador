@@ -408,6 +408,15 @@ Casillas leídas del formulario y de su instructivo. Oficial leída.
 
 ## 9. Dudas abiertas (D-PF)
 
+> **De qué dudas depende la implementación (fase M6, D-142, 2026-11-26).** Si una se resuelve distinto, hay que cambiar el código:
+> - **D-PF-8:** el 26 de febrero del RESIMPLE se corre al siguiente hábil, como todo vencimiento calculado; `remind_by` avisa por el 26.
+> - **D-PF-9:** solo se genera la declaración 702; las cuotas trimestrales no.
+> - **D-PF-10:** la 702 se genera desde el ejercicio de su alta, también el primero incompleto.
+> - **D-PF-1:** el RESIMPLE (702) se admite en la organización persona física (el mismo RUC que su dueño), además de la unipersonal.
+> - **D-PF-6 y D-PF-7:** la 956 exige la 715 y no va con la 211; la 716 sin IVA no tiene registro.
+> - **D-PF-11:** la contabilidad se muestra como opcional para la persona física sin IRE General (un aviso, nunca un bloqueo).
+> - **D-PF-17 (nueva):** el perfil rechaza la 211 con el RESIMPLE.
+
 **D-PF-1. ¿La empresa unipersonal usa el RUC de su dueño?**
 
 - Ninguna norma leída lo dice con todas las letras. Lo sugiere la RG 79/2021, art. 6°: solo la EIRL recibe una serie propia.
@@ -470,6 +479,12 @@ Casillas leídas del formulario y de su instructivo. Oficial leída.
 **D-PF-15. Multa por presentar tarde el 515, el 516 o el 502** (casillas 49 y 131) y por confirmar tarde la 956 (RG 90/2021, art. 8°). No encontré el monto (igual que la D-11).
 
 **D-PF-16. Deducciones que la aplicación no puede saber sola.** El familiar a cargo (cónyuge no contribuyente, ingresos de hasta ₲ 30.000.000), el autovehículo cada 3 años y la vivienda cada 5 años dependen de datos del contribuyente. ¿Se piden en el perfil de la persona física?
+
+
+**D-PF-17. ¿La persona física con RESIMPLE puede tener IVA por sus servicios personales?**
+
+- La Ley 6380, art. 27, último párrafo, saca del IVA a la unipersonal del RESIMPLE. El art. 82, num. 1, inc. a), hace contribuyente del IVA a la persona física por sus servicios personales.
+- Si las dos cosas están en el mismo RUC (D-PF-1), no está claro cuál prevalece. Hoy el perfil rechaza la 211 junto con el RESIMPLE (D-142).
 
 ---
 

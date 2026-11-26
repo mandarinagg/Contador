@@ -8,9 +8,11 @@
   verificada, no cambia (409): se carga otra con otra fecha.
 - El RUC y el DV salen de `core.organizations` y son obligatorios (también lo exige el
   trigger `profiles_guard`). Sin perfil no hay obligaciones.
-- Coherencia mínima, para no generar obligaciones contradictorias: 211 (IVA) solo si es
-  contribuyente del IVA; 700 (IRE General) no con régimen SIMPLE y 701 (IRE SIMPLE) no con
-  régimen General; nunca 700 y 701 juntas.
+- Coherencia mínima, para no generar obligaciones contradictorias (`_check_consistency`):
+  211 (IVA) solo si es contribuyente del IVA; cada obligación del IRE (700, 701, 702) con su
+  régimen y nunca dos juntas; el IRP (715, 716) y la 956 solo para una persona física, con
+  el cierre en diciembre; el RESIMPLE sin IVA; la 956 sin la 211 (D-142). El backend no
+  exige contabilidad a nadie: eso es un aviso del frontend.
 """
 
 import uuid
@@ -86,7 +88,25 @@ def _obligations_snapshot(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [{"code": r["code"], "registered_on": jsonable(r["registered_on"])} for r in rows]
 
 
-def _check_consistency(data: dict[str, Any]) -> None:
+_IRE_OBLIGATIONS = {"700": "ire_general", "701": "ire_simple", "702": "resimple"}
+_IRE_NAMES = {
+    "700": "IRE General",
+    "701": "IRE SIMPLE",
+    "702": "IRE RESIMPLE",
+}
+_REGIME_NAMES = {
+    "ire_general": "el IRE General",
+    "ire_simple": "el IRE SIMPLE",
+    "resimple": "el RESIMPLE",
+    "none": "«sin IRE»",
+}
+_IRP_OBLIGATIONS = {"715": "IRP-RSP", "716": "IRP-RGC"}
+# Formas jurídicas que son contribuyentes del IRE por sí mismas (Ley 6380/2019, art. 2°).
+_COMPANY_FORMS = frozenset({"EAS", "SA", "SRL", "UNIPERSONAL"})
+_RESIMPLE_FORMS = frozenset({"PERSONA_FISICA", "UNIPERSONAL"})
+
+
+def _check_consistency(data: dict[str, Any], legal_form: str) -> None:
     codes = [o["code"] for o in data["obligations"]]
     if len(codes) != len(set(codes)):
         raise AppError(
@@ -94,15 +114,64 @@ def _check_consistency(data: dict[str, Any]) -> None:
             "Una obligación figura dos veces: cada código va una sola vez.",
             status_code=422,
         )
+    regime = data["ire_regime"]
+    person = legal_form == "PERSONA_FISICA"
     problems: list[str] = []
     if "211" in codes and not data["vat_taxpayer"]:
         problems.append("La obligación 211 (IVA General) es de contribuyentes del IVA.")
-    if "700" in codes and "701" in codes:
-        problems.append("No se puede estar en el IRE General (700) y en el SIMPLE (701) a la vez.")
-    if "700" in codes and data["ire_regime"] == "ire_simple":
-        problems.append("La obligación 700 es del IRE General, pero el régimen es el SIMPLE.")
-    if "701" in codes and data["ire_regime"] == "ire_general":
-        problems.append("La obligación 701 es del IRE SIMPLE, pero el régimen es el General.")
+    ire = [c for c in _IRE_OBLIGATIONS if c in codes]
+    if len(ire) > 1:
+        names = " y ".join(f"{_IRE_NAMES[c]} ({c})" for c in ire)
+        problems.append(f"No se puede estar en más de un régimen del IRE a la vez: {names}.")
+    for code in ire:
+        expected = _IRE_OBLIGATIONS[code]
+        if code == "702" and regime != expected:
+            problems.append(
+                "La obligación 702 es del IRE RESIMPLE: elegí el régimen RESIMPLE para cargarla."
+            )
+        elif code != "702" and regime in _REGIME_NAMES and regime != expected:
+            problems.append(
+                f"La obligación {code} es del {_IRE_NAMES[code]}, pero el régimen es "
+                f"{_REGIME_NAMES[regime]}."
+            )
+    if regime == "resimple" and legal_form not in _RESIMPLE_FORMS:
+        problems.append(
+            "El RESIMPLE es solo para empresas unipersonales de una persona física "
+            "(Ley 6380/2019, art. 27)."
+        )
+    if regime == "none" and legal_form in _COMPANY_FORMS:
+        problems.append(
+            "Una empresa es contribuyente del IRE (Ley 6380/2019, art. 2°): elegí su régimen "
+            "o «Todavía no lo sé»."
+        )
+    if regime == "resimple" and "211" in codes:
+        problems.append(
+            "Quien liquida por el RESIMPLE no es contribuyente del IVA (Ley 6380/2019, art. 27, "
+            "último párrafo): no puede tener la obligación 211."
+        )
+    irp = [c for c in _IRP_OBLIGATIONS if c in codes]
+    for code in irp:
+        if not person:
+            problems.append(
+                f"La obligación {code} ({_IRP_OBLIGATIONS[code]}) es del impuesto a la renta "
+                "personal: solo la tiene una persona física, no una empresa."
+            )
+    if irp and person and data["fiscal_close_month"] != 12:
+        problems.append(
+            "El ejercicio del IRP es el año civil (Ley 6380/2019, art. 52): con la obligación "
+            f"{' o '.join(irp)} el cierre del ejercicio es en diciembre."
+        )
+    if "956" in codes:
+        if "211" in codes:
+            problems.append(
+                "Con la 211 (IVA) el registro de comprobantes es el mensual, 955, no el anual 956 "
+                "(RG 90/2021, art. 7°, texto de la RG DNIT 12/2024)."
+            )
+        if "715" not in codes:
+            problems.append(
+                "El registro anual de comprobantes (956) va con la obligación 715 (IRP-RSP) "
+                "(RG 90/2021, art. 7°, texto de la RG DNIT 12/2024)."
+            )
     if problems:
         raise AppError(
             "PROFILE_INCONSISTENT",
@@ -124,7 +193,7 @@ def put_version(
             "perfil fiscal: los vencimientos dependen de la terminación del RUC.",
             status_code=422,
         )
-    _check_consistency(data)
+    _check_consistency(data, org.legal_form)
     existing = db.scalar(
         select(Profile)
         .where(Profile.organization_id == organization_id, Profile.valid_from == data["valid_from"])

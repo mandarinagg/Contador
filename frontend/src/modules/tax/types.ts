@@ -8,7 +8,7 @@ export type Direction = 'purchase' | 'sale'
 export type VoucherType = 'invoice' | 'credit_note' | 'debit_note'
 export type DocType = 'ruc' | 'identity_card' | 'passport' | 'foreign_id' | 'unnamed' | 'diplomatic' | 'tax_id'
 export type Condition = 'cash' | 'credit'
-export type IreRegime = 'ire_general' | 'ire_simple' | 'unknown'
+export type IreRegime = 'ire_general' | 'ire_simple' | 'resimple' | 'none' | 'unknown'
 export type ObligationStatus = 'pending' | 'filed' | 'paid' | 'not_applicable'
 
 export interface RuleApplied {

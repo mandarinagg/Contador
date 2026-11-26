@@ -119,3 +119,47 @@ test('una persona física se da de alta con nombres y apellidos y aparece como �
   await page.getByRole('menuitemradio', { name: new RegExp(firstName) }).click()
   await expect(orgButton(page)).toContainText(firstName)
 })
+
+test('el perfil fiscal de la persona física con IRP-RSP genera su vencimiento en el Calendario (M6)', async ({ page }) => {
+  const year = new Date().getFullYear()
+  await signInTo(page, firstName)
+  await orgButton(page).click()
+  await page.getByRole('menuitemradio', { name: /Benítez Duarte, María José/ }).click()
+  await expect(orgButton(page)).toContainText('Benítez Duarte, María José')
+
+  // RUC = cédula 1234567 (DV 9), terminación 7: el IRP vence el día 21 de la DJ, en marzo.
+  await page.goto('/empresa')
+  await page.getByLabel('RUC (es tu cédula)').fill('1234567')
+  await page.getByLabel('Dígito verificador').fill('9')
+  await page.getByRole('button', { name: 'Guardar cambios' }).click()
+  await expect(page.getByText('Datos de la organización guardados.')).toBeVisible()
+
+  await page.goto('/impuestos/perfil')
+  await page.getByRole('button', { name: 'Empezar' }).click()
+  await page.getByLabel('Rige desde').fill(`${year - 1}-01-01`)
+  await page.getByRole('button', { name: 'Siguiente' }).click()
+  await page.getByRole('radio', { name: /^Sin IRE/ }).check()
+  await page.getByRole('button', { name: 'Siguiente' }).click()
+  await page.getByRole('button', { name: 'Siguiente' }).click() // cierre en diciembre
+  await page.getByRole('radio', { name: /^No/ }).check()
+  await page.getByRole('button', { name: 'Siguiente' }).click()
+  await page.getByRole('checkbox', { name: /^715 — IRP-RSP/ }).check()
+  await page.getByLabel('Fecha de alta de la 715').fill(`${year - 1}-01-01`)
+  await page.getByRole('button', { name: 'Siguiente' }).click()
+  await page.getByRole('button', { name: 'Guardar el perfil' }).click()
+  await expect(page.getByText('La contabilidad es opcional')).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Principal' }).getByText('· opcional')).toBeVisible()
+
+  // Ejercicio del año pasado: vence en marzo de este año (sábado o domingo pasan al lunes).
+  const due = new Date(Date.UTC(year, 2, 21))
+  while (due.getUTCDay() === 0 || due.getUTCDay() === 6) due.setUTCDate(due.getUTCDate() + 1)
+  const dueText = `${String(due.getUTCDate()).padStart(2, '0')}/03/${year}`
+  await page.goto('/impuestos/calendario')
+  const row = page.getByRole('listitem', { name: `IRP-RSP: declaración anual (Formulario 515), ejercicio ${year - 1}` })
+  await expect(row).toContainText(`Vence el ${dueText}`)
+  await expect(row).toContainText('obligación 715')
+
+  await orgButton(page).click()
+  await page.getByRole('menuitemradio', { name: new RegExp(firstName) }).click()
+  await expect(orgButton(page)).toContainText(firstName)
+})
