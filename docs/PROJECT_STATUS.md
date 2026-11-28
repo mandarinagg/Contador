@@ -1,6 +1,6 @@
 # Estado del proyecto
 
-**Última actualización:** 2026-11-25 · **Fase actual:** 1B — Instalador para Windows 11
+**Última actualización:** 2026-11-28 · **Fase actual:** 1B — Instalador para Windows 11
 
 ## Resumen
 
@@ -8,7 +8,7 @@
 |---|---|
 | 0 — Discovery y auditoría | ✅ Completa |
 | 1 — Fundación | ✅ Funcional en navegador |
-| 1B — Instalador Windows 11 | 🟡 CI verde en Windows real (lanzador, copias, instalador instalado, abierto, cerrado y desinstalado). Falta instalarlo en la PC del propietario |
+| 1B — Instalador Windows 11 | 🟡 CI verde en Windows real (lanzador, copias, instalador instalado, abierto, cerrado y desinstalado). **Instalado en la PC del propietario desde el 2026-11-25** (usuario de Windows `antho`, sin tildes: P-8 no se da ahí); arranca, migra y hace la copia diaria. Falta probar P-12 y el uso real |
 | 2 — Finanzas empresa/personal | 🟡 Backend y interfaz hechos; probado de punta a punta en navegador (ver tabla). Falta validarlo con extractos reales del propietario |
 | 3 — Contabilidad (núcleo) | ✅ Backend e interfaz hechos; probado de punta a punta en navegador (ver tabla). El plan de cuentas sigue sin validar por un contador |
 | 3B — Activos fijos, centros, recurrentes, XLSX | ✅ Backend e interfaz hechos; probado de punta a punta en navegador (ver tabla). Vidas útiles, residuales y cuadro fiscal `pending` hasta que los valide el contador; descarga de Excel en la app de escritorio sin probar |
@@ -95,6 +95,7 @@
 | P-9 | ~~La API no tiene `GET /finance/contexts/{cid}/transactions/{id}`~~ | **Resuelto**: en la API (`test_finance_transaction_detail.py`) y en la interfaz, que lee el movimiento de origen por id aunque los filtros de la lista lo excluyan (E2E en `contabilidad-3b.spec.ts`) |
 | P-11 | Detalles menores de la API | El 422 `ASSET_CATEGORY_INCOMPLETE` trae nombres pero no ids (la interfaz enlaza por nombre); las plantillas recurrentes no admiten moneda extranjera (`RecurringLineOut` sin `fx_*`, la interfaz lo deshabilita) |
 | P-12 | Descarga de Excel dentro de la app de escritorio sin probar | Probada en el navegador; en WebView2 debería abrir la descarga normal (`saveBlob`). Probarla al instalar en la PC real |
+| P-14 | No hay forma de recuperar una contraseña olvidada | Pasó en la PC del propietario (2026-11-28). La contraseña se guarda con Argon2id y no se puede leer; hoy solo se puede cambiar a mano en la base. Ver «Para retomar». Falta decidir el mecanismo (por ejemplo, un comando del backend o un código de recuperación al crear la cuenta) |
 | P-13 | El aviso de recurrentes en el E2E solo se verifica en 2026 | `contabilidad-3b.spec.ts` lo condiciona a `getFullYear() === 2026`; desde 2027 esa parte se saltea hasta ajustar las fechas de la prueba |
 | P-10 | ~~Los asientos traen el id de quien creó/contabilizó, no el nombre~~ | **Resuelto**: en la API (`test_accounting_entry_user_names.py`) y en la interfaz (asiento y libro diario, sin leer `/users`) |
 
@@ -108,14 +109,26 @@ D-001 a D-133 en `DECISIONS.md` (D-127 a D-133: el B1 del bot de Marangatu). **D
 4. **Facturación electrónica**: estado de la habilitación, timbrado de pruebas, certificado de firma (prestador habilitado), IdCSC/CSC de pruebas.
 5. ~~Contador/a responsable~~ **No hay (D-118):** la herramienta cumple ese rol y verifica contra las fuentes oficiales, con tu aprobación.
 6. **Bancos** con los que opera (para preparar los adaptadores de extractos) y un extracto de ejemplo anonimizado.
-7. **Probar el instalador** en la PC con Windows 11 y avisar el resultado (y si el nombre de usuario de Windows tiene tildes o ñ).
+7. ~~**Probar el instalador**~~ **Instalado (2026-11-25)**, usuario de Windows sin tildes. Falta avisar cómo va el uso real y la descarga de Excel (P-12).
 8. Revisar los hallazgos R-10 y R-11 de `DISCOVERY.md` (repositorio git en la carpeta personal con `.git-credentials`).
 9. **Credenciales de Marangatu** para el bot (D-119), cuando lleguemos a esa fase. Se guardan en el almacén de credenciales de Windows, nunca en el repositorio.
 10. ~~Confirmar la D-119~~ **Decidido (2026-11-25):** el bot presenta solo, sin pedir aprobación, con las 12 condiciones de la D-119 (ante la duda no presenta y avisa). Falta confirmar si el bot también paga (por ahora no).
 11. **Estatuto de la EAS** (D-3): el plazo que fija para poner las utilidades a disposición. De eso depende cuándo nace la retención del IDU.
 12. **Municipio de la EAS**, para la patente municipal.
 
-## Para retomar (traspaso, 2026-11-26)
+## Para retomar (traspaso, 2026-11-28)
+**2026-11-28:** `main` al día con `origin/main` (`bbc6133`); no hubo cambios de código.
+- **La app está instalada en la PC del propietario (Windows 11).** Los datos están en `%LOCALAPPDATA%\ContadorAI` (`pgdata`, `logs`, `backups/auto` con copias del 25, 26 y 28-11). PostgreSQL escucha en 127.0.0.1:55440, con el usuario y la base `contador`. Su clave está en el Administrador de credenciales (servicio `ContadorAI`, cuenta `postgresql`, crate `keyring` 3). La API corre en 127.0.0.1:8765.
+- **El propietario olvidó la contraseña de la app (P-14).** No se puede ver porque está guardada con Argon2id. Se preparó un script, fuera del repositorio, que:
+  - lee la clave de la base del Administrador de credenciales;
+  - valida la contraseña nueva con `identity.schemas.Password`;
+  - guarda el resumen con `hash_password` en `core.users`;
+  - pone en cero `failed_login_count` y `locked_until`;
+  - revoca las sesiones en `core.user_sessions`.
+
+  Se corre desde `backend/` con `uv run python <script>` y la app abierta. **Sin confirmar si ya se corrió ni si leyó bien la clave** (el script prueba con UTF-16 y con UTF-8). Si hace falta de nuevo, conviene llevarlo al repositorio como comando del backend.
+- La PC de desarrollo ahora también es esta, con Windows. `uv run` crea `backend/uv.lock`, que no está en el repositorio ni en `.gitignore`.
+
 **Estado de `main` (2026-11-26):** fases 0 a 3B, la fase 4 (tributación), el B1 del bot de Marangatu y el plan **varias organizaciones y persona física** (F0 y M1 a M8, `docs/specs/MULTI_ORG_PERSONA_FISICA.md`, D-134 a D-144) integrados. Pruebas: backend 591 (pytest contra PostgreSQL real, incluidas las `slow`), Vitest 259, E2E 57 (se suman `marangatu` y `organizaciones`). Migraciones hasta `0013_registro_ingresos_egresos`. CI verde en los 5 jobs en todas las etapas; el último, con M8 y el traspaso (`1e24561`, corrida 45759924973), trae el instalador para probar: `gh run download 45759924973 -R mandarinagg/Contador -n contador-ai-windows-instalador`. Pesa 82 MB comprimido (Playwright desde el B1).
 - **Varias organizaciones (M1 a M3, M5):** selector en la barra, «Nueva organización» (la crea cualquier propietario), elección al ingresar, sumar un usuario existente, usuario activo por organización (0009), RUC único (0008), aislamiento probado en todos los módulos con un control que falla si una ruta con id queda sin probar (`test_multi_org_isolation.py`). Bot: una corrida en toda la PC (`BOT_BUSY`), capturas en `documentos/<org>/marangatu/`, 409 al cambiar el RUC con clave guardada.
 - **Persona física (M4, M6 a M8):** alta con nombres y apellidos (RUC = cédula); RESIMPLE y «Sin IRE»; reglas 715, 716, 956 y 702 `pending`; registro de ingresos y egresos con tipos sin timbrado y archivo anual 956; página «IRP del año» con el borrador del 515 (las casillas sin dato quedan vacías) y el cuadre contra el registro (D-119 enmendada, todavía sin conectar al bot).
