@@ -1,10 +1,14 @@
 # Catálogo de pantallas de Marangatu (docs/specs/BOT_MARANGATU.md §3).
 #
-# ⚠ PROVISORIO. Solo la pantalla de ingreso (`login`) viene de la página real, pública, leída el
-# 2026-11-28 (D-145). Las demás (ingreso fallido, captcha, inicio, sesión cerrada) todavía son
-# las del portal simulado (backend/tests/marangatu_fake/), armadas con lo poco que dicen las
-# guías de la DNIT (usuario = RUC sin DV, clave, captcha al tercer intento fallido). Se
-# reemplazan con el borrador que deja el reconocimiento real (spec §10, paso 2), revisado a mano.
+# ⚠ PROVISORIO. Vienen del portal real: el ingreso (`login`, página pública leída el 2026-11-28,
+# D-145) y el inicio y otras cuatro pantallas vistas en el primer reconocimiento real del
+# 2026-11-28 (D-146). Siguen siendo del portal simulado (backend/tests/marangatu_fake/): el
+# ingreso fallido, el captcha y la sesión cerrada, armados con lo poco que dicen las guías de la
+# DNIT (usuario = RUC sin DV, clave, captcha al tercer intento fallido). Faltan los menús: se
+# cargan con JavaScript y esa corrida los recorrió antes de que terminaran de cargar.
+#
+# Las pantallas reales se reconocen SOLO por la dirección (anclada al camino) y el título: los
+# textos de la página pueden traer datos personales (nombre, RUC, números de declaración).
 #
 # La copia empaquetada es backend/app/modules/marangatu/pantallas.py: una prueba controla que
 # sean idénticas (si este archivo cambia, hay que regenerar la copia).
@@ -25,17 +29,23 @@
 #                            `va_a`: pantallas a las que puede llevar; `final: true` solo para
 #                            el clic que presenta (en el B1 no se ejecuta nunca).
 #   capturada_en             fecha del reconocimiento que la registró (null: simulada).
+#
+# meta.salida: el enlace para salir; `campo` es el selector, `texto` el texto del enlace (el
+#   recorrido nunca lo sigue). meta.cargando: textos de «cargando» que arma JavaScript: el bot
+#   espera, con tope, a que desaparezcan antes de leer cada página.
 meta:
   formato: 1
   provisorio: true
-  aviso: "PROVISORIO: solo el ingreso viene del portal real; el resto es del portal simulado."
+  aviso: "PROVISORIO: el ingreso y cinco pantallas vienen del portal real; el resto es del portal simulado."
   actualizado: "2026-11-28"
   ingreso: login
   inicio: inicio
-  # Enlace para salir de Marangatu desde cualquier pantalla con la sesión abierta.
+  # Enlace para salir de Marangatu (real, visto el 2026-11-28: «Salir» -> /eset/logout).
   salida:
-    campo: "#salir"
+    campo: "a[href$='/eset/logout']"
     texto: "Salir"
+  # Textos que muestra la página mientras JavaScript arma el menú o los mensajes.
+  cargando: ["Recuperando opciones de menú", "Recuperando Mensajes"]
 pantallas:
   - id: login
     version: 2
@@ -75,21 +85,53 @@ pantallas:
       textos: ["No soy un robot"]
     acciones: []
     capturada_en: null
+  # Pantallas reales vistas en el primer reconocimiento (2026-11-28). Sin acciones: el bot todavía
+  # no actúa en ellas. Se reconocen solo por la dirección y el título (sin textos personales).
   - id: inicio
+    version: 2
+    provisoria: true
+    reconoce:
+      url: '^https?://[^/]+/eset/(\?|;|$)'
+      titulo: "Bienvenido | MARANGATU"
+    acciones: []
+    capturada_en: "2026-11-28"
+  - id: informacion_contribuyente
     version: 1
     provisoria: true
     reconoce:
-      url: "/eset/inicio"
-      titulo: "Marangatu"
-      textos: ["Menú principal"]
-      campos: ["#salir"]
+      url: '^https?://[^/]+/eset/datosBasicosContribuyente\.do(\?|;|$)'
+      titulo: "Información del Contribuyente | MARANGATU"
     acciones: []
-    capturada_en: null
+    capturada_en: "2026-11-28"
+  - id: presentar_declaracion
+    version: 1
+    provisoria: true
+    reconoce:
+      url: '^https?://[^/]+/eset/recibirDDJJContribuyente\.do(\?|;|$)'
+      titulo: "Presentar Declaración | MARANGATU"
+    acciones: []
+    capturada_en: "2026-11-28"
+  - id: cuenta_corriente
+    version: 1
+    provisoria: true
+    reconoce:
+      url: '^https?://[^/]+/eset/mantenerAbmXsl\.do(\?|;|$)'
+      titulo: "Consultar Cuenta Corriente Contribuyente | MARANGATU"
+    acciones: []
+    capturada_en: "2026-11-28"
+  - id: marandu
+    version: 1
+    provisoria: true
+    reconoce:
+      url: '^https?://[^/]+/eset/buzon/marandu(\?|;|$)'
+      titulo: "Marandu | MARANGATU"
+    acciones: []
+    capturada_en: "2026-11-28"
   - id: sesion_cerrada
     version: 1
     provisoria: true
     reconoce:
-      url: "/eset/salir"
+      url: "/eset/logout"
       textos: ["Sesión finalizada"]
     acciones: []
     capturada_en: null

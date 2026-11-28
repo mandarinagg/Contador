@@ -8,12 +8,14 @@ clave, descargar o enviar un formulario.
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import time
 import uuid
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
 import yaml
@@ -45,6 +47,15 @@ NOT_DONE = (
     "/eset/descargas/estado",
     "/eset/olvide",
 )
+HOME_URLS = [
+    "/eset/",
+    "/eset/datosBasicosContribuyente.do",
+    "/eset/recibirDDJJContribuyente.do",
+    "/eset/mantenerAbmXsl.do",
+    "/eset/buzon/marandu",
+    "/eset/consultas/obligaciones",
+    "/eset/consultas/novedades",
+]
 
 
 def _nothing_submitted(portal: FakePortal) -> None:
@@ -76,10 +87,19 @@ def test_reconnaissance_happy_path(
     assert steps[4]["screen_id"] == "inicio"
     visited = [s for s in steps if s["action"] == "reconocer_pagina"]
     urls = [s["values"]["url"].removeprefix(portal.base_url) for s in visited]
-    assert urls == ["/eset/inicio", "/eset/consultas/obligaciones", "/eset/consultas/novedades"]
-    assert [s["screen_id"] for s in visited] == ["inicio", None, None]
+    # Los enlaces que arma JavaScript (obligaciones, novedades) se siguen: se espera al menú.
+    assert urls == HOME_URLS
+    assert [s["screen_id"] for s in visited] == [
+        "inicio",
+        "informacion_contribuyente",
+        "presentar_declaracion",
+        "cuenta_corriente",
+        "marandu",
+        None,
+        None,
+    ]
     # La estructura no lleva los valores de los campos (el período precargado no aparece).
-    form = visited[1]["values"]["estructura"]
+    form = visited[5]["values"]["estructura"]
     assert {"tipo": "text", "id": "periodo", "nombre": "periodo", "etiqueta": "Período"} in form[
         "campos"
     ]
@@ -89,18 +109,26 @@ def test_reconnaissance_happy_path(
     assert names[-2:] == ["salir", "reconocer"] and steps[-1]["screen_id"] == "sesion_cerrada"
     assert portal.state.logged_out
     assert portal.state.login_attempts == 1
+    # El enlace de salir se usa una sola vez y al final: el recorrido nunca lo visita.
+    assert portal.state.count("/eset/logout") == 1
+    after = portal.state.hits[portal.state.hits.index(("GET", "/eset/logout")) + 1 :]
+    assert all(path in ("/favicon.ico", "/eset/login") for _, path in after)
     _nothing_submitted(portal)
     # Borrador del catálogo para revisar a mano, con su SHA-256 en el registro.
     draft_step = next(s for s in steps if s["action"] == "borrador_catalogo")
     draft = yaml.safe_load((bot_env.data_dir / draft_step["capture_path"]).read_text("utf-8"))
     assert draft["meta"]["provisorio"] is True and draft["meta"]["corrida"] == detail["id"]
-    assert [p["reconoce"]["url"] for p in draft["pantallas"]] == [
-        "/eset/inicio",
-        "/eset/consultas/obligaciones",
-        "/eset/consultas/novedades",
-    ]
-    assert draft["pantallas"][0]["id"] == "inicio" and draft["pantallas"][0]["version"] == 2
-    assert "#periodo" in draft["pantallas"][1]["reconoce"]["campos"]
+    assert [
+        urlsplit(p["reconoce"]["url"].removeprefix("^https?://[^/]+")).path.split("(")[0]
+        for p in draft["pantallas"]
+    ] == [re.escape(u) for u in HOME_URLS]
+    assert draft["pantallas"][0]["id"] == "inicio" and draft["pantallas"][0]["version"] == 3
+    assert "#periodo" in draft["pantallas"][5]["reconoce"]["campos"]
+    # Sin datos personales: se reconoce por URL, título y campos; nunca por textos ni encabezados.
+    assert all("textos" not in p["reconoce"] for p in draft["pantallas"])
+    draft_text = (bot_env.data_dir / draft_step["capture_path"]).read_text("utf-8")
+    assert "9999999" not in draft_text and "example.com" not in draft_text
+    assert "INFORMACIÓN DEL CONTRIBUYENTE" not in draft_text
     # Cada captura existe, con su hash; la cadena y los archivos verifican.
     for step in steps:
         if step["capture_path"]:
@@ -188,7 +216,7 @@ def test_login_stops_without_retrying(
     assert detail["status"] == "detenida" and detail["stop_code"] == code, detail
     assert detail["stop_text"]
     assert portal.state.login_attempts == attempts
-    assert portal.state.count("/eset/inicio") == 0
+    assert portal.state.count("/eset/") == 0
     _nothing_submitted(portal)
     first = detail["steps"][0]
     assert first["action"] == "abrir_ingreso" and first["capture_path"]
@@ -217,12 +245,12 @@ def test_unknown_home_is_taken_as_provisional_and_crawled(
     assert "inicio_provisorio" in names
     provisional = next(s for s in steps if s["action"] == "inicio_provisorio")
     assert "inicio provisorio" in provisional["message"]
-    assert provisional["values"]["url"].endswith("/eset/inicio")
+    assert provisional["values"]["url"].endswith("/eset/")
     assert not [s for s in steps if s["result"] == "detenido"], "no se anota como detenido"
     assert names.index("clic") < names.index("inicio_provisorio") < names.index("reconocer_pagina")
     draft_step = next(s for s in steps if s["action"] == "borrador_catalogo")
     draft = yaml.safe_load((bot_env.data_dir / draft_step["capture_path"]).read_text("utf-8"))
-    assert [p["reconoce"]["url"] for p in draft["pantallas"]] == ["/eset/inicio"]
+    assert [p["reconoce"]["url"] for p in draft["pantallas"]] == [recon.url_regex("/eset/")]
     assert draft["pantallas"][0]["id"] == "pantalla_001"
     assert portal.state.logged_out, "sale de Marangatu"
     assert portal.state.login_attempts == 1
@@ -243,7 +271,7 @@ def test_failed_login_with_unknown_message_stops_without_provisional_home(
     assert detail["status"] == "detenida" and detail["stop_code"] == "UNKNOWN_SCREEN", detail
     assert portal.state.login_attempts == 1
     assert "inicio_provisorio" not in actions(detail)
-    assert portal.state.count("/eset/inicio") == 0
+    assert portal.state.count("/eset/") == 0
     assert detail["steps"][-1]["action"] == "detener"
     _nothing_submitted(portal)
 
@@ -263,7 +291,8 @@ def test_logout_without_known_link_does_not_hang(
     assert detail["status"] == "completada", detail
     logout = next(s for s in detail["steps"] if s["action"] == "salir")
     assert logout["result"] == "ok" and "cerrar el navegador" in logout["message"]
-    assert logout["values"] == {"campo": "#salir"}
+    assert logout["values"] == {"campo": "a[href$='/eset/logout']"}
+    assert portal.state.count("/eset/logout") == 0
     assert not portal.state.logged_out
     assert detail["steps"][-1]["action"] == "salir"
 
@@ -302,6 +331,77 @@ def test_final_click_is_never_executed(
     assert end.status == "detenida" and end.stop_code == "NOT_ENABLED"
     assert portal.state.login_attempts == 0
     assert not [s for s in events if isinstance(s, StepEvent) and s.action == "clic"]
+
+
+def _recon_job(folder: Path, portal: FakePortal) -> Job:
+    folder.mkdir(parents=True)
+    return Job(
+        run_id=uuid.uuid4(),
+        kind="reconocimiento",
+        stage="reconocimiento",
+        ruc=RUC,
+        login_url=portal.login_url,
+        capture_dir=str(folder),
+        headless=True,
+        channel=None,
+        max_pages=20,
+        timeout_seconds=90,
+    )
+
+
+def test_without_waiting_the_crawl_misses_links_loaded_by_javascript(
+    bot_env: BotEnv,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sin la espera, el recorrido lee el menú «Recuperando opciones…» y no sigue lo que arma JS:
+    es lo que pasó en el primer reconocimiento real (D-146)."""
+    from app.modules.marangatu import browser, credentials
+
+    credentials.save(RUC, PASSWORD)
+    monkeypatch.setattr(browser, "wait_for_content", lambda *a, **k: None)
+    events: list[StepEvent | EndEvent] = []
+    with FakePortal(password=PASSWORD, user=RUC) as portal:
+        recon.run(_recon_job(bot_env.data_dir / "sin-espera", portal), events.append)
+    assert isinstance(events[-1], EndEvent) and events[-1].status == "completada"
+    assert portal.state.count("/eset/consultas/obligaciones") == 0
+    assert portal.state.count("/eset/buzon/marandu") == 1  # los enlaces ya presentes sí
+
+
+def test_waiting_is_bounded_when_the_loading_text_never_goes_away(
+    bot_env: BotEnv,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un texto de «cargando» que no se va no cuelga la corrida: se lee lo que haya."""
+    from app.modules.marangatu import credentials
+
+    credentials.save(RUC, PASSWORD)
+    monkeypatch.setattr(recon, "CONTENT_WAIT_MS", 800)
+    raw_meta = {**pantallas.META, "cargando": ["Bienvenido al nuevo Marangatu"]}
+    stuck = catalog.build(raw_meta, pantallas.PANTALLAS)
+    events: list[StepEvent | EndEvent] = []
+    started = time.monotonic()
+    with FakePortal(password=PASSWORD, user=RUC, mode="inicio_cambiado") as portal:
+        recon.run(_recon_job(bot_env.data_dir / "tope", portal), events.append, stuck)
+    assert time.monotonic() - started < 40
+    assert isinstance(events[-1], EndEvent) and events[-1].status == "completada"
+
+
+def test_crawl_never_follows_the_logout_link_even_without_the_denylist(
+    bot_env: BotEnv,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La exclusión del enlace de salir no depende de la lista negra ni de que tenga id."""
+    from app.modules.marangatu import credentials
+
+    credentials.save(RUC, PASSWORD)
+    monkeypatch.setattr(recon, "DENYLIST", ())
+    events: list[StepEvent | EndEvent] = []
+    with FakePortal(password=PASSWORD, user=RUC) as portal:
+        recon.run(_recon_job(bot_env.data_dir / "sin-lista", portal), events.append)
+        hits = list(portal.state.hits)
+    assert portal.state.count("/eset/logout") == 1
+    after = hits[hits.index(("GET", "/eset/logout")) + 1 :]
+    assert all(path in ("/favicon.ico", "/eset/login") for _, path in after)
 
 
 def test_worker_crash_does_not_take_down_the_api(

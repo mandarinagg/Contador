@@ -10,9 +10,13 @@ presentar nada.
 2. **Recorrido:** desde el inicio sigue **solo enlaces** (`<a href>`) del mismo sitio, abriendo
    su dirección. **Nunca hace clic** en botones ni envía formularios, y salta los enlaces con
    palabras de la lista negra (presentar, enviar, confirmar, pagar…), las descargas y el de
-   salir. Respeta el máximo de páginas y el tiempo. En el recorrido, una pantalla desconocida
-   no detiene: es lo que se viene a conocer. De cada una guarda la captura y la estructura.
+   salir (por su dirección o su texto, no solo por el id). Antes de leer cada página espera, con
+   tope, a que termine de cargar lo que arma JavaScript (D-146). Respeta el máximo de páginas y
+   el tiempo. En el recorrido, una pantalla desconocida no detiene: es lo que se viene a
+   conocer. De cada una guarda la captura y la estructura.
 3. **Borrador del catálogo:** un YAML con una pantalla por página visitada, para revisar a mano.
+   Reconoce por URL y título (y campos), nunca por textos de la página: pueden traer datos
+   personales (D-146).
 4. **Salida:** sale de Marangatu y cierra el navegador **siempre**, también ante un error.
 """
 
@@ -25,7 +29,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import urldefrag, urlsplit
+from urllib.parse import urldefrag, urljoin, urlsplit
 
 import yaml
 from playwright.sync_api import Error as PlaywrightError
@@ -47,6 +51,8 @@ from app.modules.marangatu.stop_codes import StopCode
 
 logger = logging.getLogger("contador.marangatu.recon")
 
+# Espera (con tope) a que JavaScript termine de armar la página: menú, mensajes (D-146).
+CONTENT_WAIT_MS = 15_000
 HIDDEN = "[oculta]"
 DRAFT_NAME = "catalogo_borrador.yaml"
 # Palabras que nunca se siguen en un enlace (texto o dirección), sin tildes y en minúscula.
@@ -98,6 +104,11 @@ def denied(text: str, href: str) -> bool:
     return any(word in haystack for word in DENYLIST)
 
 
+def url_regex(path: str) -> str:
+    """Expresión que reconoce exactamente ese camino (con o sin consulta), en cualquier sitio."""
+    return rf"^https?://[^/]+{re.escape(path)}(\?|;|$)"
+
+
 def _normalize_url(url: str) -> str:
     return urldefrag(url)[0].rstrip("/")
 
@@ -145,10 +156,28 @@ class Recon:
             )
         )
 
+    def _settle(self, page: Page) -> None:
+        """Espera, con tope y dentro del tiempo de la corrida, el contenido que arma JavaScript."""
+        self._check_time()
+        remaining_ms = int((self.deadline - time.monotonic()) * 1000)
+        browser.wait_for_content(
+            page,
+            self.catalog.loading_texts,
+            timeout_ms=min(CONTENT_WAIT_MS, remaining_ms),
+        )
+
     def _see(
-        self, page: Page, name: str, action: str, *, unknown_stops: bool = True
+        self,
+        page: Page,
+        name: str,
+        action: str,
+        *,
+        unknown_stops: bool = True,
+        settle: bool = False,
     ) -> Screen | None:
         """Captura y reconoce la pantalla actual, y la anota como paso."""
+        if settle:
+            self._settle(page)
         shot = self._capture(page, name)
         screen = recognize(self.catalog, browser.probe(page, self.catalog.selectors()))
         self._step(
@@ -207,7 +236,7 @@ class Recon:
         page.click(action.selector)
         page.wait_for_load_state("domcontentloaded")
         self._step("clic", screen=screen, values={"campo": action.selector, "boton": action.button})
-        reached = self._see(page, "despues-del-clic", "reconocer", unknown_stops=False)
+        reached = self._see(page, "despues-del-clic", "reconocer", unknown_stops=False, settle=True)
         if reached is not None and reached.stops_with is not None:
             raise Stop(reached.stops_with, f"Pantalla {reached.id}")
         if browser.looks_like_captcha(page):
@@ -274,8 +303,10 @@ class Recon:
             return False
         if link.get("descarga") or parts.path.lower().endswith(SKIPPED_EXTENSIONS):
             return False
-        logout_id = self.catalog.logout_selector.lstrip("#")
-        if link.get("id") and link.get("id") == logout_id:
+        # Nunca se sigue el enlace de salir: cerraría la sesión en mitad del recorrido.
+        if self.catalog.is_logout_link(
+            link_id=link.get("id"), text=str(link.get("texto") or ""), href=href
+        ):
             return False
         return not denied(str(link.get("texto") or ""), href)
 
@@ -299,6 +330,7 @@ class Recon:
                         message=str(exc).splitlines()[0][:300],
                     )
                     continue
+            self._settle(page)
             info = browser.structure(page)
             screen = recognize(self.catalog, browser.probe(page, self.catalog.selectors()))
             shot = self._capture(page, "pagina")
@@ -339,9 +371,10 @@ class Recon:
                     "version": known.version + 1 if known else 1,
                     "provisoria": True,
                     "reconoce": {
-                        "url": re.escape(path),
+                        # Solo URL, título y campos: los textos y encabezados pueden traer
+                        # nombres, RUC o números de declaración (D-146).
+                        "url": url_regex(path),
                         "titulo": info["titulo"] or None,
-                        "textos": info["encabezados"][:3],
                         "campos": fields,
                     },
                     "acciones": [],
@@ -393,7 +426,13 @@ class Recon:
                 )
                 self.logged_in = False
                 return
-            page.click(selector)
+            link = page.locator(selector).first
+            href = link.get_attribute("href")
+            if link.is_visible() or not href:
+                link.click()
+            else:
+                # El enlace está en un menú desplegable cerrado: se abre su dirección.
+                page.goto(urljoin(page.url, href), wait_until="domcontentloaded")
             page.wait_for_load_state("domcontentloaded")
             self._step("salir", values={"campo": selector})
             self._see(page, "salida", "reconocer", unknown_stops=False)

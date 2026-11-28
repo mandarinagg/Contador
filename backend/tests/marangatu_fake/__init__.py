@@ -1,16 +1,19 @@
 """Portal simulado de Marangatu para las pruebas (spec §2 y §9). Nunca se toca el portal real.
 
 HTML local (`pages/`) servido por un servidor HTTP en un hilo, en 127.0.0.1 y un puerto libre.
-Imita las pantallas del catálogo PROVISORIO (`docs/research/marangatu_pantallas.yaml`) y anota
-cada pedido, así las pruebas comprueban lo que el bot hizo y lo que **no** hizo (presentar,
-reintentar el ingreso, cambiar la clave…).
+Imita el recorrido real visto el 2026-11-28 (D-146): ingreso, redirección a `/eset/` («Bienvenido |
+MARANGATU») con el menú armado por JavaScript un rato después, cuatro pantallas con sus caminos y
+títulos reales y el enlace «Salir» a `/eset/logout` (sin id). Anota cada pedido, así las
+pruebas comprueban lo que el bot hizo y lo que **no** hizo (presentar, reintentar el ingreso,
+cambiar la clave…).
 
 Modos:
-- `normal`: ingreso, inicio con menú, una consulta, una pantalla fuera del catálogo y salir;
+- `normal`: ingreso, inicio con menú que carga por JavaScript, las pantallas reales, una consulta,
+  una pantalla fuera del catálogo y salir;
 - `captcha`: la pantalla de ingreso ya pide captcha;
 - `login_cambiado`: la pantalla de ingreso cambió (otro título y otros campos);
 - `inicio_cambiado`: después de ingresar aparece un inicio que el catálogo no conoce;
-- `inicio_sin_salir`: igual, y sin enlace para salir (`#salir`);
+- `inicio_sin_salir`: igual, y sin enlace para salir;
 - `login_fallido_desconocido`: el ingreso falla con un mensaje que el catálogo no conoce y la
   página sigue con el formulario de clave.
 
@@ -82,7 +85,7 @@ def _handler(state: PortalState) -> type[BaseHTTPRequestHandler]:
                     "login_cambiado": "login_cambiado.html",
                 }.get(state.mode, "login.html")
                 return self._page(page)
-            if path == "/eset/salir":
+            if path == "/eset/logout":
                 state.logged_out = True
                 return self._page(
                     "salir.html", headers={"Set-Cookie": f"{SESSION_COOKIE}=; Max-Age=0; Path=/"}
@@ -90,12 +93,16 @@ def _handler(state: PortalState) -> type[BaseHTTPRequestHandler]:
             if not self._logged_in():
                 return self._redirect("/eset/login")
             pages = {
-                "/eset/inicio": (
+                "/eset/": (
                     {
                         "inicio_cambiado": "inicio_cambiado.html",
                         "inicio_sin_salir": "inicio_sin_salir.html",
                     }.get(state.mode, "inicio.html")
                 ),
+                "/eset/datosBasicosContribuyente.do": "informacion_contribuyente.html",
+                "/eset/recibirDDJJContribuyente.do": "presentar_declaracion.html",
+                "/eset/mantenerAbmXsl.do": "cuenta_corriente.html",
+                "/eset/buzon/marandu": "marandu.html",
                 "/eset/consultas/obligaciones": "obligaciones.html",
                 "/eset/consultas/novedades": "novedades.html",
             }
@@ -117,7 +124,7 @@ def _handler(state: PortalState) -> type[BaseHTTPRequestHandler]:
             ok = form.get("usuario") == [state.user] and form.get("clave") == [state.password]
             if ok:
                 return self._redirect(
-                    "/eset/inicio", headers={"Set-Cookie": f"{SESSION_COOKIE}=ok; Path=/"}
+                    "/eset/", headers={"Set-Cookie": f"{SESSION_COOKIE}=ok; Path=/"}
                 )
             if state.mode == "login_fallido_desconocido":
                 return self._page("login_fallido_desconocido.html")

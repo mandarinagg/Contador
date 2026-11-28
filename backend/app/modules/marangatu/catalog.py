@@ -13,6 +13,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
+from urllib.parse import urlsplit
 
 from app.modules.marangatu import pantallas
 from app.modules.marangatu.stop_codes import StopCode
@@ -23,6 +24,7 @@ from app.modules.marangatu.stop_codes import StopCode
 FINAL_ACTIONS_ENABLED = False
 
 DATA_KINDS = ("usuario", "clave")
+_HREF_SUFFIX = re.compile(r"""\[href\$=['"]([^'"]+)['"]\]""")
 
 
 class FinalActionBlocked(Exception):
@@ -65,6 +67,10 @@ class Catalog:
     login_screen: str
     home_screen: str
     logout_selector: str
+    logout_text: str = ""
+    # Textos de «cargando» (p. ej. «Recuperando opciones de menú»): mientras estén en la página,
+    # el contenido todavía lo arma JavaScript y el bot espera antes de leerla (D-146).
+    loading_texts: tuple[str, ...] = ()
     meta: dict[str, Any] = field(default_factory=dict)
 
     def screen(self, screen_id: str) -> Screen:
@@ -72,6 +78,16 @@ class Catalog:
             if screen.id == screen_id:
                 return screen
         raise KeyError(screen_id)
+
+    def is_logout_link(self, *, link_id: str | None, text: str, href: str) -> bool:
+        """¿Es el enlace de salir? Por id (`#salir`), por el final de la dirección
+        (`a[href$='/eset/logout']`) o por el texto exacto: el recorrido nunca lo sigue."""
+        if self.logout_selector.startswith("#") and link_id == self.logout_selector[1:]:
+            return True
+        suffix = _HREF_SUFFIX.search(self.logout_selector)
+        if suffix and urlsplit(href).path.rstrip("/").lower().endswith(suffix.group(1).lower()):
+            return True
+        return bool(self.logout_text) and _normalize(text) == _normalize(self.logout_text)
 
     def selectors(self) -> tuple[str, ...]:
         """Todos los selectores que hace falta mirar para reconocer cualquier pantalla."""
@@ -153,6 +169,8 @@ def build(meta: dict[str, Any], screens: Sequence[dict[str, Any]]) -> Catalog:
         login_screen=meta["ingreso"],
         home_screen=meta["inicio"],
         logout_selector=meta["salida"]["campo"],
+        logout_text=str(meta["salida"].get("texto") or ""),
+        loading_texts=tuple(str(t) for t in meta.get("cargando") or ()),
         meta=dict(meta),
     )
     ids = [s.id for s in catalog.screens]

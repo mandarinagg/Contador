@@ -11,10 +11,11 @@
 
 import sys
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Any
 
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Page, sync_playwright
 
 from app.modules.marangatu.catalog import StaticProbe
@@ -64,6 +65,33 @@ def probe(page: Page, selectors: tuple[str, ...]) -> StaticProbe:
         text = ""
     present = frozenset(s for s in selectors if page.locator(s).count() > 0)
     return StaticProbe(url=page.url, title=page.title(), text=text, present=present)
+
+
+_STILL_LOADING_JS = """
+(texts) => {
+  const body = (document.body && document.body.innerText || '').toLowerCase();
+  return !texts.some((t) => body.includes(t));
+}
+"""
+
+
+def wait_for_content(
+    page: Page, loading_texts: tuple[str, ...], *, timeout_ms: int, idle_ms: int = 10_000
+) -> None:
+    """Espera, con límite, a que termine de cargar el contenido que arma JavaScript (D-146).
+
+    Primero la red quieta (`networkidle`, con un tope corto: el portal puede consultar cada
+    tanto y nunca quedar quieto) y después, hasta `timeout_ms`, que ninguno de los textos de
+    «cargando» siga en la página. Los vencimientos no son un error: se lee lo que haya.
+    """
+    timeout_ms = max(0, timeout_ms)
+    with suppress(PlaywrightError):
+        page.wait_for_load_state("networkidle", timeout=min(idle_ms, timeout_ms))
+    texts = [t.casefold() for t in loading_texts if t.strip()]
+    if not texts or timeout_ms <= 0:
+        return
+    with suppress(PlaywrightError):
+        page.wait_for_function(_STILL_LOADING_JS, arg=texts, timeout=timeout_ms)
 
 
 def looks_like_captcha(page: Page) -> bool:

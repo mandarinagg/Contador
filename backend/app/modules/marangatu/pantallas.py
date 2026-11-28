@@ -7,7 +7,8 @@ prueba `tests/test_marangatu_catalog.py::test_packaged_catalog_is_identical_to_r
 compara los dos: si el YAML cambia, la prueba falla hasta regenerar este archivo
 (`scripts/generar_pantallas_marangatu.py`).
 
-PROVISORIO: son las pantallas del portal simulado. Se reemplazan con el reconocimiento real.
+PROVISORIO: el ingreso y cinco pantallas son del portal real (D-145, D-146); el resto, del
+portal simulado. `meta.cargando` lista los textos de «cargando» que el bot espera que se vayan.
 """
 
 from typing import Any
@@ -15,11 +16,12 @@ from typing import Any
 META: dict[str, Any] = {
     "formato": 1,
     "provisorio": True,
-    "aviso": "PROVISORIO: solo el ingreso viene del portal real; el resto es del portal simulado.",
+    "aviso": "PROVISORIO: el ingreso y cinco pantallas vienen del portal real; el resto es del portal simulado.",
     "actualizado": "2026-11-28",
     "ingreso": "login",
     "inicio": "inicio",
-    "salida": {"campo": "#salir", "texto": "Salir"},
+    "salida": {"campo": "a[href$='/eset/logout']", "texto": "Salir"},
+    "cargando": ["Recuperando opciones de menú", "Recuperando Mensajes"],
 }
 
 PANTALLAS: tuple[dict[str, Any], ...] = (
@@ -70,22 +72,61 @@ PANTALLAS: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "inicio",
+        "version": 2,
+        "provisoria": True,
+        "reconoce": {"url": "^https?://[^/]+/eset/(\\?|;|$)", "titulo": "Bienvenido | MARANGATU"},
+        "acciones": [],
+        "capturada_en": "2026-11-28",
+    },
+    {
+        "id": "informacion_contribuyente",
         "version": 1,
         "provisoria": True,
         "reconoce": {
-            "url": "/eset/inicio",
-            "titulo": "Marangatu",
-            "textos": ["Menú principal"],
-            "campos": ["#salir"],
+            "url": "^https?://[^/]+/eset/datosBasicosContribuyente\\.do(\\?|;|$)",
+            "titulo": "Información del Contribuyente | MARANGATU",
         },
         "acciones": [],
-        "capturada_en": None,
+        "capturada_en": "2026-11-28",
+    },
+    {
+        "id": "presentar_declaracion",
+        "version": 1,
+        "provisoria": True,
+        "reconoce": {
+            "url": "^https?://[^/]+/eset/recibirDDJJContribuyente\\.do(\\?|;|$)",
+            "titulo": "Presentar Declaración | MARANGATU",
+        },
+        "acciones": [],
+        "capturada_en": "2026-11-28",
+    },
+    {
+        "id": "cuenta_corriente",
+        "version": 1,
+        "provisoria": True,
+        "reconoce": {
+            "url": "^https?://[^/]+/eset/mantenerAbmXsl\\.do(\\?|;|$)",
+            "titulo": "Consultar Cuenta Corriente Contribuyente | MARANGATU",
+        },
+        "acciones": [],
+        "capturada_en": "2026-11-28",
+    },
+    {
+        "id": "marandu",
+        "version": 1,
+        "provisoria": True,
+        "reconoce": {
+            "url": "^https?://[^/]+/eset/buzon/marandu(\\?|;|$)",
+            "titulo": "Marandu | MARANGATU",
+        },
+        "acciones": [],
+        "capturada_en": "2026-11-28",
     },
     {
         "id": "sesion_cerrada",
         "version": 1,
         "provisoria": True,
-        "reconoce": {"url": "/eset/salir", "textos": ["Sesión finalizada"]},
+        "reconoce": {"url": "/eset/logout", "textos": ["Sesión finalizada"]},
         "acciones": [],
         "capturada_en": None,
     },

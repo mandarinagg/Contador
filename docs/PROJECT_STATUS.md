@@ -100,7 +100,7 @@
 | P-10 | ~~Los asientos traen el id de quien creó/contabilizó, no el nombre~~ | **Resuelto**: en la API (`test_accounting_entry_user_names.py`) y en la interfaz (asiento y libro diario, sin leer `/users`) |
 
 ## Decisiones tomadas en esta sesión
-D-001 a D-145 en `DECISIONS.md` (D-127 a D-133: el B1 del bot de Marangatu; D-145: el ingreso con la página real). **D-007 (facturación como servicio Node) requiere tu confirmación.**
+D-001 a D-146 en `DECISIONS.md` (D-127 a D-133: el B1 del bot de Marangatu; D-145 y D-146: el ingreso y las pantallas reales). **D-007 (facturación como servicio Node) requiere tu confirmación.**
 
 ## Información requerida del propietario
 1. **Confirmar D-007**: reutilizar el núcleo SIFEN como servicio Node (recomendado) en lugar de portarlo a Python.
@@ -128,6 +128,7 @@ D-001 a D-145 en `DECISIONS.md` (D-127 a D-133: el B1 del bot de Marangatu; D-14
 
   Se corre desde `backend/` con `uv run python <script>` y la app abierta. **Sin confirmar si ya se corrió ni si leyó bien la clave** (el script prueba con UTF-16 y con UTF-8). Si hace falta de nuevo, conviene llevarlo al repositorio como comando del backend.
 - **Bot de Marangatu: el reconocimiento no llegaba a escribir (D-145).** Las tres corridas del 2026-11-28 en la PC del propietario se detuvieron con `UNKNOWN_SCREEN` sin ningún intento de ingreso: el catálogo era provisorio (el del portal simulado) y no reconocía la página real. Ahora `login` sale de la página pública real (formulario `loginForm`, botón «Acceder»), el reconocimiento acepta un inicio desconocido como provisorio (sin campo de clave, sin captcha, fuera de la URL de ingreso) y salir no espera un enlace que no se conoce. **Hace falta un instalador nuevo del CI y una nueva corrida del reconocimiento en la PC del propietario.**
+- **Primer reconocimiento real del bot (2026-11-28, D-146).** Dos corridas completas: ingresó, llegó al inicio (`/eset/`) y recorrió 5 páginas (información del contribuyente, presentar declaración, cuenta corriente y Marandu, además del inicio). El menú lateral lo arma JavaScript y el recorrido leyó antes de que cargara; el enlace de salir es `/eset/logout`. Todavía se desconocen el mensaje de clave incorrecta y si aparece captcha. Ahora el catálogo trae esas 5 pantallas (por dirección y título), el bot sale por `/eset/logout`, espera a que cargue el contenido de JavaScript y el borrador no lleva textos personales. **Hace falta un instalador nuevo del CI y una nueva corrida del reconocimiento para capturar el menú completo.**
 - La PC de desarrollo ahora también es esta, con Windows. `uv run` crea `backend/uv.lock`, que no está en el repositorio ni en `.gitignore`.
 
 **Estado de `main` (2026-11-26):** fases 0 a 3B, la fase 4 (tributación), el B1 del bot de Marangatu y el plan **varias organizaciones y persona física** (F0 y M1 a M8, `docs/specs/MULTI_ORG_PERSONA_FISICA.md`, D-134 a D-144) integrados. Pruebas: backend 591 (pytest contra PostgreSQL real, incluidas las `slow`), Vitest 259, E2E 57 (se suman `marangatu` y `organizaciones`). Migraciones hasta `0013_registro_ingresos_egresos`. CI verde en los 5 jobs en todas las etapas; el último, con M8 y el traspaso (`1e24561`, corrida 45759924973), trae el instalador para probar: `gh run download 45759924973 -R mandarinagg/Contador -n contador-ai-windows-instalador`. Pesa 82 MB comprimido (Playwright desde el B1).
@@ -187,6 +188,6 @@ D-001 a D-145 en `DECISIONS.md` (D-127 a D-133: el B1 del bot de Marangatu; D-14
   - Trabajador en otro proceso (`contador-backend.exe marangatu-worker` en el instalador), Playwright con el Edge del sistema en Windows, clave en el Administrador de credenciales.
   - Catálogo **provisorio** (`docs/research/marangatu_pantallas.yaml`, regenerar la copia con `scripts/generar_pantallas_marangatu.py`) y portal simulado en `backend/tests/marangatu_fake/`.
   - Falta: incluir `<datos>/documentos` en la copia de seguridad (D-131); un endpoint para cambiar la etapa de un tipo de tarea (hoy solo se muestra); la E2E usa el almacén de claves falso de `backend/tests/marangatu_fake`.
-  - Sin probar: un reconocimiento real, el detalle de corridas con capturas y «Verificar el registro» con datos vivos; si los menús de Marangatu usan JavaScript, el recorrido no los sigue (D-132).
-- **Hacer el reconocimiento real con el propietario en su PC.** Hace falta para escribir el catálogo: hoy no se conocen las pantallas por dentro.
+  - Sin probar: el detalle de corridas con capturas y «Verificar el registro» con datos vivos. El primer reconocimiento real ya se hizo (D-146); los menús usan JavaScript y ahora se espera a que carguen.
+- **Capturar el menú completo con un segundo reconocimiento real en la PC del propietario** (el primero ya se hizo el 2026-11-28, D-146: 5 páginas). Hace falta el instalador nuevo; con eso se escribe el resto del catálogo (mensaje de clave incorrecta, captcha, pantallas por dentro).
 - **Instalar en la PC real del propietario** (cierra la fase 1B). Sirve para el reconocimiento.

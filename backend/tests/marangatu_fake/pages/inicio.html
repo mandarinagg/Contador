@@ -1,17 +1,40 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><title>Marangatu - Inicio</title></head>
+<html lang="es"><head><meta charset="utf-8"><title>Bienvenido | MARANGATU</title></head>
 <body>
-  <h1>Menú principal</h1>
-  <nav>
-    <a id="menu-obligaciones" href="/eset/consultas/obligaciones">Consultar obligaciones</a>
-    <a href="/eset/consultas/novedades">Novedades</a>
-    <a href="/eset/presentar">Presentar declaración</a>
-    <a href="/eset/configuracion/cambiar-clave">Cambiar clave</a>
-    <a href="/eset/descargas/constancia.pdf">Constancia (PDF)</a>
-    <a href="/eset/descargas/estado" download>Estado de cuenta</a>
-    <a href="#" onclick="document.title='js'">Menú desplegable</a>
-    <a href="javascript:void(0)">Otro menú</a>
-    <a href="https://www.dnit.gov.py/">DNIT</a>
-    <a id="salir" href="/eset/salir">Salir</a>
-  </nav>
+  <!-- Portal simulado: imita el inicio real (2026-11-28). El menú lateral lo arma JavaScript
+       un rato después de cargar la página; mientras tanto dice «Recuperando opciones de menú». -->
+  <header>
+    <a href="/eset/datosBasicosContribuyente.do">Datos del contribuyente</a>
+    <a href="/eset/recibirDDJJContribuyente.do">Declaraciones juradas</a>
+    <a href="/eset/mantenerAbmXsl.do">Cuenta corriente</a>
+    <a href="/eset/buzon/marandu">Buzón</a>
+    <a href="/eset/logout">Salir</a>
+  </header>
+  <nav id="menu"><p id="cargando">Recuperando opciones de menú ...</p></nav>
+  <aside>MARANDU (2)</aside>
+  <script>
+    setTimeout(function () {
+      var items = [
+        ['Consultar obligaciones', '/eset/consultas/obligaciones', 'menu-obligaciones'],
+        ['Novedades', '/eset/consultas/novedades'],
+        ['Presentar declaración', '/eset/presentar'],
+        ['Cambiar clave', '/eset/configuracion/cambiar-clave'],
+        ['Constancia (PDF)', '/eset/descargas/constancia.pdf'],
+        ['Estado de cuenta', '/eset/descargas/estado', null, true],
+        ['Menú desplegable', '#'],
+        ['Otro menú', 'javascript:void(0)'],
+        ['DNIT', 'https://www.dnit.gov.py/']
+      ];
+      var menu = document.getElementById('menu');
+      menu.innerHTML = '';
+      items.forEach(function (item) {
+        var a = document.createElement('a');
+        a.textContent = item[0];
+        a.setAttribute('href', item[1]);
+        if (item[2]) a.id = item[2];
+        if (item[3]) a.setAttribute('download', '');
+        menu.appendChild(a);
+      });
+    }, 3000);
+  </script>
 </body></html>

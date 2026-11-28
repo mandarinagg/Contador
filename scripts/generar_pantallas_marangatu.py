@@ -29,7 +29,8 @@ prueba `tests/test_marangatu_catalog.py::test_packaged_catalog_is_identical_to_r
 compara los dos: si el YAML cambia, la prueba falla hasta regenerar este archivo
 (`scripts/generar_pantallas_marangatu.py`).
 
-PROVISORIO: son las pantallas del portal simulado. Se reemplazan con el reconocimiento real.
+PROVISORIO: el ingreso y cinco pantallas son del portal real (D-145, D-146); el resto, del
+portal simulado. `meta.cargando` lista los textos de «cargando» que el bot espera que se vayan.
 """
 
 from typing import Any

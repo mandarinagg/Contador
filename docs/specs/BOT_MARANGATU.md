@@ -91,7 +91,13 @@ Cada pantalla del catálogo tiene:
     **inicio provisorio** si no tiene campo de clave, no pide captcha y no es la del ingreso; si
     sigue el campo de clave, se detiene con `UNKNOWN_SCREEN` y no se reintenta. Si no se encuentra
     el enlace de salir, lo anota y la sesión se cierra al cerrar el navegador.
-  - Deja un borrador del catálogo (`catalogo_borrador.yaml`) para revisar a mano.
+  - **Pantallas reales y espera (D-146):** el catálogo trae el inicio (`/eset/`) y cuatro pantallas
+    reales, reconocidas solo por dirección y título (sin textos: pueden ser datos personales). Se
+    sale con el enlace «Salir» (`/eset/logout`), que el recorrido nunca sigue. Antes de leer cada
+    página espera, con tope, la red quieta y que desaparezcan los textos de «cargando»
+    (`meta.cargando`), porque el menú lo arma JavaScript.
+  - Deja un borrador del catálogo (`catalogo_borrador.yaml`) para revisar a mano: reconoce por
+    dirección, título y campos, sin textos ni encabezados (D-146).
   - Con eso se escribe el catálogo y el portal simulado.
 - El portal puede cambiar sin aviso (Res. 568/2006, art. 13). Entonces se detiene, y el siguiente
   reconocimiento actualiza el catálogo (con `version` + 1).

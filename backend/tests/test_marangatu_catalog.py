@@ -148,3 +148,79 @@ def test_stop_codes_match_spec_and_migration() -> None:
     module = importlib.util.module_from_spec(loader)
     loader.loader.exec_module(module)
     assert tuple(c.value for c in StopCode) == module.STOP_CODES
+
+
+REAL_PAGES = {
+    "/eset/": ("Bienvenido | MARANGATU", "inicio"),
+    "/eset/?lang=es": ("Bienvenido | MARANGATU", "inicio"),
+    "/eset/datosBasicosContribuyente.do": (
+        "Información del Contribuyente | MARANGATU",
+        "informacion_contribuyente",
+    ),
+    "/eset/recibirDDJJContribuyente.do": (
+        "Presentar Declaración | MARANGATU",
+        "presentar_declaracion",
+    ),
+    "/eset/mantenerAbmXsl.do": (
+        "Consultar Cuenta Corriente Contribuyente | MARANGATU",
+        "cuenta_corriente",
+    ),
+    "/eset/buzon/marandu": ("Marandu | MARANGATU", "marandu"),
+}
+
+
+@pytest.mark.parametrize("path", sorted(REAL_PAGES))
+def test_real_pages_are_recognized_by_url_and_title_only(path: str) -> None:
+    """Las pantallas reales (D-146) no dependen de los textos de la página: pueden traer datos
+    personales. Cada una se reconoce sola, y el ingreso no se confunde con el inicio."""
+    title, expected = REAL_PAGES[path]
+    packaged = catalog.packaged()
+    for text in ("", "Recuperando opciones de menú ...", "cualquier texto"):
+        probe = StaticProbe(f"https://marangatu.example{path}", title, text, frozenset())
+        screen = recognize(packaged, probe)
+        assert screen is not None and screen.id == expected, (path, text)
+    # Otro título, o un camino parecido, no coincide.
+    other = StaticProbe(f"https://x.test{path}", "Otro", "", frozenset())
+    assert recognize(packaged, other) is None
+    similar = ("?" not in path) * [f"https://x.test{path}x"] + [f"https://x.test/otro{path}"]
+    for url in similar:
+        assert recognize(packaged, StaticProbe(url, title, "", frozenset())) is None
+
+
+def test_real_screens_have_no_texts_and_the_login_is_not_the_home() -> None:
+    packaged = catalog.packaged()
+    real = {s for _, s in REAL_PAGES.values()}
+    for screen_id in real:
+        screen = packaged.screen(screen_id)
+        assert screen.recognition.texts == () and screen.recognition.url
+        assert screen.actions == () and screen.provisional
+    # La URL de cualquier otra pantalla de /eset/ no es el inicio.
+    home = packaged.screen("inicio")
+    other = StaticProbe("https://x.test/eset/login", "Bienvenido | MARANGATU", "", frozenset())
+    assert not catalog.matches(home, other)
+    assert recognize(packaged, other) is None  # el ingreso real exige además sus campos
+    assert recognize(packaged, LOGIN) is not None and recognize(packaged, LOGIN).id == "login"  # type: ignore[union-attr]
+
+
+def test_logout_link_is_the_real_one() -> None:
+    packaged = catalog.packaged()
+    assert packaged.logout_selector == "a[href$='/eset/logout']"
+    assert packaged.logout_text == "Salir"
+    # Por dirección, aunque el texto cambie, y por texto, aunque cambie la dirección.
+    assert packaged.is_logout_link(link_id=None, text="Cerrar", href="https://x.test/eset/logout")
+    assert packaged.is_logout_link(link_id=None, text=" salir ", href="https://x.test/otra")
+    assert not packaged.is_logout_link(link_id=None, text="Marandu", href="https://x.test/eset/")
+    # Con selector por id, también.
+    by_id = build({**pantallas.META, "salida": {"campo": "#salir"}}, pantallas.PANTALLAS)
+    assert by_id.is_logout_link(link_id="salir", text="x", href="/a")
+
+
+def test_loading_texts_come_from_the_catalog_meta() -> None:
+    packaged = catalog.packaged()
+    assert packaged.loading_texts == (
+        "Recuperando opciones de menú",
+        "Recuperando Mensajes",
+    )
+    assert pantallas.META["cargando"] == list(packaged.loading_texts)
+    without = {k: v for k, v in pantallas.META.items() if k != "cargando"}
+    assert build(without, pantallas.PANTALLAS).loading_texts == ()
