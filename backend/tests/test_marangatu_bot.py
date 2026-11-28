@@ -26,7 +26,7 @@ from app.modules.marangatu.protocol import EndEvent, Job, StepEvent
 from app.modules.marangatu.recon import denied
 from tests.conftest import auth_header
 from tests.finance_utils import ok
-from tests.marangatu_fake import FakePortal
+from tests.marangatu_fake import LOGIN_POSTS, FakePortal
 from tests.marangatu_utils import (
     MARANGATU,
     PASSWORD,
@@ -51,7 +51,7 @@ def _nothing_submitted(portal: FakePortal) -> None:
     for path in NOT_DONE:
         assert portal.state.count(path) == 0, path
     assert portal.state.received_forms == []
-    assert all(method == "GET" or path == "/eset/login" for method, path in portal.state.hits)
+    assert all(method == "GET" or path in LOGIN_POSTS for method, path in portal.state.hits)
 
 
 def test_reconnaissance_happy_path(
@@ -200,7 +200,55 @@ def test_login_stops_without_retrying(
     assert detail["steps"][-1]["action"] == "detener"
 
 
-def test_unknown_home_stops_and_logs_out(
+def test_unknown_home_is_taken_as_provisional_and_crawled(
+    client: TestClient,
+    owner_token: str,
+    db: Session,
+    bot_env: BotEnv,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D-145: un inicio desconocido, sin campo de clave, sirve para reconocer (y se sale)."""
+    enable_bot(client, owner_token)
+    with FakePortal(password=PASSWORD, user=RUC, mode="inicio_cambiado") as portal:
+        detail = start_and_supervise(client, owner_token, db, portal.login_url, monkeypatch)
+    assert detail["status"] == "completada", detail
+    steps = detail["steps"]
+    names = actions(detail)
+    assert "inicio_provisorio" in names
+    provisional = next(s for s in steps if s["action"] == "inicio_provisorio")
+    assert "inicio provisorio" in provisional["message"]
+    assert provisional["values"]["url"].endswith("/eset/inicio")
+    assert not [s for s in steps if s["result"] == "detenido"], "no se anota como detenido"
+    assert names.index("clic") < names.index("inicio_provisorio") < names.index("reconocer_pagina")
+    draft_step = next(s for s in steps if s["action"] == "borrador_catalogo")
+    draft = yaml.safe_load((bot_env.data_dir / draft_step["capture_path"]).read_text("utf-8"))
+    assert [p["reconoce"]["url"] for p in draft["pantallas"]] == ["/eset/inicio"]
+    assert draft["pantallas"][0]["id"] == "pantalla_001"
+    assert portal.state.logged_out, "sale de Marangatu"
+    assert portal.state.login_attempts == 1
+    _nothing_submitted(portal)
+
+
+def test_failed_login_with_unknown_message_stops_without_provisional_home(
+    client: TestClient,
+    owner_token: str,
+    db: Session,
+    bot_env: BotEnv,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Si sigue el campo de clave, es un ingreso fallido: un solo intento y se detiene."""
+    enable_bot(client, owner_token, password="otra-clave")
+    with FakePortal(password=PASSWORD, user=RUC, mode="login_fallido_desconocido") as portal:
+        detail = start_and_supervise(client, owner_token, db, portal.login_url, monkeypatch)
+    assert detail["status"] == "detenida" and detail["stop_code"] == "UNKNOWN_SCREEN", detail
+    assert portal.state.login_attempts == 1
+    assert "inicio_provisorio" not in actions(detail)
+    assert portal.state.count("/eset/inicio") == 0
+    assert detail["steps"][-1]["action"] == "detener"
+    _nothing_submitted(portal)
+
+
+def test_logout_without_known_link_does_not_hang(
     client: TestClient,
     owner_token: str,
     db: Session,
@@ -208,14 +256,16 @@ def test_unknown_home_stops_and_logs_out(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     enable_bot(client, owner_token)
-    with FakePortal(password=PASSWORD, user=RUC, mode="inicio_cambiado") as portal:
+    started = time.monotonic()
+    with FakePortal(password=PASSWORD, user=RUC, mode="inicio_sin_salir") as portal:
         detail = start_and_supervise(client, owner_token, db, portal.login_url, monkeypatch)
-    assert detail["stop_code"] == "UNKNOWN_SCREEN", detail
-    unknown = [s for s in detail["steps"] if s["result"] == "detenido" and s["capture_path"]]
-    assert unknown, "la pantalla desconocida queda con su captura"
-    assert portal.state.logged_out, "sale de Marangatu también al detenerse"
-    assert portal.state.login_attempts == 1
-    _nothing_submitted(portal)
+    assert time.monotonic() - started < 60
+    assert detail["status"] == "completada", detail
+    logout = next(s for s in detail["steps"] if s["action"] == "salir")
+    assert logout["result"] == "ok" and "cerrar el navegador" in logout["message"]
+    assert logout["values"] == {"campo": "#salir"}
+    assert not portal.state.logged_out
+    assert detail["steps"][-1]["action"] == "salir"
 
 
 @pytest.mark.parametrize("stage", ["reconocimiento", "ensayo", "habilitada"])

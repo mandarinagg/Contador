@@ -86,6 +86,11 @@ Cada pantalla del catálogo tiene:
     botones ni envía formularios, y salta los enlaces con palabras como «Presentar», «Enviar»,
     «Confirmar» o «Pagar», las descargas y el de salir. Una pantalla desconocida no lo detiene en
     el recorrido (es lo que viene a conocer), pero sí en el ingreso (D-132).
+  - **Ingreso e inicio (D-145):** la pantalla de ingreso del catálogo es la página real (formulario
+    `loginForm`, botón «Acceder»). Después del clic, una pantalla desconocida solo se toma como
+    **inicio provisorio** si no tiene campo de clave, no pide captcha y no es la del ingreso; si
+    sigue el campo de clave, se detiene con `UNKNOWN_SCREEN` y no se reintenta. Si no se encuentra
+    el enlace de salir, lo anota y la sesión se cierra al cerrar el navegador.
   - Deja un borrador del catálogo (`catalogo_borrador.yaml`) para revisar a mano.
   - Con eso se escribe el catálogo y el portal simulado.
 - El portal puede cambiar sin aviso (Res. 568/2006, art. 13). Entonces se detiene, y el siguiente

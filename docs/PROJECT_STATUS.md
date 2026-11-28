@@ -100,7 +100,7 @@
 | P-10 | ~~Los asientos traen el id de quien creó/contabilizó, no el nombre~~ | **Resuelto**: en la API (`test_accounting_entry_user_names.py`) y en la interfaz (asiento y libro diario, sin leer `/users`) |
 
 ## Decisiones tomadas en esta sesión
-D-001 a D-133 en `DECISIONS.md` (D-127 a D-133: el B1 del bot de Marangatu). **D-007 (facturación como servicio Node) requiere tu confirmación.**
+D-001 a D-145 en `DECISIONS.md` (D-127 a D-133: el B1 del bot de Marangatu; D-145: el ingreso con la página real). **D-007 (facturación como servicio Node) requiere tu confirmación.**
 
 ## Información requerida del propietario
 1. **Confirmar D-007**: reutilizar el núcleo SIFEN como servicio Node (recomendado) en lugar de portarlo a Python.
@@ -127,6 +127,7 @@ D-001 a D-133 en `DECISIONS.md` (D-127 a D-133: el B1 del bot de Marangatu). **D
   - revoca las sesiones en `core.user_sessions`.
 
   Se corre desde `backend/` con `uv run python <script>` y la app abierta. **Sin confirmar si ya se corrió ni si leyó bien la clave** (el script prueba con UTF-16 y con UTF-8). Si hace falta de nuevo, conviene llevarlo al repositorio como comando del backend.
+- **Bot de Marangatu: el reconocimiento no llegaba a escribir (D-145).** Las tres corridas del 2026-11-28 en la PC del propietario se detuvieron con `UNKNOWN_SCREEN` sin ningún intento de ingreso: el catálogo era provisorio (el del portal simulado) y no reconocía la página real. Ahora `login` sale de la página pública real (formulario `loginForm`, botón «Acceder»), el reconocimiento acepta un inicio desconocido como provisorio (sin campo de clave, sin captcha, fuera de la URL de ingreso) y salir no espera un enlace que no se conoce. **Hace falta un instalador nuevo del CI y una nueva corrida del reconocimiento en la PC del propietario.**
 - La PC de desarrollo ahora también es esta, con Windows. `uv run` crea `backend/uv.lock`, que no está en el repositorio ni en `.gitignore`.
 
 **Estado de `main` (2026-11-26):** fases 0 a 3B, la fase 4 (tributación), el B1 del bot de Marangatu y el plan **varias organizaciones y persona física** (F0 y M1 a M8, `docs/specs/MULTI_ORG_PERSONA_FISICA.md`, D-134 a D-144) integrados. Pruebas: backend 591 (pytest contra PostgreSQL real, incluidas las `slow`), Vitest 259, E2E 57 (se suman `marangatu` y `organizaciones`). Migraciones hasta `0013_registro_ingresos_egresos`. CI verde en los 5 jobs en todas las etapas; el último, con M8 y el traspaso (`1e24561`, corrida 45759924973), trae el instalador para probar: `gh run download 45759924973 -R mandarinagg/Contador -n contador-ai-windows-instalador`. Pesa 82 MB comprimido (Playwright desde el B1).

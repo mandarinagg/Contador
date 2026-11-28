@@ -28,9 +28,9 @@ MIGRATION = os.path.join(BACKEND_DIR, "migrations", "versions", "0007_marangatu.
 
 LOGIN = StaticProbe(
     url="https://marangatu.example/eset/login",
-    title="Marangatu - Ingreso",
-    text="Ingreso al sistema  Usuario Contraseña",
-    present=frozenset({"#usuario", "#clave", "#ingresar"}),
+    title="Bienvenido | MARANGATU",
+    text="Acceder  ¿ Olvidó su contraseña ?  ¿ Quiere saber más sobre Marangatu ?",
+    present=frozenset({"#usuario", "#clave", "form[name=loginForm] button[type=submit]"}),
 )
 
 
@@ -64,6 +64,26 @@ def test_recognition_needs_everything() -> None:
         StaticProbe("https://marangatu.example/eset/otra", LOGIN.title, LOGIN.text, LOGIN.present),
     ):
         assert recognize(packaged, probe) is None
+
+
+def test_real_login_page_is_recognized_as_login() -> None:
+    """Forma de la página real (leída el 2026-11-28): sin etiquetas, botón «Acceder» sin id."""
+    real = StaticProbe(
+        url="https://marangatu.set.gov.py/eset/login",
+        title="Bienvenido | MARANGATU",
+        text="Acceder  ¿ Olvidó su contraseña ?  ¿ Quiere saber más sobre Marangatu ?",
+        present=frozenset(
+            {"#usuario", "#clave", "form[name=loginForm] button[type=submit]", "#usuarioRecuperar"}
+        ),
+    )
+    screen = recognize(catalog.packaged(), real)
+    assert screen is not None and screen.id == "login" and screen.version == 2
+    assert [a.selector for a in screen.actions] == [
+        "#usuario",
+        "#clave",
+        "form[name=loginForm] button[type=submit]",
+    ]
+    assert screen.actions[2].button == "Acceder"
 
 
 def test_stopping_screen_wins() -> None:

@@ -1,12 +1,11 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><title>Marangatu - Ingreso</title></head>
+<html lang="es"><head><meta charset="utf-8"><title>Bienvenido | MARANGATU</title></head>
 <body>
-  <h1>Ingreso al sistema</h1>
-  <!-- Portal simulado: imita la pantalla de ingreso del catálogo PROVISORIO. -->
-  <form method="post" action="/eset/login">
-    <label for="usuario">Usuario</label> <input id="usuario" name="usuario" type="text">
-    <label for="clave">Contraseña</label> <input id="clave" name="clave" type="password">
-    <button id="ingresar" type="submit">Ingresar</button>
+  <!-- Portal simulado: imita la estructura de la página de ingreso real (leída el 2026-11-28). -->
+  <form name="loginForm" method="post" action="authenticate">
+    <input type="text" class="form-control" id="usuario" name="usuario" value="" placeholder="Usuario">
+    <input type="password" class="form-control" id="clave" name="clave" placeholder="Contraseña">
+    <button type="submit" class="btn btn-primary btn-lg btn-block">Acceder</button>
   </form>
-  <a href="/eset/olvide">¿Olvidó su clave?</a>
+  <button type="button">¿ Olvidó su contraseña ?</button>
 </body></html>

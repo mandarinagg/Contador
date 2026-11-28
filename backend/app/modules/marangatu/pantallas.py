@@ -15,8 +15,8 @@ from typing import Any
 META: dict[str, Any] = {
     "formato": 1,
     "provisorio": True,
-    "aviso": "PROVISORIO: pantallas del portal simulado; reemplazar tras el reconocimiento real.",
-    "actualizado": "2026-11-25",
+    "aviso": "PROVISORIO: solo el ingreso viene del portal real; el resto es del portal simulado.",
+    "actualizado": "2026-11-28",
     "ingreso": "login",
     "inicio": "inicio",
     "salida": {"campo": "#salir", "texto": "Salir"},
@@ -25,34 +25,37 @@ META: dict[str, Any] = {
 PANTALLAS: tuple[dict[str, Any], ...] = (
     {
         "id": "login",
-        "version": 1,
+        "version": 2,
         "provisoria": True,
         "reconoce": {
             "url": "/eset/login",
             "titulo": "Marangatu",
-            "textos": ["Ingreso al sistema", "Usuario", "Contraseña"],
-            "campos": ["#usuario", "#clave", "#ingresar"],
+            "textos": ["Acceder"],
+            "campos": ["#usuario", "#clave", "form[name=loginForm] button[type=submit]"],
         },
         "acciones": [
             {"llenar": {"dato": "usuario", "campo": "#usuario"}},
             {"llenar": {"dato": "clave", "campo": "#clave"}},
             {
                 "clic": {
-                    "boton": "Ingresar",
-                    "campo": "#ingresar",
+                    "boton": "Acceder",
+                    "campo": "form[name=loginForm] button[type=submit]",
                     "va_a": ["inicio", "login_fallido", "login_captcha"],
                     "final": False,
                 }
             },
         ],
-        "capturada_en": None,
+        "capturada_en": "2026-11-28",
     },
     {
         "id": "login_fallido",
         "version": 1,
         "provisoria": True,
         "detiene": "LOGIN_FAILED",
-        "reconoce": {"url": "/eset/login", "textos": ["Usuario o contraseña incorrectos"]},
+        "reconoce": {
+            "url": "/eset/(login|authenticate)",
+            "textos": ["Usuario o contraseña incorrectos"],
+        },
         "acciones": [],
         "capturada_en": None,
     },
@@ -61,7 +64,7 @@ PANTALLAS: tuple[dict[str, Any], ...] = (
         "version": 1,
         "provisoria": True,
         "detiene": "CAPTCHA",
-        "reconoce": {"url": "/eset/login", "textos": ["No soy un robot"]},
+        "reconoce": {"url": "/eset/(login|authenticate)", "textos": ["No soy un robot"]},
         "acciones": [],
         "capturada_en": None,
     },

@@ -1,9 +1,10 @@
 # Catálogo de pantallas de Marangatu (docs/specs/BOT_MARANGATU.md §3).
 #
-# ⚠ PROVISORIO. Hoy no se conocen las pantallas reales de Marangatu por dentro: estas son las
-# del portal simulado (backend/tests/marangatu_fake/), armadas con lo poco que dicen las guías
-# de la DNIT (usuario = RUC sin DV, clave, captcha al tercer intento fallido). Se reemplazan
-# con el borrador que deja el reconocimiento real (spec §10, paso 2), revisado a mano.
+# ⚠ PROVISORIO. Solo la pantalla de ingreso (`login`) viene de la página real, pública, leída el
+# 2026-11-28 (D-145). Las demás (ingreso fallido, captcha, inicio, sesión cerrada) todavía son
+# las del portal simulado (backend/tests/marangatu_fake/), armadas con lo poco que dicen las
+# guías de la DNIT (usuario = RUC sin DV, clave, captcha al tercer intento fallido). Se
+# reemplazan con el borrador que deja el reconocimiento real (spec §10, paso 2), revisado a mano.
 #
 # La copia empaquetada es backend/app/modules/marangatu/pantallas.py: una prueba controla que
 # sean idénticas (si este archivo cambia, hay que regenerar la copia).
@@ -27,8 +28,8 @@
 meta:
   formato: 1
   provisorio: true
-  aviso: "PROVISORIO: pantallas del portal simulado; reemplazar tras el reconocimiento real."
-  actualizado: "2026-11-25"
+  aviso: "PROVISORIO: solo el ingreso viene del portal real; el resto es del portal simulado."
+  actualizado: "2026-11-28"
   ingreso: login
   inicio: inicio
   # Enlace para salir de Marangatu desde cualquier pantalla con la sesión abierta.
@@ -37,28 +38,31 @@ meta:
     texto: "Salir"
 pantallas:
   - id: login
-    version: 1
+    version: 2
     provisoria: true
+    # Reconocimiento tomado de la página de ingreso real y pública, leída el 2026-11-28: título
+    # «Bienvenido | MARANGATU», formulario `loginForm`, campos con placeholder (sin etiquetas) y
+    # botón «Acceder» sin id.
     reconoce:
       url: "/eset/login"
       titulo: "Marangatu"
-      textos: ["Ingreso al sistema", "Usuario", "Contraseña"]
-      campos: ["#usuario", "#clave", "#ingresar"]
+      textos: ["Acceder"]
+      campos: ["#usuario", "#clave", "form[name=loginForm] button[type=submit]"]
     acciones:
       - llenar: {dato: usuario, campo: "#usuario"}
       - llenar: {dato: clave, campo: "#clave"}
       - clic:
-          boton: "Ingresar"
-          campo: "#ingresar"
+          boton: "Acceder"
+          campo: "form[name=loginForm] button[type=submit]"
           va_a: [inicio, login_fallido, login_captcha]
           final: false
-    capturada_en: null
+    capturada_en: "2026-11-28"
   - id: login_fallido
     version: 1
     provisoria: true
     detiene: LOGIN_FAILED
     reconoce:
-      url: "/eset/login"
+      url: "/eset/(login|authenticate)"
       textos: ["Usuario o contraseña incorrectos"]
     acciones: []
     capturada_en: null
@@ -67,7 +71,7 @@ pantallas:
     provisoria: true
     detiene: CAPTCHA
     reconoce:
-      url: "/eset/login"
+      url: "/eset/(login|authenticate)"
       textos: ["No soy un robot"]
     acciones: []
     capturada_en: null

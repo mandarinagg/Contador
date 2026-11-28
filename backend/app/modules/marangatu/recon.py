@@ -4,8 +4,9 @@ presentar nada.
 1. **Ingreso** (un solo intento): abre la pantalla de ingreso, la captura **antes** de escribir
    la clave y la reconoce con el catálogo. Solo hace las acciones del catálogo para esa
    pantalla. Después del clic reconoce a dónde llegó: el inicio sigue; el ingreso fallido o el
-   captcha detienen (`LOGIN_FAILED`, `CAPTCHA`) y **no se reintenta**; lo desconocido detiene
-   con `UNKNOWN_SCREEN`.
+   captcha detienen (`LOGIN_FAILED`, `CAPTCHA`) y **no se reintenta**. Una pantalla desconocida
+   se toma como **inicio provisorio** (D-145) solo si no tiene campo de clave, no pide captcha
+   y no es la del ingreso; si no, detiene con `UNKNOWN_SCREEN`.
 2. **Recorrido:** desde el inicio sigue **solo enlaces** (`<a href>`) del mismo sitio, abriendo
    su dirección. **Nunca hace clic** en botones ni envía formularios, y salta los enlaces con
    palabras de la lista negra (presentar, enviar, confirmar, pagar…), las descargas y el de
@@ -110,6 +111,7 @@ class Recon:
         self.deadline = time.monotonic() + job.timeout_seconds
         self.counter = 0
         self.logged_in = False
+        self.provisional_home = False
         self.home_url: str | None = None
         self.pages: list[dict[str, Any]] = []
 
@@ -205,14 +207,42 @@ class Recon:
         page.click(action.selector)
         page.wait_for_load_state("domcontentloaded")
         self._step("clic", screen=screen, values={"campo": action.selector, "boton": action.button})
-        reached = self._see(page, "despues-del-clic", "reconocer")
+        reached = self._see(page, "despues-del-clic", "reconocer", unknown_stops=False)
         if reached is not None and reached.stops_with is not None:
             raise Stop(reached.stops_with, f"Pantalla {reached.id}")
         if browser.looks_like_captcha(page):
             raise Stop(StopCode.CAPTCHA, "Marangatu pide captcha")
-        if reached is None or reached.id not in action.goes_to:
+        if reached is None:
+            if self._provisional_home(page):
+                return None
             raise Stop(StopCode.UNKNOWN_SCREEN, "Pantalla desconocida después del clic")
+        if reached.id not in action.goes_to:
+            raise Stop(
+                StopCode.UNKNOWN_SCREEN, f"Pantalla {reached.id} no esperada después del clic"
+            )
         return reached
+
+    def _provisional_home(self, page: Page) -> bool:
+        """¿La pantalla desconocida tras el clic de ingreso es un inicio? (D-145)
+
+        Solo si no tiene campo de clave visible (si lo tiene, lo más probable es un ingreso
+        fallido con un mensaje que todavía no se conoce), no pide captcha y no es la URL del
+        ingreso. Si lo es, lo anota como paso y el recorrido sigue desde ahí.
+        """
+        if page.locator("input[type=password]:visible").count() > 0:
+            return False
+        if browser.looks_like_captcha(page):
+            return False
+        login = self.catalog.screen(self.catalog.login_screen)
+        if login.recognition.url and re.search(login.recognition.url, page.url):
+            return False
+        self._step(
+            "inicio_provisorio",
+            values={"url": page.url},
+            message="Inicio desconocido: se toma como inicio provisorio para el reconocimiento",
+        )
+        self.provisional_home = True
+        return True
 
     def login(self, page: Page) -> None:
         page.goto(self.job.login_url, wait_until="domcontentloaded")
@@ -228,7 +258,9 @@ class Recon:
         for action in screen.actions:
             self._check_time()
             reached = self._do(page, screen, action) or reached
-        if reached is None or reached.id != self.catalog.home_screen:
+        if not self.provisional_home and (
+            reached is None or reached.id != self.catalog.home_screen
+        ):
             raise Stop(StopCode.UNKNOWN_SCREEN, "El ingreso no llegó al inicio")
         self.logged_in = True
         self.home_url = page.url
@@ -351,6 +383,16 @@ class Recon:
                 return
             if page.locator(selector).count() == 0 and self.home_url:
                 page.goto(self.home_url, wait_until="domcontentloaded")
+            if page.locator(selector).count() == 0:
+                # No se conoce el enlace de salir: sin él no se espera un tiempo de más.
+                self._step(
+                    "salir",
+                    values={"campo": selector},
+                    message="No se encontró el enlace para salir; la sesión se cierra al "
+                    "cerrar el navegador",
+                )
+                self.logged_in = False
+                return
             page.click(selector)
             page.wait_for_load_state("domcontentloaded")
             self._step("salir", values={"campo": selector})

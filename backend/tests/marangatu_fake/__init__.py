@@ -9,7 +9,13 @@ Modos:
 - `normal`: ingreso, inicio con menú, una consulta, una pantalla fuera del catálogo y salir;
 - `captcha`: la pantalla de ingreso ya pide captcha;
 - `login_cambiado`: la pantalla de ingreso cambió (otro título y otros campos);
-- `inicio_cambiado`: después de ingresar aparece un inicio que el catálogo no conoce.
+- `inicio_cambiado`: después de ingresar aparece un inicio que el catálogo no conoce;
+- `inicio_sin_salir`: igual, y sin enlace para salir (`#salir`);
+- `login_fallido_desconocido`: el ingreso falla con un mensaje que el catálogo no conoce y la
+  página sigue con el formulario de clave.
+
+El formulario de ingreso manda a `authenticate` (relativo, como el real); `/eset/login` también
+se acepta.
 """
 
 import threading
@@ -21,6 +27,7 @@ from urllib.parse import parse_qs
 
 PAGES = Path(__file__).parent / "pages"
 SESSION_COOKIE = "MARANGATU_SIMULADO"
+LOGIN_POSTS = ("/eset/login", "/eset/authenticate")
 
 
 @dataclass
@@ -84,7 +91,10 @@ def _handler(state: PortalState) -> type[BaseHTTPRequestHandler]:
                 return self._redirect("/eset/login")
             pages = {
                 "/eset/inicio": (
-                    "inicio_cambiado.html" if state.mode == "inicio_cambiado" else "inicio.html"
+                    {
+                        "inicio_cambiado": "inicio_cambiado.html",
+                        "inicio_sin_salir": "inicio_sin_salir.html",
+                    }.get(state.mode, "inicio.html")
                 ),
                 "/eset/consultas/obligaciones": "obligaciones.html",
                 "/eset/consultas/novedades": "novedades.html",
@@ -100,7 +110,7 @@ def _handler(state: PortalState) -> type[BaseHTTPRequestHandler]:
             state.hits.append(("POST", path))
             length = int(self.headers.get("Content-Length") or 0)
             form = parse_qs(self.rfile.read(length).decode("utf-8"))
-            if path != "/eset/login":
+            if path not in LOGIN_POSTS:
                 state.received_forms.append(form)
                 return self._send(200, b"<html><body><h1>Presentado</h1></body></html>")
             state.login_attempts += 1
@@ -109,6 +119,8 @@ def _handler(state: PortalState) -> type[BaseHTTPRequestHandler]:
                 return self._redirect(
                     "/eset/inicio", headers={"Set-Cookie": f"{SESSION_COOKIE}=ok; Path=/"}
                 )
+            if state.mode == "login_fallido_desconocido":
+                return self._page("login_fallido_desconocido.html")
             return self._page("login_fallido.html")
 
     return Handler
